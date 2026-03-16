@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+const User = require("../models/resident");
 const PendingRegistration = require("../models/Register");
 const { sendOTPEmail, sendWelcomeEmail } = require("../services/mailer");
 const { generateOTP } = require("../utils/otpGenerator");

@@ -12,6 +12,7 @@ const PendingRegistrationSchema = new mongoose.Schema(
       minlength: [2, "Full name must be at least 2 characters"],
       maxlength: [100, "Full name must not exceed 100 characters"],
     },
+
     email: {
       type: String,
       required: [true, "Email is required"],
@@ -21,12 +22,14 @@ const PendingRegistrationSchema = new mongoose.Schema(
       match: [/^\S+@\S+\.\S+$/, "Please provide a valid email address"],
       index: true,
     },
+
     password: {
       type: String,
       required: [true, "Password is required"],
       minlength: [8, "Password must be at least 8 characters"],
       select: false,
     },
+
     gender: {
       type: String,
       enum: {
@@ -35,16 +38,19 @@ const PendingRegistrationSchema = new mongoose.Schema(
       },
       required: [true, "Gender is required"],
     },
+
     dateOfBirth: {
       type: Date,
       required: [true, "Date of birth is required"],
     },
+
     address: {
       type: String,
       required: [true, "Address is required"],
       trim: true,
       maxlength: [255, "Address must not exceed 255 characters"],
     },
+
     role: {
       type: String,
       enum: {
@@ -53,17 +59,13 @@ const PendingRegistrationSchema = new mongoose.Schema(
       },
       default: "resident",
     },
-    organizationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Organization",
-      required: false,
-    },
- 
+
     otp: {
       type: String,
       required: false,
       select: false,
     },
+
     otpExpires: {
       type: Date,
       required: false, 

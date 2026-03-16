@@ -1,10 +1,11 @@
-const Resident = require("../models/User");
+const Resident = require("../models/resident");
 
 const ADMIN_EMAIL = "maslog@admin.gov.ph";
 const ADMIN_SEED = {
   fullname: "Justin Valladolid",
   dateOfBirth: new Date("2005-04-16"),
   email: ADMIN_EMAIL,
+  photo: "",
   password: process.env.ADMIN_DEFAULT_PASSWORD || "MaslogAdmin@2025",
   verified: true,
   role: "admin",

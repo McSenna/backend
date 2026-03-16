@@ -1,6 +1,6 @@
 "use strict";
 const { transporter, hasCredentials } = require("../config");
-const { generateAppointmentConfirmationHTML, generateAppointmentReminderHTML } = require("../templates/appointment");
+const { generateAppointmentConfirmationHTML, generateAppointmentReminderHTML } = require("../templates/appointmentTemplate");
 const { buildAttachments } = require("../assets");
 
 const sendAppointmentConfirmationEmail = async (email, fullname = "User", appointmentDetails = {}) => {

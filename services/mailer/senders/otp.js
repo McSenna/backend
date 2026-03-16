@@ -1,6 +1,6 @@
 "use strict";
 const { transporter, hasCredentials } = require("../config");
-const { generateOTPEmailHTML } = require("../templates/otp");
+const { generateOTPEmailHTML } = require("../templates/otpTemplate");
 const { buildAttachments } = require("../assets");
 
 const sendOTPEmail = async (email, otp, fullname = "User") => {
@@ -14,7 +14,9 @@ const sendOTPEmail = async (email, otp, fullname = "User") => {
       to:          email,
       subject:     "MaslogCare – Your Verification Code",
       html:        generateOTPEmailHTML(fullname, otp),
-      text:        `Your MaslogCare verification code is: ${otp}\n\nExpires in 5 minutes. Do not share this code.\nIf you did not request this, please ignore this message.`,
+      text:        `Your MaslogCare verification code is: ${otp}\n\n
+                    Expires in 5 minutes. Do not share this code.\n
+                    If you did not request this, please ignore this message.`,
       attachments: buildAttachments("logo", "heroOtp"),
     });
     console.log("✅ OTP email sent:", info.response);

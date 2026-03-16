@@ -1,6 +1,6 @@
 "use strict";
 const { transporter, hasCredentials } = require("../config");
-const { generateNotificationEmailHTML } = require("../templates/notification");
+const { generateNotificationEmailHTML } = require("../templates/notificationTemplate");
 const { buildAttachments } = require("../assets");
 
 const sendNotificationEmail = async (email, fullname = "User") => {

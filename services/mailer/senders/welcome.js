@@ -1,6 +1,6 @@
 "use strict";
 const { transporter, hasCredentials } = require("../config");
-const { generateWelcomeEmailHTML } = require("../templates/welcome");
+const { generateWelcomeEmailHTML } = require("../templates/welcomeTemplate");
 const { buildAttachments } = require("../assets");
 
 const sendWelcomeEmail = async (email, fullname = "User") => {

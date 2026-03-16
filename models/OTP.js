@@ -13,6 +13,10 @@ const OTPSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    expiresAt: {
+      type: Date,
+      required: true,
+    },
   },
   {
     timestamps: true,
@@ -21,5 +25,4 @@ const OTPSchema = new mongoose.Schema(
 
 OTPSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-module.exports = mongoose.model("otp_verifications", OTPSchema, "otp_verifications");
-
+module.exports = mongoose.model("OtpVerification", OTPSchema, "otp_verifications");

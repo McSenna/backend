@@ -1,6 +1,6 @@
 "use strict";
 const { transporter, hasCredentials } = require("../config");
-const { generatePasswordResetHTML } = require("../templates/passwordReset");
+const { generatePasswordResetHTML } = require("../templates/passwordResetTemplate");
 const { buildAttachments } = require("../assets");
 
 const sendPasswordResetEmail = async (email, fullname = "User", resetUrl = "#") => {

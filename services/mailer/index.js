@@ -12,11 +12,11 @@ const {
   generateAppointmentReminderHTML,
   generatePasswordResetHTML,
 } = {
-  ...require("./templates/otp"),
-  ...require("./templates/notification"),
-  ...require("./templates/welcome"),
-  ...require("./templates/appointment"),
-  ...require("./templates/passwordReset"),
+  ...require("./templates/otpTemplate"),
+  ...require("./templates/notificationTemplate"),
+  ...require("./templates/welcomeTemplate"),
+  ...require("./templates/appointmentTemplate"),
+  ...require("./templates/passwordResetTemplate"),
 };
 
 const {
