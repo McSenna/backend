@@ -23,6 +23,12 @@ const PendingRegistrationSchema = new mongoose.Schema(
       index: true,
     },
 
+  photo: {
+    type: String,
+    required: false, 
+    trim: true,
+   },
+
     password: {
       type: String,
       required: [true, "Password is required"],
