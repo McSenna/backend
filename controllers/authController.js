@@ -1,9 +1,10 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/resident");
+const User = require("../models/User");
 const PendingRegistration = require("../models/register");
 const { sendOTPEmail, sendWelcomeEmail } = require("../services/mailer");
 const { generateOTP } = require("../utils/otpGenerator");
 const { validateRegistrationPayload, isValidOTP } = require("../utils/validation");
+const { normalizeProfilePhoto } = require("../utils/profilePhoto");
 
 const OTP_EXPIRY_MINUTES = 5;
 
@@ -19,6 +20,11 @@ const buildUserResponse = (user) => ({
   email: user.email,
   role: user.role,
   verified: user.verified,
+  dateOfBirth: user.dateOfBirth,
+  gender: user.gender,
+  address: user.address,
+  // Base64 data URI used directly by the frontend Image component.
+  avatarUrl: user.profilePhoto || null,
 });
 
 exports.register = async (req, res) => {
@@ -32,6 +38,12 @@ exports.register = async (req, res) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+
+    const incomingPhoto = req.body.profilePhoto ?? req.body.profileImage ?? req.body.photo ?? "";
+    const normalizedPhoto = normalizeProfilePhoto(incomingPhoto);
+    if (!normalizedPhoto.ok) {
+      return res.status(400).json({ success: false, message: normalizedPhoto.message });
+    }
 
     const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
@@ -53,6 +65,7 @@ exports.register = async (req, res) => {
       role: "resident",
       otp,
       otpExpires,
+      profilePhoto: normalizedPhoto.profilePhoto,
     });
 
     try {
@@ -123,7 +136,8 @@ exports.verifyOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid or expired verification code" });
     }
 
-    if (!pending.verifyOtp(otp)) {
+    const isOtpValid = await pending.verifyOtp(otp);
+    if (!isOtpValid) {
       await PendingRegistration.deleteOne({ _id: pending._id });
       return res.status(400).json({ success: false, message: "Invalid or expired verification code" });
     }
@@ -137,6 +151,7 @@ exports.verifyOtp = async (req, res) => {
       address: pending.address,
       verified: true,
       role: "resident",
+      profilePhoto: pending.profilePhoto || "",
     });
 
     await PendingRegistration.deleteOne({ _id: pending._id });
