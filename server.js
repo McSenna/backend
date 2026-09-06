@@ -21,10 +21,22 @@ app.use(
 const organizationRoutes = require("./routes/organizationRoutes");
 const authRoutes = require("./routes/authRoutes");
 const appointmentRoutes = require("./routes/appointmentRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const userRoutes = require("./routes/userRoutes");
+const systemLogRoutes = require("./routes/systemLogRoutes");
 
 app.use("/api", organizationRoutes);
 app.use("/api", authRoutes);
 app.use("/api", appointmentRoutes);
+app.use("/api", notificationRoutes);
+app.use("/api", userRoutes);
+app.use("/api", systemLogRoutes);
+
+const { globalErrorHandler } = require("./middleware/errorHandler");
+const { verifyTransport } = require("./services/mailer");
+
+// Centralized error handling
+app.use(globalErrorHandler);
 
 const PORT = process.env.PORT || 5000;
 
@@ -32,6 +44,7 @@ async function startServer() {
   try {
     await connectDB();
     await seedAdmin();
+    verifyTransport();
   } catch (error) {
     console.error("Failed to start server:", error);
     process.exit(1);

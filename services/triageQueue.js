@@ -2,6 +2,9 @@
 
 const Appointment = require("../models/Appointment");
 const MissionSchedule = require("../models/MissionSchedule");
+const User = require("../models/User");
+const Notification = require("../models/Notification");
+const { sendAppointmentConfirmationEmail } = require("../services/mailer");
 const { ageToTier, computeAgeYears } = require("../utils/priorityQueue");
 const { validateDurationForCategory } = require("../config/consultationCategories");
 const { suggestNextAvailableSlot } = require("../utils/slotAvailability");
@@ -12,6 +15,29 @@ function normalizeDayStart(d) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x;
+}
+
+function formatConsultationTypeLabel(key) {
+  return String(key || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatAppointmentDetails(slotStart, workerLabel, locationLabel) {
+  const d = new Date(slotStart);
+  return {
+    date: d.toLocaleDateString("en-PH", { weekday: "short", year: "numeric", month: "short", day: "numeric" }),
+    time: d.toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }),
+    worker: workerLabel || "Medical mission team",
+    location: locationLabel || "Barangay health mission site",
+  };
+}
+
+function formatSlotStartForNotification(slotStart) {
+  if (!slotStart) return "";
+  const d = new Date(slotStart);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function computePriorityFromAppointmentDoc(appt, residentDOB) {
@@ -72,6 +98,8 @@ async function processMissionSchedulePriorityQueue(missionScheduleId, { staffId 
   }
 
   const missionCategoryMap = buildMissionCategoryMap(mission);
+  const staffUser = staffId ? await User.findById(staffId).lean() : null;
+  const doctorLabel = staffUser?.fullname ?? null;
 
   // Existing confirmed/rescheduled bookings occupy time, so we must not conflict with them.
   const booked = await Appointment.find({
@@ -89,7 +117,7 @@ async function processMissionSchedulePriorityQueue(missionScheduleId, { staffId 
 
   // Load all pending appointments and compute strict priority tags based on resident AGE.
   const pending = await Appointment.find({ status: "pending" })
-    .populate("resident", "dateOfBirth")
+    .populate("resident", "dateOfBirth fullname email")
     .select("consultationType createdAt ageTier prioritySortKey ageAtSubmission _id")
     .exec();
 
@@ -146,6 +174,48 @@ async function processMissionSchedulePriorityQueue(missionScheduleId, { staffId 
     );
 
     if (!updated) continue; // Someone else assigned it first.
+
+    const resident = appt?.resident;
+    const residentRecipientId = resident?._id ?? appt.resident;
+    const appointmentTypeLabel = formatConsultationTypeLabel(appt.consultationType);
+    const details = {
+      ...formatAppointmentDetails(updated.slotStart, doctorLabel, null),
+      appointmentType: appointmentTypeLabel,
+    };
+    const timeLabel = formatSlotStartForNotification(updated.slotStart);
+
+    // Fire-and-forget notifications + email so queue assignment stays fast.
+    void Notification.create({
+      recipient: residentRecipientId,
+      appointment: updated._id,
+      type: "appointment_confirmed",
+      title: "Appointment confirmed",
+      body: `Your ${appointmentTypeLabel} appointment is confirmed. Date: ${details.date}. Time: ${details.time}. Doctor: ${doctorLabel || "Medical mission team"}.`,
+      time: timeLabel,
+      tone: "success",
+    }).catch((e) => {
+      console.warn("Auto-confirm notification failed:", e?.message ?? e);
+    });
+
+    if (staffId) {
+      void Notification.create({
+        recipient: staffId,
+        appointment: updated._id,
+        type: "appointment_confirmed",
+        title: "Appointment confirmed",
+        body: `${resident?.fullname ? `${resident.fullname}'s` : "A patient's"} ${appointmentTypeLabel} appointment is confirmed.`,
+        time: timeLabel,
+        tone: "success",
+      }).catch((e) => {
+        console.warn("Auto-confirm staff notification failed:", e?.message ?? e);
+      });
+    }
+
+    if (resident?.email) {
+      void sendAppointmentConfirmationEmail(resident.email, resident.fullname, details).catch((e) => {
+        console.warn("Auto-confirm email failed:", e?.message ?? e);
+      });
+    }
 
     bookedSim.push({
       _id: updated._id,

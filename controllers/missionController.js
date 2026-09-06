@@ -8,6 +8,7 @@ const {
   processMissionSchedulePriorityQueue,
   processUpcomingMissionSchedulesPriorityQueue,
 } = require("../services/triageQueue");
+const { createSystemLog } = require("../services/systemLogService");
 
 function normalizeDateInput(d) {
   const x = new Date(d);
@@ -28,7 +29,6 @@ exports.createMissionSchedule = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid date" });
     }
 
-    // Critical rule: never allow duplicate mission schedules on the same day.
     const existing = await MissionSchedule.findOne({ date: day }).lean();
     if (existing) {
       return res.status(409).json({ success: false, message: "A mission schedule already exists for this date." });
@@ -38,8 +38,7 @@ exports.createMissionSchedule = async (req, res) => {
       startTime != null ? String(startTime) : morning?.start || "08:00";
     const morningEnd =
       endTime != null ? String(endTime) : morning?.end || "12:00";
-    // If startTime/endTime are provided, we treat it as a single continuous time range.
-    // We disable the afternoon window by making it zero-length (end <= start).
+      
     const afternoonStart = startTime != null && endTime != null ? String(endTime) : afternoon?.start || "13:00";
     const afternoonEnd = startTime != null && endTime != null ? String(endTime) : afternoon?.end || "17:00";
 
@@ -93,6 +92,20 @@ exports.createMissionSchedule = async (req, res) => {
 
     // Auto-assign pending queue into this newly created mission schedule.
     await processMissionSchedulePriorityQueue(doc._id, { staffId: req.user.userId });
+
+    await createSystemLog({
+      req,
+      action: "SCHEDULE_CREATED",
+      user: { _id: req.user.userId, role: req.user.role },
+      role: req.user.role,
+      description: "Mission schedule created",
+      resource: "MissionSchedule",
+      resourceId: String(doc._id),
+      metadata: {
+        date: doc.date ? new Date(doc.date).toISOString() : null,
+        categoryCount: (doc.categories || []).length,
+      },
+    });
 
     return res.status(201).json({ success: true, missionSchedule: doc });
   } catch (err) {
@@ -180,6 +193,15 @@ exports.updateMissionSchedule = async (req, res) => {
     mission.categories = normalizedCats;
     await mission.save();
 
+    // Create system log for mission schedule update
+    await createSystemLog({
+      action: "update",
+      entity: "mission_schedule",
+      entityId: mission._id,
+      userId: req.user.userId,
+      changes: { date: day, morningStart, morningEnd, afternoonStart, afternoonEnd, categories: normalizedCats },
+    });
+
     // Validate and reset linked booked appointments if they no longer fit the updated schedule.
     const updatedMission = await MissionSchedule.findById(mission._id).lean();
     const windows = getMissionDayWindows(updatedMission);
@@ -233,6 +255,19 @@ exports.updateMissionSchedule = async (req, res) => {
     // Re-fill the schedule with highest-priority pending appointments if anything was reset.
     await processMissionSchedulePriorityQueue(mission._id, { staffId: req.user.userId });
 
+    await createSystemLog({
+      req,
+      action: "SCHEDULE_UPDATED",
+      user: { _id: req.user.userId, role: req.user.role },
+      role: req.user.role,
+      description: "Mission schedule updated",
+      resource: "MissionSchedule",
+      resourceId: String(mission._id),
+      metadata: {
+        date: day ? new Date(day).toISOString() : null,
+      },
+    });
+
     return res.json({ success: true, missionSchedule: await MissionSchedule.findById(mission._id).lean() });
   } catch (err) {
     console.error("updateMissionSchedule:", err);
@@ -271,6 +306,19 @@ exports.deleteMissionSchedule = async (req, res) => {
 
     // Reprocess future schedules so pending appointments can be assigned again.
     await processUpcomingMissionSchedulesPriorityQueue({ staffId: req.user.userId });
+
+    await createSystemLog({
+      req,
+      action: "SCHEDULE_DELETED",
+      user: { _id: req.user.userId, role: req.user.role },
+      role: req.user.role,
+      description: "Mission schedule deleted",
+      resource: "MissionSchedule",
+      resourceId: String(mission._id),
+      metadata: {
+        date: mission.date ? new Date(mission.date).toISOString() : null,
+      },
+    });
 
     return res.json({ success: true, deleted: true });
   } catch (err) {

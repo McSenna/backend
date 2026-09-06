@@ -8,4 +8,4 @@ const OrganizationsSchema = new mongoose.Schema({
   role: String,
 });
 
-module.exports = mongoose.model("Organizations", OrganizationsSchema);
+module.exports = mongoose.model("Organizations", OrganizationsSchema, "organizations");

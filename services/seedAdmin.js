@@ -3,6 +3,7 @@ const User = require("../models/User");
 const ADMIN_EMAIL = "maslog@admin.gov.ph";
 const MIDWIFE_EMAIL = "midwife@maslog.gov.ph";
 const DOCTOR_EMAIL = "doctor@maslog.gov.ph";
+const BHW_EMAIL = "bhw@maslog.gov.ph";
 const ADMIN_SEED = {
   fullname: "System Administrator",
   dateOfBirth: new Date("2005-04-16"),
@@ -39,6 +40,18 @@ const DOCTOR_SEED = {
   gender: "male",
 };
 
+const BHW_SEED = {
+  fullname: "Mission BHW",
+  dateOfBirth: new Date("1995-12-10"),
+  email: BHW_EMAIL,
+  profilePhoto: "",
+  password: process.env.BHW_DEFAULT_PASSWORD || "MaslogBHW@2025",
+  verified: true,
+  role: "bhw",
+  address: "Maslog, Eastern Samar",
+  gender: "female",
+};
+
 const seedAdmin = async () => {
   try {
     const existing = await User.findOne({ email: ADMIN_EMAIL.toLowerCase().trim(), role: "admin" }).lean();
@@ -58,9 +71,15 @@ const seedAdmin = async () => {
       await User.create(DOCTOR_SEED);
       console.log("Default doctor account created for:", DOCTOR_EMAIL);
     }
+
+    const bhw = await User.findOne({ email: BHW_EMAIL.toLowerCase().trim(), role: "bhw" }).lean();
+    if (!bhw) {
+      await User.create(BHW_SEED);
+      console.log("Default BHW account created for:", BHW_EMAIL);
+    }
   } catch (error) {
     console.error("Failed to seed admin/midwife accounts:", error.message);
   }
 };
-
+  
 module.exports = { seedAdmin };

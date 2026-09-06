@@ -1,18 +1,75 @@
 "use strict";
 const { C, fonts, heroPartial, ignoreNoticePartial } = require("../utils");
 
-const appointmentDetailsCard = ({ patientName, date, time, worker, location }) => `
+const appointmentStatusBadge = (statusKind) => {
+  const kind = statusKind || "confirmed";
+
+  if (kind === "rescheduled") {
+    return `
+      <table cellpadding="0" cellspacing="0" width="100%" role="presentation"
+        style="background:${C.goldBg};border:1px solid ${C.goldBorder};border-radius:10px;">
+        <tr>
+          <td style="padding:10px 16px;text-align:center;">
+            <span style="font-size:12px;font-weight:700;color:${C.goldText};font-family:${fonts.sans};">&#9200; Your appointment has been rescheduled</span>
+          </td>
+        </tr>
+      </table>
+    `;
+  }
+
+  if (kind === "declined") {
+    return `
+      <table cellpadding="0" cellspacing="0" width="100%" role="presentation"
+        style="background:${C.mist};border:1px solid ${C.mistBorder};border-radius:10px;">
+        <tr>
+          <td style="padding:10px 16px;text-align:center;">
+            <span style="font-size:12px;font-weight:700;color:${C.textDark};font-family:${fonts.sans};">&#128197; Your appointment request was declined</span>
+          </td>
+        </tr>
+      </table>
+    `;
+  }
+
+  // confirmed (default)
+  return `
+    <table cellpadding="0" cellspacing="0" width="100%" role="presentation"
+      style="background:${C.sageBg};border:1px solid ${C.sageBorder};border-radius:10px;">
+      <tr>
+        <td style="padding:10px 16px;text-align:center;">
+          <span style="font-size:12px;font-weight:700;color:${C.sageText};font-family:${fonts.sans};">&#9989; Your appointment is confirmed</span>
+        </td>
+      </tr>
+    </table>
+  `;
+};
+
+const appointmentDetailsCard = ({
+  patientName,
+  appointmentType,
+  date,
+  time,
+  worker,
+  location,
+  declineReason,
+  statusKind = "confirmed",
+}) => `
 <table cellpadding="0" cellspacing="0" width="100%" role="presentation"
   style="background:${C.white};border:1px solid ${C.mistBorder};border-radius:14px;box-shadow:0 2px 10px rgba(16,46,74,0.06);">
   <tr>
     <td style="padding:20px 20px 6px;">
       ${[
-        { label: "&#128100; Patient",       value: patientName },
-        { label: "&#128197; Date",           value: date        },
-        { label: "&#128336; Time",           value: time        },
-        { label: "&#129654; Health Worker",  value: worker      },
-        { label: "&#127968; Location",       value: location    },
-      ].map(({ label, value }) => `
+        { label: "&#128100; Patient", value: patientName },
+        appointmentType ? { label: "&#128336; Appointment Type", value: appointmentType } : null,
+        { label: "&#128197; Date", value: date },
+        { label: "&#128336; Time", value: time },
+        { label: "&#129654; Doctor", value: worker },
+        { label: "&#127968; Location", value: location },
+        statusKind === "declined" && declineReason
+          ? { label: "&#128221; Reason", value: declineReason }
+          : null,
+      ]
+        .filter(Boolean)
+        .map(({ label, value }) => `
       <table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin-bottom:12px;">
         <tr>
           <td width="130" valign="top">
@@ -27,23 +84,25 @@ const appointmentDetailsCard = ({ patientName, date, time, worker, location }) =
   </tr>
   <tr>
     <td style="padding:0 20px 18px;">
-      <table cellpadding="0" cellspacing="0" width="100%" role="presentation"
-        style="background:${C.sageBg};border:1px solid ${C.sageBorder};border-radius:10px;">
-        <tr>
-          <td style="padding:10px 16px;text-align:center;">
-            <span style="font-size:12px;font-weight:700;color:${C.sageText};font-family:${fonts.sans};">&#9989; Your appointment is confirmed</span>
-          </td>
-        </tr>
-      </table>
+      ${appointmentStatusBadge(statusKind)}
     </td>
   </tr>
 </table>`;
 
-const appointmentInfoCard = ({ patientName, date, time, worker, location }) => `
+const appointmentInfoCard = ({ patientName, appointmentType, date, time, worker, location, statusKind, declineReason }) => `
 <tr>
   <td style="background:${C.mist};padding:28px 26px 20px;">
     <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:2.2px;text-transform:uppercase;color:${C.textSubtle};font-family:${fonts.sans};">Appointment Details</p>
-    ${appointmentDetailsCard({ patientName, date, time, worker, location })}
+    ${appointmentDetailsCard({
+      patientName,
+      appointmentType,
+      date,
+      time,
+      worker,
+      location,
+      statusKind,
+      declineReason,
+    })}
   </td>
 </tr>`;
 
@@ -113,13 +172,13 @@ const rescheduleRowPartial = () => `
   </td>
 </tr>`;
 
-const generateAppointmentConfirmationHTML = (fullname, { date, time, worker, location }) => {
+const generateAppointmentConfirmationHTML = (fullname, { date, time, worker, location, appointmentType }) => {
   const year      = new Date().getFullYear();
   const firstName = String(fullname).split(" ")[0];
   const body = [
     heroPartial("heroNotif", `Appointment Confirmed`,
       `Your appointment at <strong style="color:${C.textDark};">MaslogCare</strong> has been successfully scheduled. Please review the details below.`),
-    appointmentInfoCard({ patientName: fullname, date, time, worker, location }),  
+    appointmentInfoCard({ patientName: fullname, appointmentType, date, time, worker, location, statusKind: "confirmed" }),
     appointmentReminderRow(),     
     ignoreNoticePartial(),        
   ].join("\n");
@@ -128,7 +187,7 @@ const generateAppointmentConfirmationHTML = (fullname, { date, time, worker, loc
     .replace(">Verification<", ">Appointment<");
 };
 
-const generateAppointmentReminderHTML = (fullname, { date, time, worker, location }) => {
+const generateAppointmentReminderHTML = (fullname, { date, time, worker, location, appointmentType }) => {
   const year      = new Date().getFullYear();
   const firstName = String(fullname).split(" ")[0];
   const body = [
@@ -143,7 +202,61 @@ const generateAppointmentReminderHTML = (fullname, { date, time, worker, locatio
     .replace(">Verification<", ">Reminder<");
 };
 
+const generateAppointmentRescheduledHTML = (fullname, { date, time, worker, location, appointmentType }) => {
+  const year = new Date().getFullYear();
+  const firstName = String(fullname).split(" ")[0];
+  const body = [
+    heroPartial(
+      "heroNotif",
+      `Appointment Rescheduled`,
+      `Your appointment at <strong style="color:${C.textDark};">MaslogCare</strong> has been rescheduled. Please review the updated details below.`
+    ),
+    appointmentInfoCard({
+      patientName: fullname,
+      appointmentType,
+      date,
+      time,
+      worker,
+      location,
+      statusKind: "rescheduled",
+    }),
+    rescheduleRowPartial(),
+    ignoreNoticePartial(),
+  ].join("\n");
+  return require("../utils").emailWrapper(body, year)
+    .replace("<title></title>", `<title>MaslogCare – Appointment Rescheduled for ${firstName}</title>`)
+    .replace(">Verification<", ">Appointment<");
+};
+
+const generateAppointmentDeclinedHTML = (fullname, { date, time, worker, location, appointmentType, declineReason }) => {
+  const year = new Date().getFullYear();
+  const firstName = String(fullname).split(" ")[0];
+  const body = [
+    heroPartial(
+      "heroNotif",
+      `Appointment Declined`,
+      `Your appointment request at <strong style="color:${C.textDark};">MaslogCare</strong> has been declined.`
+    ),
+    appointmentInfoCard({
+      patientName: fullname,
+      appointmentType,
+      date,
+      time,
+      worker,
+      location,
+      statusKind: "declined",
+      declineReason: declineReason || "",
+    }),
+    ignoreNoticePartial(),
+  ].join("\n");
+  return require("../utils").emailWrapper(body, year)
+    .replace("<title></title>", `<title>MaslogCare – Appointment Update for ${firstName}</title>`)
+    .replace(">Verification<", ">Appointment<");
+};
+
 module.exports = {
   generateAppointmentConfirmationHTML,
   generateAppointmentReminderHTML,
+  generateAppointmentRescheduledHTML,
+  generateAppointmentDeclinedHTML,
 };

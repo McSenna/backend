@@ -17,7 +17,13 @@ const {
   hasConflict,
   suggestNextAvailableSlot,
 } = require("../utils/slotAvailability");
-const { sendAppointmentConfirmationEmail, sendNotificationEmail } = require("../services/mailer");
+const {
+  sendAppointmentConfirmationEmail,
+  sendAppointmentRescheduledEmail,
+  sendAppointmentDeclinedEmail,
+} = require("../services/mailer");
+const Notification = require("../models/Notification");
+const { createSystemLog } = require("../services/systemLogService");
 
 const STAFF_ROLES = ["doctor", "admin", "midwife"];
 const BOOKED_STATUSES = ["confirmed", "rescheduled"];
@@ -39,6 +45,25 @@ function formatAppointmentDetails(slotStart, workerLabel, locationLabel) {
     worker: workerLabel || "Medical mission team",
     location: locationLabel || "Barangay health mission site",
   };
+}
+
+function formatConsultationTypeLabel(key) {
+  return String(key || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatSlotStartForNotification(slotStart) {
+  if (!slotStart) return "";
+  const d = new Date(slotStart);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function truncateNotificationBody(text, maxLen = 1000) {
+  const s = String(text ?? "");
+  if (s.length <= maxLen) return s;
+  return s.slice(0, Math.max(0, maxLen - 3)) + "...";
 }
 
 exports.createAppointment = async (req, res) => {
@@ -79,6 +104,20 @@ exports.createAppointment = async (req, res) => {
       .populate("resident", "fullname email dateOfBirth")
       .populate("missionSchedule", "date morningStart morningEnd afternoonStart afternoonEnd")
       .lean();
+
+    await createSystemLog({
+      req,
+      action: "APPOINTMENT_CREATED",
+      user: { _id: req.user.userId, role: req.user.role },
+      role: req.user.role,
+      description: "Resident submitted a new appointment request",
+      resource: "Appointment",
+      resourceId: String(appt._id),
+      metadata: {
+        consultationType: key,
+        isUrgent: Boolean(isUrgent),
+      },
+    });
 
     return res.status(201).json({
       success: true,
@@ -322,20 +361,54 @@ exports.assignAppointment = async (req, res) => {
 
     const populated = await Appointment.findById(appointment._id)
       .populate("resident", "fullname email")
+      .populate("assignedBy", "fullname")
       .populate("missionSchedule")
       .lean();
 
     const resident = populated.resident;
+    const actorId = req.user.userId;
+    const doctorLabel = populated.assignedBy?.fullname ?? null;
+    const appointmentTypeLabel = formatConsultationTypeLabel(populated.consultationType);
+    const details = {
+      ...formatAppointmentDetails(populated.slotStart, doctorLabel, null),
+      appointmentType: appointmentTypeLabel,
+    };
+    const timeLabel = formatSlotStartForNotification(populated.slotStart);
+
+    const residentRecipientId = resident?._id ?? appointment.resident;
+
+    // Notification creation is awaited for reliability; email sending is non-blocking.
+    await Promise.all([
+      Notification.create({
+        recipient: residentRecipientId,
+        appointment: populated._id,
+        type: "appointment_confirmed",
+        title: "Appointment confirmed",
+        body: truncateNotificationBody(
+          `Your ${appointmentTypeLabel} appointment is confirmed. Date: ${details.date}. Time: ${details.time}. Doctor: ${
+            doctorLabel || "Medical mission team"
+          }.`
+        ),
+        time: timeLabel,
+        tone: "success",
+      }),
+      Notification.create({
+        recipient: actorId,
+        appointment: populated._id,
+        type: "appointment_confirmed",
+        title: "Appointment confirmed",
+        body: truncateNotificationBody(
+          `${resident?.fullname ? `${resident.fullname}'s` : "A patient's"} ${appointmentTypeLabel} appointment is confirmed.`
+        ),
+        time: timeLabel,
+        tone: "success",
+      }),
+    ]);
+
     if (resident?.email) {
-      try {
-        await sendAppointmentConfirmationEmail(
-          resident.email,
-          resident.fullname,
-          formatAppointmentDetails(populated.slotStart, null, null)
-        );
-      } catch (e) {
-        console.warn("Confirmation email skipped:", e.message);
-      }
+      void sendAppointmentConfirmationEmail(resident.email, resident.fullname, details).catch((e) => {
+        console.warn("Confirmation email skipped:", e?.message ?? e);
+      });
     }
 
     // Fill any additional open slots using strict priority triage.
@@ -344,6 +417,20 @@ exports.assignAppointment = async (req, res) => {
     } catch (e) {
       console.warn("queue reprocess after assign failed:", e.message);
     }
+
+    await createSystemLog({
+      req,
+      action: "APPOINTMENT_APPROVED",
+      user: { _id: req.user.userId, role: req.user.role },
+      role: req.user.role,
+      description: "Medical staff approved and scheduled an appointment",
+      resource: "Appointment",
+      resourceId: String(appointment._id),
+      metadata: {
+        missionScheduleId,
+        categoryKey,
+      },
+    });
 
     return res.json({
       success: true,
@@ -397,16 +484,53 @@ exports.reassignAppointment = async (req, res) => {
 
     const populated = await Appointment.findById(appointment._id)
       .populate("resident", "fullname email")
+      .populate("assignedBy", "fullname")
       .populate("missionSchedule")
       .lean();
 
     const resident = populated.resident;
+    const actorId = req.user.userId;
+    const doctorLabel = populated.assignedBy?.fullname ?? null;
+    const appointmentTypeLabel = formatConsultationTypeLabel(populated.consultationType);
+    const details = {
+      ...formatAppointmentDetails(populated.slotStart, doctorLabel, null),
+      appointmentType: appointmentTypeLabel,
+    };
+    const timeLabel = formatSlotStartForNotification(populated.slotStart);
+
+    const residentRecipientId = resident?._id ?? appointment.resident;
+
+    await Promise.all([
+      Notification.create({
+        recipient: residentRecipientId,
+        appointment: populated._id,
+        type: "appointment_rescheduled",
+        title: "Appointment rescheduled",
+        body: truncateNotificationBody(
+          `Your ${appointmentTypeLabel} appointment has been rescheduled. Date: ${details.date}. Time: ${details.time}. Doctor: ${
+            doctorLabel || "Medical mission team"
+          }.`
+        ),
+        time: timeLabel,
+        tone: "warning",
+      }),
+      Notification.create({
+        recipient: actorId,
+        appointment: populated._id,
+        type: "appointment_rescheduled",
+        title: "Appointment rescheduled",
+        body: truncateNotificationBody(
+          `${resident?.fullname ? `${resident.fullname}'s` : "A patient's"} ${appointmentTypeLabel} appointment is rescheduled.`
+        ),
+        time: timeLabel,
+        tone: "warning",
+      }),
+    ]);
+
     if (resident?.email) {
-      try {
-        await sendNotificationEmail(resident.email, resident.fullname);
-      } catch (e) {
-        console.warn("Reschedule notification email skipped:", e.message);
-      }
+      void sendAppointmentRescheduledEmail(resident.email, resident.fullname, details).catch((e) => {
+        console.warn("Reschedule email skipped:", e?.message ?? e);
+      });
     }
 
     // Fill any additional open slots using strict priority triage.
@@ -415,6 +539,20 @@ exports.reassignAppointment = async (req, res) => {
     } catch (e) {
       console.warn("queue reprocess after reassign failed:", e.message);
     }
+
+    await createSystemLog({
+      req,
+      action: "APPOINTMENT_RESCHEDULED",
+      user: { _id: req.user.userId, role: req.user.role },
+      role: req.user.role,
+      description: "Medical staff rescheduled an appointment",
+      resource: "Appointment",
+      resourceId: String(appointment._id),
+      metadata: {
+        missionScheduleId,
+        categoryKey,
+      },
+    });
 
     return res.json({
       success: true,
@@ -437,6 +575,10 @@ exports.rejectAppointment = async (req, res) => {
       return res.status(404).json({ success: false, message: "Appointment not found" });
     }
 
+    const previousSlotStart = appointment.slotStart;
+    const actorId = req.user.userId;
+    const appointmentTypeLabel = formatConsultationTypeLabel(appointment.consultationType);
+
     const freedMissionScheduleId = appointment.missionSchedule;
 
     if (appointment.status === "declined") {
@@ -455,9 +597,66 @@ exports.rejectAppointment = async (req, res) => {
     appointment.assignedDurationMinutes = null;
     await appointment.save();
 
+    const timeLabel = formatSlotStartForNotification(previousSlotStart) || "Recent";
+
+    // Create notifications after DB update (appointment.status is now "declined").
+    await Promise.all([
+      Notification.create({
+        recipient: appointment.resident,
+        appointment: appointment._id,
+        type: "appointment_declined",
+        title: "Appointment declined",
+        body: truncateNotificationBody(
+          `Your ${appointmentTypeLabel} appointment request was declined.${appointment.declineReason ? ` Reason: ${appointment.declineReason}` : ""}`
+        ),
+        time: timeLabel,
+        tone: "info",
+      }),
+      Notification.create({
+        recipient: actorId,
+        appointment: appointment._id,
+        type: "appointment_declined",
+        title: "Appointment declined",
+        body: truncateNotificationBody(`A ${appointmentTypeLabel} appointment request was declined by medical staff.`),
+        time: timeLabel,
+        tone: "info",
+      }),
+    ]);
+
     const populated = await Appointment.findById(appointment._id)
       .populate("resident", "fullname email")
       .lean();
+
+    // Optional: send declined email (include date/time if it existed before decline).
+    if (populated?.resident?.email) {
+      let doctorLabel = null;
+      try {
+        const doctorUserId = appointment.assignedBy ?? actorId;
+        const doctorUser = await User.findById(doctorUserId).lean();
+        doctorLabel = doctorUser?.fullname ?? null;
+      } catch {
+        doctorLabel = null;
+      }
+
+      const baseDetails = previousSlotStart
+        ? formatAppointmentDetails(previousSlotStart, doctorLabel, null)
+        : {
+            date: "Date TBD",
+            time: "Time TBD",
+            worker: doctorLabel || "Medical mission team",
+            location: "Barangay health mission site",
+          };
+
+      const declinedDetails = {
+        ...baseDetails,
+        appointmentType: appointmentTypeLabel,
+        declineReason: appointment.declineReason,
+      };
+
+      void sendAppointmentDeclinedEmail(populated.resident.email, populated.resident.fullname, declinedDetails).catch((e) => {
+        console.warn("Declined email skipped:", e?.message ?? e);
+      });
+    }
 
     if (freedMissionScheduleId) {
       try {
@@ -466,6 +665,19 @@ exports.rejectAppointment = async (req, res) => {
         console.warn("queue reprocess after reject failed:", e.message);
       }
     }
+
+    await createSystemLog({
+      req,
+      action: "APPOINTMENT_REJECTED",
+      user: { _id: req.user.userId, role: req.user.role },
+      role: req.user.role,
+      description: "Medical staff rejected an appointment request",
+      resource: "Appointment",
+      resourceId: String(appointment._id),
+      metadata: {
+        reason: appointment.declineReason || "",
+      },
+    });
 
     return res.json({ success: true, message: "Appointment declined", appointment: populated });
   } catch (err) {

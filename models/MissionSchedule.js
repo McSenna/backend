@@ -26,4 +26,4 @@ const MissionScheduleSchema = new mongoose.Schema(
 
 MissionScheduleSchema.index({ date: 1, createdAt: -1 });
 
-module.exports = mongoose.model("MissionSchedule", MissionScheduleSchema);
+module.exports = mongoose.model("MissionSchedule", MissionScheduleSchema, "mission_schedules");

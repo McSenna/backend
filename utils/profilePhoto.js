@@ -1,7 +1,7 @@
 "use strict";
 
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-const MAX_BYTES = Number(process.env.PROFILE_PHOTO_MAX_BYTES || 2_000_000); // 2MB
+const MAX_BYTES = Number(process.env.PROFILE_PHOTO_MAX_BYTES || 2_000_000); 
 const DATA_URI_PREFIX_RE = /^data:(image\/[a-zA-Z0-9+.-]+);base64,/;
 
 function isBase64String(s) {
@@ -14,10 +14,10 @@ function isBase64String(s) {
 function detectMimeFromMagic(buffer) {
   if (!buffer || buffer.length < 12) return null;
 
-  // JPEG: FF D8 FF
+  // JPEG
   if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "image/jpeg";
 
-  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  // PNG
   if (
     buffer[0] === 0x89 &&
     buffer[1] === 0x50 &&
@@ -31,12 +31,12 @@ function detectMimeFromMagic(buffer) {
     return "image/png";
   }
 
-  // WEBP: "RIFF....WEBP"
+  // WEBP
   if (buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP") {
     return "image/webp";
   }
 
-  // GIF: GIF87a / GIF89a
+  // GIF
   if (buffer.toString("ascii", 0, 6) === "GIF87a") return "image/gif";
   if (buffer.toString("ascii", 0, 6) === "GIF89a") return "image/gif";
 

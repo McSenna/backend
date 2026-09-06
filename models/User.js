@@ -23,7 +23,6 @@ const UserSchema = new mongoose.Schema(
       index: true,
     },
 
-    // Stored as a base64 data URI in the database (no filesystem storage).
     profilePhoto: {
       type: String,
       default: "",

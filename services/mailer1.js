@@ -1,16 +1,15 @@
 "use strict";
 const nodemailer = require("nodemailer");
 
-// ─── Transport ────────────────────────────────────────────────────────────────
 
 const buildTransportConfig = () => {
-  const user    = process.env.EMAIL_USER;
-  const pass    = process.env.EMAIL_PASS;
-  const port    = process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 465;
-  const isProd  = process.env.NODE_ENV === "production";
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
+  const port = process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 465;
+  const isProd = process.env.NODE_ENV === "production";
 
   const config = {
-    host:   process.env.EMAIL_HOST || "smtp.gmail.com",
+    host: process.env.EMAIL_HOST || "smtp.gmail.com",
     port,
     secure: process.env.EMAIL_SECURE !== undefined
       ? process.env.EMAIL_SECURE === "true"
@@ -19,7 +18,7 @@ const buildTransportConfig = () => {
   };
 
   if (port === 587) {
-    config.secure     = false;
+    config.secure = false;
     config.requireTLS = true;
   }
 
@@ -55,43 +54,42 @@ const verifyTransport = () => {
 
 verifyTransport();
 
-// ─── Pearl Design System ──────────────────────────────────────────────────────
 
 const C = {
-  pearl:        "#FFF7E6",
-  pearlMid:     "#F5E4B8",
-  pearlDeep:    "#F0D8A0",
-  pearlBorder:  "#F0E2BC",
-  pearlGold:    "#C49A3C",
-  pearlGoldSoft:"#E8D890",
-  midnight:     "#102E4A",
+  pearl: "#FFF7E6",
+  pearlMid: "#F5E4B8",
+  pearlDeep: "#F0D8A0",
+  pearlBorder: "#F0E2BC",
+  pearlGold: "#C49A3C",
+  pearlGoldSoft: "#E8D890",
+  midnight: "#102E4A",
   midnightDeep: "#0A1E30",
-  midnightMid:  "#1A4568",
-  midnightLight:"#2D6B9E",
-  skyBg:        "#E6F2FB",
-  skyBorder:    "#B8D8F0",
-  sageBg:       "#E8F6EE",
-  sageBorder:   "#AADAC0",
-  sageText:     "#1E5C38",
-  goldBg:       "#FEF3DC",
-  goldBorder:   "#F0D080",
-  goldText:     "#8A6010",
-  mist:         "#F4F7FA",
-  mistBorder:   "#E0EAF2",
-  white:        "#FFFFFF",
-  bgOuter:      "#D6DDE4",
-  textDark:     "#0E2038",
-  textMid:      "#3A5068",
-  textLight:    "#6A8A9E",
-  textSubtle:   "#4A6E8A",
-  textMuted:    "#8AAABB",
-  red:          "#C0392B",
+  midnightMid: "#1A4568",
+  midnightLight: "#2D6B9E",
+  skyBg: "#E6F2FB",
+  skyBorder: "#B8D8F0",
+  sageBg: "#E8F6EE",
+  sageBorder: "#AADAC0",
+  sageText: "#1E5C38",
+  goldBg: "#FEF3DC",
+  goldBorder: "#F0D080",
+  goldText: "#8A6010",
+  mist: "#F4F7FA",
+  mistBorder: "#E0EAF2",
+  white: "#FFFFFF",
+  bgOuter: "#D6DDE4",
+  textDark: "#0E2038",
+  textMid: "#3A5068",
+  textLight: "#6A8A9E",
+  textSubtle: "#4A6E8A",
+  textMuted: "#8AAABB",
+  red: "#C0392B",
 };
 
 const fonts = {
-  sans:  `'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`,
+  sans: `'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`,
   serif: `'DM Serif Display', Georgia, 'Times New Roman', serif`,
-  link:  `<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>`,
+  link: `<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>`,
 };
 
 // ─── CID Asset Map ────────────────────────────────────────────────────────────
@@ -123,14 +121,14 @@ const ASSETS = (() => {
     path: path.join(base, "icons", filename),
   });
   return {
-    logo:        { cid: "maslogcareLogo",    filename: "logo.png",           path: path.join(base, "logo", "logo.png") },
-    heroOtp:     icon("hero-otp.png",        "heroOtp"),
-    heroWelcome: icon("hero-welcome.png",    "heroWelcome"),
-    heroNotif:   icon("hero-notif.png",      "heroNotif"),
-    calendar:    icon("icon-calendar.png",   "iconCalendar"),
-    megaphone:   icon("icon-megaphone.png",  "iconMegaphone"),
-    records:     icon("icon-records.png",    "iconRecords"),
-    health:      icon("icon-health.png",     "iconHealth"),
+    logo: { cid: "maslogcareLogo", filename: "logo.png", path: path.join(base, "logo", "logo.png") },
+    heroOtp: icon("hero-otp.png", "heroOtp"),
+    heroWelcome: icon("hero-welcome.png", "heroWelcome"),
+    heroNotif: icon("hero-notif.png", "heroNotif"),
+    calendar: icon("icon-calendar.png", "iconCalendar"),
+    megaphone: icon("icon-megaphone.png", "iconMegaphone"),
+    records: icon("icon-records.png", "iconRecords"),
+    health: icon("icon-health.png", "iconHealth"),
   };
 })();
 
@@ -348,10 +346,10 @@ const securityNoticePartial = () => `
 // Fixed 236px per card = (488px inner width − 16px gap) ÷ 2.
 
 const WELCOME_FEATURES = [
-  { iconKey: "calendar",  title: "Book Appointments",    desc: "Schedule barangay health visits easily" },
-  { iconKey: "megaphone", title: "Health Announcements", desc: "Stay updated on programs & alerts"       },
-  { iconKey: "records",   title: "Medical Records",      desc: "View & manage your health history"       },
-  { iconKey: "health",    title: "Health Programs",      desc: "Access community wellness programs"      },
+  { iconKey: "calendar", title: "Book Appointments", desc: "Schedule barangay health visits easily" },
+  { iconKey: "megaphone", title: "Health Announcements", desc: "Stay updated on programs & alerts" },
+  { iconKey: "records", title: "Medical Records", desc: "View & manage your health history" },
+  { iconKey: "health", title: "Health Programs", desc: "Access community wellness programs" },
 ];
 
 const featureCard = ({ iconKey, title, desc }) => `
@@ -423,21 +421,21 @@ const welcomeCtaPartial = () => `
 
 const NOTIFICATION_CARDS = [
   {
-    emoji: "&#128197;", iconBg: C.skyBg,  iconBorder: C.skyBorder,
+    emoji: "&#128197;", iconBg: C.skyBg, iconBorder: C.skyBorder,
     title: "Appointment Reminder",
-    desc:  "Your health center appointment is scheduled for tomorrow at 9:00 AM. Please bring your health booklet and valid ID.",
+    desc: "Your health center appointment is scheduled for tomorrow at 9:00 AM. Please bring your health booklet and valid ID.",
     tag: "&#128205; Tomorrow, 9:00 AM", tagBg: C.skyBg, tagBorder: C.skyBorder, tagColor: C.midnight,
   },
   {
     emoji: "&#128137;", iconBg: C.sageBg, iconBorder: C.sageBorder,
     title: "Vaccination Program",
-    desc:  "Free flu vaccination available this week at the Barangay Health Center. Walk-ins welcome — no appointment needed.",
+    desc: "Free flu vaccination available this week at the Barangay Health Center. Walk-ins welcome — no appointment needed.",
     tag: "&#128197; Until Mar 31", tagBg: C.sageBg, tagBorder: C.sageBorder, tagColor: C.sageText,
   },
   {
     emoji: "&#127775;", iconBg: C.goldBg, iconBorder: C.goldBorder,
     title: "Community Announcement",
-    desc:  "New telehealth consultation services are now available for all registered MaslogCare members in the barangay.",
+    desc: "New telehealth consultation services are now available for all registered MaslogCare members in the barangay.",
     tag: "&#10024; New Service", tagBg: C.goldBg, tagBorder: C.goldBorder, tagColor: C.goldText,
   },
 ];
@@ -449,7 +447,7 @@ const notificationBodyPartial = () => `
     <p style="margin:0 0 14px;font-size:10px;font-weight:700;letter-spacing:2.2px;text-transform:uppercase;color:${C.textSubtle};font-family:${fonts.sans};">Your Updates</p>
     <table cellpadding="0" cellspacing="0" width="100%" role="presentation"
       style="background:${C.white};border:1px solid ${C.mistBorder};border-radius:14px;box-shadow:0 2px 10px rgba(16,46,74,0.05);">
-      ${NOTIFICATION_CARDS.slice(0,2).map((card, i) => `
+      ${NOTIFICATION_CARDS.slice(0, 2).map((card, i) => `
       <tr><td style="padding:16px 18px;${i > 0 ? `border-top:1px solid ${C.mistBorder};` : ""}">
         <table cellpadding="0" cellspacing="0" role="presentation"><tr>
           <td valign="top" style="padding-right:12px;">
@@ -503,12 +501,12 @@ const appointmentDetailsCard = ({ patientName, date, time, worker, location }) =
   <tr>
     <td style="padding:20px 20px 6px;">
       ${[
-        { label: "&#128100; Patient",       value: patientName },
-        { label: "&#128197; Date",           value: date        },
-        { label: "&#128336; Time",           value: time        },
-        { label: "&#129654; Health Worker",  value: worker      },
-        { label: "&#127968; Location",       value: location    },
-      ].map(({ label, value }) => `
+    { label: "&#128100; Patient", value: patientName },
+    { label: "&#128197; Date", value: date },
+    { label: "&#128336; Time", value: time },
+    { label: "&#129654; Health Worker", value: worker },
+    { label: "&#127968; Location", value: location },
+  ].map(({ label, value }) => `
       <table cellpadding="0" cellspacing="0" width="100%" role="presentation" style="margin-bottom:12px;">
         <tr>
           <td width="130" valign="top">
@@ -666,7 +664,7 @@ const resetSecurityNoticePartial = () => `
 // Identical padding pattern to OTP — all emails are the same height.
 
 const generateOTPEmailHTML = (fullname, otp) => {
-  const year      = new Date().getFullYear();
+  const year = new Date().getFullYear();
   const firstName = String(fullname).split(" ")[0];
   const body = [
     heroPartial("heroOtp", `Verify Your Identity`,
@@ -680,7 +678,7 @@ const generateOTPEmailHTML = (fullname, otp) => {
 };
 
 const generateNotificationEmailHTML = (fullname) => {
-  const year      = new Date().getFullYear();
+  const year = new Date().getFullYear();
   const firstName = String(fullname).split(" ")[0];
   const body = [
     heroPartial("heroNotif", `Health Notification`,
@@ -695,7 +693,7 @@ const generateNotificationEmailHTML = (fullname) => {
 };
 
 const generateWelcomeEmailHTML = (fullname) => {
-  const year      = new Date().getFullYear();
+  const year = new Date().getFullYear();
   const firstName = String(fullname).split(" ")[0];
   const body = [
     heroPartial("heroWelcome", `Welcome, ${firstName}`,
@@ -710,7 +708,7 @@ const generateWelcomeEmailHTML = (fullname) => {
 };
 
 const generateAppointmentConfirmationHTML = (fullname, { date, time, worker, location }) => {
-  const year      = new Date().getFullYear();
+  const year = new Date().getFullYear();
   const firstName = String(fullname).split(" ")[0];
   const body = [
     heroPartial("heroNotif", `Appointment Confirmed`,
@@ -725,7 +723,7 @@ const generateAppointmentConfirmationHTML = (fullname, { date, time, worker, loc
 };
 
 const generateAppointmentReminderHTML = (fullname, { date, time, worker, location }) => {
-  const year      = new Date().getFullYear();
+  const year = new Date().getFullYear();
   const firstName = String(fullname).split(" ")[0];
   const body = [
     heroPartial("heroNotif", `Upcoming Appointment`,
@@ -740,7 +738,7 @@ const generateAppointmentReminderHTML = (fullname, { date, time, worker, locatio
 };
 
 const generatePasswordResetHTML = (fullname, resetUrl = "#") => {
-  const year      = new Date().getFullYear();
+  const year = new Date().getFullYear();
   const firstName = String(fullname).split(" ")[0];
   const body = [
     heroPartial("heroOtp", `Reset Your Password`,
@@ -765,11 +763,11 @@ const sendOTPEmail = async (email, otp, fullname = "User") => {
   }
   try {
     const info = await transporter.sendMail({
-      from:        `"MaslogCare" <${process.env.EMAIL_USER}>`,
-      to:          email,
-      subject:     "MaslogCare – Your Verification Code",
-      html:        generateOTPEmailHTML(fullname, otp),
-      text:        `Your MaslogCare verification code is: ${otp}\n\nExpires in 5 minutes. Do not share this code.\nIf you did not request this, please ignore this message.`,
+      from: `"MaslogCare" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "MaslogCare – Your Verification Code",
+      html: generateOTPEmailHTML(fullname, otp),
+      text: `Your MaslogCare verification code is: ${otp}\n\nExpires in 5 minutes. Do not share this code.\nIf you did not request this, please ignore this message.`,
       attachments: buildAttachments("logo", "heroOtp"),
     });
     console.log("✅ OTP email sent:", info.response);
@@ -787,11 +785,11 @@ const sendNotificationEmail = async (email, fullname = "User") => {
   }
   try {
     await transporter.sendMail({
-      from:        `"MaslogCare" <${process.env.EMAIL_USER}>`,
-      to:          email,
-      subject:     "MaslogCare – Health Notification",
-      html:        generateNotificationEmailHTML(fullname),
-      text:        `You have received a new healthcare update from MaslogCare. Please log in to your patient portal to view your health records and updates.\n\nQuestions? Email help@maslogcare.ph or visit the health center.`,
+      from: `"MaslogCare" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "MaslogCare – Health Notification",
+      html: generateNotificationEmailHTML(fullname),
+      text: `You have received a new healthcare update from MaslogCare. Please log in to your patient portal to view your health records and updates.\n\nQuestions? Email help@maslogcare.ph or visit the health center.`,
       attachments: buildAttachments("logo", "heroNotif"),
     });
     console.log("✅ Notification email sent to:", email);
@@ -807,11 +805,11 @@ const sendWelcomeEmail = async (email, fullname = "User") => {
   }
   try {
     await transporter.sendMail({
-      from:        `"MaslogCare" <${process.env.EMAIL_USER}>`,
-      to:          email,
-      subject:     "Welcome to MaslogCare – Account Activated",
-      html:        generateWelcomeEmailHTML(fullname),
-      text:        `Welcome to MaslogCare, ${fullname}! Your account has been successfully created and verified.\n\nQuestions? Email help@maslogcare.ph or visit the health center.`,
+      from: `"MaslogCare" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Welcome to MaslogCare – Account Activated",
+      html: generateWelcomeEmailHTML(fullname),
+      text: `Welcome to MaslogCare, ${fullname}! Your account has been successfully created and verified.\n\nQuestions? Email help@maslogcare.ph or visit the health center.`,
       attachments: buildAttachments("logo", "heroWelcome", "calendar", "megaphone", "records", "health"),
     });
     console.log("✅ Welcome email sent to:", email);
@@ -827,11 +825,11 @@ const sendAppointmentConfirmationEmail = async (email, fullname = "User", appoin
   }
   try {
     await transporter.sendMail({
-      from:        `"MaslogCare" <${process.env.EMAIL_USER}>`,
-      to:          email,
-      subject:     "MaslogCare – Your Appointment is Confirmed",
-      html:        generateAppointmentConfirmationHTML(fullname, appointmentDetails),
-      text:        `Hello ${fullname}, your MaslogCare appointment has been confirmed.\n\nDate: ${appointmentDetails.date}\nTime: ${appointmentDetails.time}\nHealth Worker: ${appointmentDetails.worker}\nLocation: ${appointmentDetails.location}\n\nQuestions? Email help@maslogcare.ph or visit the health center.`,
+      from: `"MaslogCare" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "MaslogCare – Your Appointment is Confirmed",
+      html: generateAppointmentConfirmationHTML(fullname, appointmentDetails),
+      text: `Hello ${fullname}, your MaslogCare appointment has been confirmed.\n\nDate: ${appointmentDetails.date}\nTime: ${appointmentDetails.time}\nHealth Worker: ${appointmentDetails.worker}\nLocation: ${appointmentDetails.location}\n\nQuestions? Email help@maslogcare.ph or visit the health center.`,
       attachments: buildAttachments("logo", "heroNotif"),
     });
     console.log("✅ Appointment confirmation email sent to:", email);
@@ -848,11 +846,11 @@ const sendAppointmentReminderEmail = async (email, fullname = "User", appointmen
   }
   try {
     await transporter.sendMail({
-      from:        `"MaslogCare" <${process.env.EMAIL_USER}>`,
-      to:          email,
-      subject:     "MaslogCare – Reminder: Appointment Tomorrow",
-      html:        generateAppointmentReminderHTML(fullname, appointmentDetails),
-      text:        `Hello ${fullname}, this is a reminder of your upcoming MaslogCare appointment.\n\nDate: ${appointmentDetails.date}\nTime: ${appointmentDetails.time}\nHealth Worker: ${appointmentDetails.worker}\nLocation: ${appointmentDetails.location}\n\nPlease arrive 10 minutes early and bring your health booklet and valid ID.\nQuestions? Email help@maslogcare.ph`,
+      from: `"MaslogCare" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "MaslogCare – Reminder: Appointment Tomorrow",
+      html: generateAppointmentReminderHTML(fullname, appointmentDetails),
+      text: `Hello ${fullname}, this is a reminder of your upcoming MaslogCare appointment.\n\nDate: ${appointmentDetails.date}\nTime: ${appointmentDetails.time}\nHealth Worker: ${appointmentDetails.worker}\nLocation: ${appointmentDetails.location}\n\nPlease arrive 10 minutes early and bring your health booklet and valid ID.\nQuestions? Email help@maslogcare.ph`,
       attachments: buildAttachments("logo", "heroNotif"),
     });
     console.log("✅ Appointment reminder email sent to:", email);
@@ -869,11 +867,11 @@ const sendPasswordResetEmail = async (email, fullname = "User", resetUrl = "#") 
   }
   try {
     await transporter.sendMail({
-      from:        `"MaslogCare" <${process.env.EMAIL_USER}>`,
-      to:          email,
-      subject:     "MaslogCare – Password Reset Request",
-      html:        generatePasswordResetHTML(fullname, resetUrl),
-      text:        `Hello ${fullname},\n\nYou requested a password reset for your MaslogCare account.\n\nReset link (valid for 15 minutes):\n${resetUrl}\n\nIf you did not request this, please ignore this email or contact help@maslogcare.ph.`,
+      from: `"MaslogCare" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "MaslogCare – Password Reset Request",
+      html: generatePasswordResetHTML(fullname, resetUrl),
+      text: `Hello ${fullname},\n\nYou requested a password reset for your MaslogCare account.\n\nReset link (valid for 15 minutes):\n${resetUrl}\n\nIf you did not request this, please ignore this email or contact help@maslogcare.ph.`,
       attachments: buildAttachments("logo", "heroOtp"),
     });
     console.log("✅ Password reset email sent to:", email);

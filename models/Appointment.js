@@ -39,4 +39,4 @@ const AppointmentSchema = new mongoose.Schema(
 AppointmentSchema.index({ status: 1, prioritySortKey: 1, createdAt: 1 });
 AppointmentSchema.index({ missionSchedule: 1, slotStart: 1 });
 
-module.exports = mongoose.model("Appointment", AppointmentSchema);
+module.exports = mongoose.model("Appointment", AppointmentSchema, "appointments");

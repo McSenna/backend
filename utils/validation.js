@@ -27,10 +27,8 @@ const validateDateOfBirth = (dateOfBirth) => {
   }
 };
 
-const isValidAddress = (address) => {
-  const len = address?.trim().length;
-  return len >= 5 && len <= 255;
-};
+const isValidAddress = (address) =>
+  address && address.trim().length >= 5 && address.trim().length <= 255;
 
 const isValidGender = (gender) =>
   ["male", "female", "other"].includes(gender?.toLowerCase());
@@ -40,7 +38,6 @@ const isValidOTP = (otp) =>
 
 const validateRegistrationPayload = (data) => {
   const errors = [];
-
   if (!data.fullname) errors.push("Full name is required");
   else if (!isValidFullName(data.fullname)) errors.push("Full name must be between 2 and 100 characters");
 
