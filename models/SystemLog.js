@@ -4,10 +4,13 @@ const VALID_ACTIONS = [
   "LOGIN",
   "LOGOUT",
   "LOGIN_FAILED",
+  "RESIDENT_WEB_LOGIN_BLOCKED",
+  "PLATFORM_ACCESS_DENIED",
   "USER_CREATED",
   "USER_UPDATED",
   "USER_DELETED",
   "USER_ROLE_CHANGED",
+  "USER_STATUS_CHANGED",
   "USER_VERIFIED",
   "USER_UNVERIFIED",
   "APPOINTMENT_CREATED",
@@ -22,9 +25,18 @@ const VALID_ACTIONS = [
   "SCHEDULE_CREATED",
   "SCHEDULE_UPDATED",
   "SCHEDULE_DELETED",
+  "INVENTORY_ITEM_CREATED",
+  "INVENTORY_ITEM_UPDATED",
+  "INVENTORY_ITEM_DEACTIVATED",
+  "INVENTORY_STOCK_IN",
+  "INVENTORY_STOCK_OUT",
+  "INVENTORY_ADJUSTED",
+  "INVENTORY_EXPIRED_RECORDED",
 ];
 
 const VALID_ROLES = ["admin", "doctor", "midwife", "bhw", "resident", "unknown"];
+
+const VALID_SEVERITIES = ["info", "success", "warning", "error"];
 
 const SystemLogSchema = new mongoose.Schema(
   {
@@ -69,6 +81,13 @@ const SystemLogSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    clientPlatform: {
+      type: String,
+      default: "",
+      trim: true,
+      lowercase: true,
+      index: true,
+    },
     resource: {
       type: String,
       default: "",
@@ -89,6 +108,22 @@ const SystemLogSchema = new mongoose.Schema(
       default: true,
       index: true,
     },
+    severity: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: "info",
+      enum: {
+        values: VALID_SEVERITIES,
+        message: "Severity must be info, success, warning, or error",
+      },
+      index: true,
+    },
+    userAgent: {
+      type: String,
+      default: "",
+      trim: true,
+    },
     metadata: {
       type: mongoose.Schema.Types.Mixed,
       default: {},
@@ -106,7 +141,9 @@ SystemLogSchema.index({ role: 1, createdAt: -1 });
 SystemLogSchema.index({ platform: 1, createdAt: -1 });
 SystemLogSchema.index({ ipAddress: 1, createdAt: -1 });
 SystemLogSchema.index({ action: 1, role: 1, createdAt: -1 });
+SystemLogSchema.index({ severity: 1, createdAt: -1 });
 
 module.exports = mongoose.model("SystemLog", SystemLogSchema, "systemlogs");
 module.exports.VALID_ACTIONS = VALID_ACTIONS;
 module.exports.VALID_ROLES = VALID_ROLES;
+module.exports.VALID_SEVERITIES = VALID_SEVERITIES;

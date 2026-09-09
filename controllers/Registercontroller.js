@@ -1,7 +1,10 @@
 const { validationResult, body } = require("express-validator");
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
-const PendingRegistration = require("../models/Register");
+const PendingRegistration = require("../models/register");
+const asyncHandler = require("../utils/asyncHandler");
+const { validationFailed } = require("../utils/AppError");
+const { HTTP_STATUS } = require("../utils/errorCodes");
 
 const registerValidators = [
   body("fullname").trim().notEmpty().withMessage("Full name is required")
@@ -33,45 +36,33 @@ const sendOtpEmail = async (email, otp) => {
   }
 };
 
-const registerController = async (req, res) => {
+const registerController = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     const messages = errors.array().map((e) => e.msg);
-    return res.status(422).json({ success: false, message: messages[0], errors: messages });
+    throw validationFailed(messages[0], messages);
   }
 
   const { fullname, email, password, gender, dateOfBirth, address } = req.body;
 
-  try {
-    await PendingRegistration.deleteOne({ email });
+  await PendingRegistration.deleteOne({ email });
 
-    const pending = new PendingRegistration({ fullname, email, password, gender, dateOfBirth, address });
+  const pending = new PendingRegistration({ fullname, email, password, gender, dateOfBirth, address });
 
-    const plainOtp = generateOtp();
-    pending.otp = await bcrypt.hash(plainOtp, 10);
-    pending.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+  const plainOtp = generateOtp();
+  pending.otp = await bcrypt.hash(plainOtp, 10);
+  pending.otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-    await pending.save();
-    await sendOtpEmail(email, plainOtp);
+  await pending.save();
+  await sendOtpEmail(email, plainOtp);
 
-    return res.status(201).json({
-      success: true,
-      message: "Registration successful. Please check your email for the OTP.",
-      email,
-    });
-  } catch (error) {
-    if (error.code === 11000) {
-      return res.status(409).json({ success: false, message: "An account with this email already exists." });
-    }
-
-    if (error.name === "ValidationError") {
-      const messages = Object.values(error.errors).map((e) => e.message);
-      return res.status(422).json({ success: false, message: messages[0], errors: messages });
-    }
-
-    console.error("❌ Registration error:", error);
-    return res.status(500).json({ success: false, message: "An unexpected error occurred. Please try again." });
-  }
-};
+  // Duplicate email (E11000) and Mongoose ValidationError are normalized by the
+  // global error handler, so they no longer need per-controller branches here.
+  return res.status(HTTP_STATUS.CREATED).json({
+    success: true,
+    message: "Registration successful. Please check your email for the OTP.",
+    email,
+  });
+});
 
 module.exports = { registerController, registerValidators };

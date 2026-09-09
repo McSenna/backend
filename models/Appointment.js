@@ -7,7 +7,19 @@ const AppointmentSchema = new mongoose.Schema(
     resident: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     consultationType: { type: String, required: true },
     description: { type: String, default: "", maxlength: 4000 },
+    /** Anything the resident adds beyond the reason for the visit. Optional. */
+    additionalNotes: { type: String, default: "", maxlength: 1000 },
     isUrgent: { type: Boolean, default: false },
+
+    /**
+     * The health worker the resident asked for.
+     *
+     * A preference, not an assignment: the queue still decides the schedule,
+     * and `assignedBy` records who actually took the appointment. Kept
+     * separate so a resident's request can never be mistaken for a staff
+     * decision. Null when the resident expressed no preference.
+     */
+    preferredProvider: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
 
     status: {
       type: String,

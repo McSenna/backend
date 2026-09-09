@@ -1,6 +1,10 @@
 "use strict";
 
 const Notification = require("../models/Notification");
+const asyncHandler = require("../utils/asyncHandler");
+const { assertValidObjectId } = require("../utils/objectId");
+const { notFound } = require("../utils/AppError");
+const { ERROR_CODES, HTTP_STATUS } = require("../utils/errorCodes");
 
 function mapToNotificationItem(n) {
   return {
@@ -14,64 +18,65 @@ function mapToNotificationItem(n) {
   };
 }
 
-exports.getNotifications = async (req, res) => {
-  try {
-    const recipientId = req.user.userId;
+exports.getNotifications = asyncHandler(async (req, res) => {
+  const recipientId = req.user.userId;
 
-    const notifications = await Notification.find({
-      recipient: recipientId,
-    })
+  const [notifications, unreadCount] = await Promise.all([
+    Notification.find({ recipient: recipientId })
       .sort({ createdAt: -1 })
       .limit(50)
-      .lean();
+      .lean(),
+    Notification.countDocuments({ recipient: recipientId, isRead: false }),
+  ]);
 
-    const unreadCount = await Notification.countDocuments({
-      recipient: recipientId,
-      isRead: false,
-    });
+  return res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: "Notifications loaded successfully.",
+    unreadCount,
+    notifications: notifications.map(mapToNotificationItem),
+  });
+});
 
-    return res.json({
-      success: true,
-      unreadCount,
-      notifications: notifications.map(mapToNotificationItem),
-    });
-  } catch (err) {
-    console.error("getNotifications:", err);
-    return res.status(500).json({ success: false, message: "Failed to load notifications" });
+exports.markNotificationRead = asyncHandler(async (req, res) => {
+  const recipientId = req.user.userId;
+  const id = assertValidObjectId(req.params.id, "notification");
+
+  const updated = await Notification.findOneAndUpdate(
+    { _id: id, recipient: recipientId, isRead: false },
+    { $set: { isRead: true, readAt: new Date() } },
+    { new: true }
+  ).lean();
+
+  if (!updated) {
+    // Either the notification is not this user's, or it was already read.
+    // Only the former is an error; an already-read notification is a no-op.
+    const exists = await Notification.exists({ _id: id, recipient: recipientId });
+    if (!exists) {
+      throw notFound(
+        "This notification could not be found.",
+        ERROR_CODES.NOTIFICATION_NOT_FOUND
+      );
+    }
   }
-};
 
-exports.markNotificationRead = async (req, res) => {
-  try {
-    const recipientId = req.user.userId;
-    const { id } = req.params;
+  return res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: "Notification updated.",
+    updated: Boolean(updated),
+  });
+});
 
-    const updated = await Notification.findOneAndUpdate(
-      { _id: id, recipient: recipientId, isRead: false },
-      { $set: { isRead: true, readAt: new Date() } },
-      { new: true }
-    ).lean();
+exports.markAllNotificationsRead = asyncHandler(async (req, res) => {
+  const recipientId = req.user.userId;
 
-    return res.json({ success: true, updated: Boolean(updated) });
-  } catch (err) {
-    console.error("markNotificationRead:", err);
-    return res.status(500).json({ success: false, message: "Failed to mark notification as read" });
-  }
-};
+  const { modifiedCount } = await Notification.updateMany(
+    { recipient: recipientId, isRead: false },
+    { $set: { isRead: true, readAt: new Date() } }
+  );
 
-exports.markAllNotificationsRead = async (req, res) => {
-  try {
-    const recipientId = req.user.userId;
-
-    const { modifiedCount } = await Notification.updateMany(
-      { recipient: recipientId, isRead: false },
-      { $set: { isRead: true, readAt: new Date() } }
-    );
-
-    return res.json({ success: true, modifiedCount });
-  } catch (err) {
-    console.error("markAllNotificationsRead:", err);
-    return res.status(500).json({ success: false, message: "Failed to mark notifications as read" });
-  }
-};
-
+  return res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: "All notifications marked as read.",
+    modifiedCount,
+  });
+});

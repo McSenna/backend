@@ -1,5 +1,7 @@
 "use strict";
 
+const { tooManyRequests } = require("../utils/AppError");
+
 /**
  * In-Memory Sliding Window Rate Limiter
  * Zero external dependency, robust against burst spam and double-submit.
@@ -65,22 +67,22 @@ function otpRateLimiter(req, res, next) {
     "unknown-ip";
 
   if (ipLimiterStore.isLimited(clientIp)) {
-    console.warn(`⚠️  [RATE LIMIT] IP ${clientIp} exceeded OTP request rate limit`);
-    return res.status(429).json({
-      success: false,
-      code: "OTP_RATE_LIMITED",
-      message: "Too many requests from this device. Please wait before trying again.",
-    });
+    return next(
+      tooManyRequests(
+        "Too many requests from this device. Please wait before trying again.",
+        "OTP_RATE_LIMITED"
+      )
+    );
   }
 
   const email = (req.body?.email || "").toLowerCase().trim();
   if (email && emailLimiterStore.isLimited(email)) {
-    console.warn(`⚠️  [RATE LIMIT] Email ${email} exceeded OTP request limit`);
-    return res.status(429).json({
-      success: false,
-      code: "OTP_RATE_LIMITED",
-      message: "Too many verification requests for this email. Please wait a few minutes before trying again.",
-    });
+    return next(
+      tooManyRequests(
+        "Too many verification requests for this email. Please wait a few minutes before trying again.",
+        "OTP_RATE_LIMITED"
+      )
+    );
   }
 
   next();
