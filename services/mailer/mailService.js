@@ -8,18 +8,6 @@ const BASE_RETRY_DELAY_MS = 500;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/**
- * Core sendMail function with provider abstraction, error classification,
- * structured logging, and safe bounded retries for transient connection errors only.
- *
- * @param {Object} options
- * @param {string} options.to - Recipient email address
- * @param {string} options.subject - Email subject
- * @param {string} options.html - HTML content
- * @param {string} [options.text] - Plain text fallback
- * @param {Array} [options.attachments] - Array of attachments
- * @returns {Promise<Object>} Nodemailer info object
- */
 async function sendMail(options) {
   const { to, subject, html, text, attachments } = options;
   const config = getMailConfig();
@@ -69,7 +57,6 @@ async function sendMail(options) {
 
       console.error(`[MAIL] Delivery failed to ${maskedTo}: [${classified.code}] ${classified.message}`);
 
-      // NEVER retry quota, authentication, or recipient errors
       if (!classified.isRetryable || attempt > MAX_RETRIES) {
         throw classified;
       }

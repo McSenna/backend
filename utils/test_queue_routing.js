@@ -1,16 +1,5 @@
 "use strict";
 
-/**
- * Queue routing rules.
- *
- * Asserts the service → role → queue mapping and the per-request scoping that
- * enforces it. Runs against the config and controller directly, with no server
- * or database, so the routing contract can be checked in a second and cannot
- * regress unnoticed.
- *
- *   node utils/test_queue_routing.js
- */
-
 const {
   SERVICE_QUEUE_MAPPING,
   canCreateMission,
@@ -38,7 +27,6 @@ function sameSet(a, b) {
   return a.length === b.length && [...a].sort().join(",") === [...b].sort().join(",");
 }
 
-/** The scope a signed-in role gets, with an optional requested role filter. */
 function scopeFor(role, query = {}) {
   return resolveQueueScope({ user: { role }, query });
 }

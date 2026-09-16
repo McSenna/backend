@@ -35,14 +35,12 @@ async function runTests() {
     }
   }
 
-  // TEST 1: Masking Email Security (No full email leaks in logs)
   test("TEST 1: maskEmail masks local part correctly", () => {
     assert.strictEqual(maskEmail("john.doe@gmail.com"), "j***e@gmail.com");
     assert.strictEqual(maskEmail("ab@test.ph"), "a***@test.ph");
     assert.strictEqual(maskEmail(""), "unknown");
   });
 
-  // TEST 2: Quota Exceeded (550 Daily user sending limit exceeded)
   test("TEST 2: Gmail 550 Daily sending limit classified as EMAIL_QUOTA_EXCEEDED", () => {
     const gmailQuotaError = {
       message: "Data command failed: 550-5.4.5 Daily user sending limit exceeded.",
@@ -55,10 +53,9 @@ async function runTests() {
     const classified = classifySmtpError(gmailQuotaError);
     assert.strictEqual(classified.code, EmailErrorCode.QUOTA_EXCEEDED);
     assert.strictEqual(classified.httpStatus, 503);
-    assert.strictEqual(classified.isRetryable, false); // Must NOT retry!
+    assert.strictEqual(classified.isRetryable, false);
   });
 
-  // TEST 3: Authentication Failure (535)
   test("TEST 3: SMTP 535 Bad Credentials classified as EMAIL_AUTH_FAILED", () => {
     const authError = {
       message: "Invalid login: 535-5.7.8 Username and Password not accepted.",
@@ -73,7 +70,6 @@ async function runTests() {
     assert.strictEqual(classified.isRetryable, false);
   });
 
-  // TEST 4: Network Failure (ECONNREFUSED / ETIMEDOUT)
   test("TEST 4: Network failure classified as EMAIL_NETWORK_ERROR with retryable flag", () => {
     const connError = {
       message: "connect ECONNREFUSED 127.0.0.1:465",
@@ -83,10 +79,9 @@ async function runTests() {
     const classified = classifySmtpError(connError);
     assert.strictEqual(classified.code, EmailErrorCode.NETWORK_ERROR);
     assert.strictEqual(classified.httpStatus, 503);
-    assert.strictEqual(classified.isRetryable, true); // Transient error can retry
+    assert.strictEqual(classified.isRetryable, true);
   });
 
-  // TEST 5: Rate limit error (421 / 429)
   test("TEST 5: Provider rate limit 429 classified as EMAIL_RATE_LIMITED", () => {
     const rateError = {
       message: "421 4.7.0 Try again later, closing connection.",
@@ -98,7 +93,6 @@ async function runTests() {
     assert.strictEqual(classified.httpStatus, 429);
   });
 
-  // TEST 6: OTP Hashing Verification
   await asyncTest("TEST 6: OTP is properly hashed with bcrypt", async () => {
     const plainOtp = "654321";
     const salt = await bcrypt.genSalt(10);
@@ -112,7 +106,6 @@ async function runTests() {
     assert.notStrictEqual(plainOtp, hashed);
   });
 
-  // TEST 7: Production Safety - Verify OTP is NOT exposed in response payload
   test("TEST 7: Production safety - Sensitive fields stripped from JSON response", () => {
     const userDoc = {
       fullname: "Resident Test",

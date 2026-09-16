@@ -3,299 +3,95 @@
 const Appointment = require("../models/Appointment");
 const MissionSchedule = require("../models/MissionSchedule");
 const User = require("../models/User");
-const Notification = require("../models/Notification");
-const { sendAppointmentConfirmationEmail } = require("../services/mailer");
-const { ageToTier, computeAgeYears } = require("../utils/priorityQueue");
-const { validateDurationForCategory } = require("../config/consultationCategories");
-const { suggestNextAvailableSlot } = require("../utils/slotAvailability");
+const { loadMissionQueue, planSlotFor } = require("./triage/missionQueueContext");
+const { announceAutoConfirm } = require("./triage/autoConfirmNotifier");
 
-const BOOKED_STATUSES = ["confirmed", "rescheduled"];
+const normalizeDayStart = (value) => {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
 
-function normalizeDayStart(d) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
+const claimPendingAppointment = ({ appointment, mission, plan, staffId, now }) =>
+  Appointment.findOneAndUpdate(
+    { _id: appointment._id, status: "pending" },
+    {
+      $set: {
+        ageTier: appointment._computedPriorityTag ?? appointment.prioritySortKey,
+        prioritySortKey: appointment._computedPriorityTag ?? appointment.prioritySortKey,
+        ageAtSubmission: appointment._computedAgeYears ?? appointment.ageAtSubmission,
 
-function formatConsultationTypeLabel(key) {
-  return String(key || "")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function formatAppointmentDetails(slotStart, workerLabel, locationLabel) {
-  const d = new Date(slotStart);
-  return {
-    date: d.toLocaleDateString("en-PH", { weekday: "short", year: "numeric", month: "short", day: "numeric" }),
-    time: d.toLocaleTimeString("en-PH", { hour: "numeric", minute: "2-digit" }),
-    worker: workerLabel || "Medical mission team",
-    location: locationLabel || "Barangay health mission site",
-  };
-}
-
-function formatSlotStartForNotification(slotStart) {
-  if (!slotStart) return "";
-  const d = new Date(slotStart);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-}
-
-function computePriorityFromAppointmentDoc(appt, residentDOB) {
-  const ageYears = computeAgeYears(residentDOB);
-  const priorityTag = ageToTier(ageYears);
-  return { ageYears, priorityTag };
-}
-
-async function tagPendingAppointments(pendingAppointments) {
-  // Enforce strict triage tagging whenever we reprocess the queue.
-  // This ensures sort order is always based on AGE, not stale stored values.
-  const bulkOps = [];
-  for (const appt of pendingAppointments) {
-    const residentDOB = appt?.resident?.dateOfBirth;
-    const { ageYears, priorityTag } = computePriorityFromAppointmentDoc(appt, residentDOB);
-
-    bulkOps.push({
-      updateOne: {
-        filter: { _id: appt._id },
-        update: {
-          $set: {
-            ageTier: priorityTag,
-            prioritySortKey: priorityTag,
-            ageAtSubmission: ageYears,
-          },
-        },
+        missionSchedule: mission._id,
+        assignedCategoryKey: plan.categoryKey,
+        assignedDurationMinutes: plan.durationMinutes,
+        slotStart: new Date(plan.slotStartIso),
+        slotEnd: new Date(new Date(plan.slotStartIso).getTime() + plan.durationMinutes * 60 * 1000),
+        assignedBy: staffId ?? null,
+        assignedAt: now,
+        status: "confirmed",
       },
-    });
+    },
+    { new: true }
+  );
 
-    // Also attach computed fields locally so our in-memory sorting uses fresh data.
-    appt._computedPriorityTag = priorityTag;
-    appt._computedAgeYears = ageYears;
-  }
-
-  if (bulkOps.length) {
-    await Appointment.bulkWrite(bulkOps, { ordered: true });
-  }
-}
-
-function buildMissionCategoryMap(mission) {
-  const map = new Map();
-  for (const c of mission.categories || []) {
-    if (c?.categoryKey) map.set(c.categoryKey, c.durationMinutes);
-  }
-  return map;
-}
-
-/**
- * Assign as many pending appointments as possible into the mission schedule,
- * always in strict (priorityTag ASC, createdAt ASC) order.
- *
- * Safe mode: does NOT displace already-confirmed/rescheduled appointments.
- */
-async function processMissionSchedulePriorityQueue(missionScheduleId, { staffId } = {}) {
-  const mission = await MissionSchedule.findById(missionScheduleId).lean();
-  if (!mission) {
+const processMissionSchedulePriorityQueue = async (missionScheduleId, { staffId } = {}) => {
+  const queue = await loadMissionQueue(missionScheduleId, "dateOfBirth fullname email");
+  if (!queue) {
     return { assigned: 0, missionScheduleId, reason: "Mission schedule not found" };
   }
 
-  const missionCategoryMap = buildMissionCategoryMap(mission);
-  const staffUser = staffId ? await User.findById(staffId).lean() : null;
-  const doctorLabel = staffUser?.fullname ?? null;
-
-  // Existing confirmed/rescheduled bookings occupy time, so we must not conflict with them.
-  const booked = await Appointment.find({
-    missionSchedule: mission._id,
-    status: { $in: BOOKED_STATUSES },
-  })
-    .select("slotStart slotEnd _id")
-    .lean();
-
-  const bookedSim = booked.map((b) => ({
-    _id: b._id,
-    slotStart: b.slotStart,
-    slotEnd: b.slotEnd,
-  }));
-
-  // Load all pending appointments and compute strict priority tags based on resident AGE.
-  const pending = await Appointment.find({ status: "pending" })
-    .populate("resident", "dateOfBirth fullname email")
-    .select("consultationType createdAt ageTier prioritySortKey ageAtSubmission _id")
-    .exec();
-
+  const { mission, missionCategoryMap, bookedSim, pending } = queue;
   if (!pending.length) return { assigned: 0, missionScheduleId };
 
-  await tagPendingAppointments(pending);
-
-  pending.sort((a, b) => {
-    const pa = a._computedPriorityTag ?? a.prioritySortKey ?? 4;
-    const pb = b._computedPriorityTag ?? b.prioritySortKey ?? 4;
-    if (pa !== pb) return pa - pb;
-    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-  });
-
+  const staffUser = staffId ? await User.findById(staffId).lean() : null;
+  const doctorLabel = staffUser?.fullname ?? null;
   const now = new Date();
   let assigned = 0;
 
-  for (const appt of pending) {
-    const categoryKey = appt.consultationType;
-    const missionDurationMinutes = missionCategoryMap.get(categoryKey);
-    if (!missionDurationMinutes) continue; // No matching slot category on this mission.
+  for (const appointment of pending) {
+    const plan = planSlotFor({ appointment, mission, missionCategoryMap, bookedSim });
+    if (!plan) continue;
 
-    const v = validateDurationForCategory(categoryKey, missionDurationMinutes);
-    if (!v.ok) continue;
+    const updated = await claimPendingAppointment({ appointment, mission, plan, staffId, now });
+    if (!updated) continue;
 
-    // Find earliest available start time for this appointment category/duration.
-    const slotStartIso = suggestNextAvailableSlot(mission, bookedSim, v.durationMinutes, null);
-    if (!slotStartIso) continue; // Matching time slot not available.
-
-    const slotStartDate = new Date(slotStartIso);
-    const slotEndDate = new Date(slotStartDate.getTime() + v.durationMinutes * 60 * 1000);
-
-    // Claim-and-assign atomically so we don't confirm a previously-taken "pending" appointment.
-    const updated = await Appointment.findOneAndUpdate(
-      { _id: appt._id, status: "pending" },
-      {
-        $set: {
-          // Re-apply computed strict triage data (so the stored tag stays correct).
-          ageTier: appt._computedPriorityTag ?? appt.prioritySortKey,
-          prioritySortKey: appt._computedPriorityTag ?? appt.prioritySortKey,
-          ageAtSubmission: appt._computedAgeYears ?? appt.ageAtSubmission,
-
-          missionSchedule: mission._id,
-          assignedCategoryKey: categoryKey,
-          assignedDurationMinutes: v.durationMinutes,
-          slotStart: slotStartDate,
-          slotEnd: slotEndDate,
-          assignedBy: staffId ?? null,
-          assignedAt: now,
-          status: "confirmed",
-        },
-      },
-      { new: true }
-    );
-
-    if (!updated) continue; // Someone else assigned it first.
-
-    const resident = appt?.resident;
-    const residentRecipientId = resident?._id ?? appt.resident;
-    const appointmentTypeLabel = formatConsultationTypeLabel(appt.consultationType);
-    const details = {
-      ...formatAppointmentDetails(updated.slotStart, doctorLabel, null),
-      appointmentType: appointmentTypeLabel,
-    };
-    const timeLabel = formatSlotStartForNotification(updated.slotStart);
-
-    // Fire-and-forget notifications + email so queue assignment stays fast.
-    void Notification.create({
-      recipient: residentRecipientId,
-      appointment: updated._id,
-      type: "appointment_confirmed",
-      title: "Appointment confirmed",
-      body: `Your ${appointmentTypeLabel} appointment is confirmed. Date: ${details.date}. Time: ${details.time}. Doctor: ${doctorLabel || "Medical mission team"}.`,
-      time: timeLabel,
-      tone: "success",
-    }).catch((e) => {
-      console.warn("Auto-confirm notification failed:", e?.message ?? e);
-    });
-
-    if (staffId) {
-      void Notification.create({
-        recipient: staffId,
-        appointment: updated._id,
-        type: "appointment_confirmed",
-        title: "Appointment confirmed",
-        body: `${resident?.fullname ? `${resident.fullname}'s` : "A patient's"} ${appointmentTypeLabel} appointment is confirmed.`,
-        time: timeLabel,
-        tone: "success",
-      }).catch((e) => {
-        console.warn("Auto-confirm staff notification failed:", e?.message ?? e);
-      });
-    }
-
-    if (resident?.email) {
-      void sendAppointmentConfirmationEmail(resident.email, resident.fullname, details).catch((e) => {
-        console.warn("Auto-confirm email failed:", e?.message ?? e);
-      });
-    }
+    announceAutoConfirm({ appointment, updated, staffId, doctorLabel });
 
     bookedSim.push({
       _id: updated._id,
-      slotStart: slotStartDate,
-      slotEnd: slotEndDate,
+      slotStart: updated.slotStart,
+      slotEnd: updated.slotEnd,
     });
     assigned += 1;
   }
 
   return { assigned, missionScheduleId };
-}
+};
 
-/**
- * Finds the first pending appointment that can be assigned into the mission schedule
- * without conflicting with existing booked slots.
- *
- * Used to enforce strict "never assign a lower priority before a higher priority".
- */
-async function getFirstAssignablePendingAppointmentForMission(missionScheduleId) {
-  const mission = await MissionSchedule.findById(missionScheduleId).lean();
-  if (!mission) return null;
-  const missionCategoryMap = buildMissionCategoryMap(mission);
+const getFirstAssignablePendingAppointmentForMission = async (missionScheduleId) => {
+  const queue = await loadMissionQueue(missionScheduleId, "dateOfBirth");
+  if (!queue) return null;
 
-  const booked = await Appointment.find({
-    missionSchedule: mission._id,
-    status: { $in: BOOKED_STATUSES },
-  })
-    .select("slotStart slotEnd _id")
-    .lean();
-
-  const bookedSim = booked.map((b) => ({
-    _id: b._id,
-    slotStart: b.slotStart,
-    slotEnd: b.slotEnd,
-  }));
-
-  const pending = await Appointment.find({ status: "pending" })
-    .populate("resident", "dateOfBirth")
-    .select("consultationType createdAt ageTier prioritySortKey ageAtSubmission _id")
-    .exec();
-
+  const { mission, missionCategoryMap, bookedSim, pending } = queue;
   if (!pending.length) return null;
 
-  await tagPendingAppointments(pending);
-
-  pending.sort((a, b) => {
-    const pa = a._computedPriorityTag ?? a.prioritySortKey ?? 4;
-    const pb = b._computedPriorityTag ?? b.prioritySortKey ?? 4;
-    if (pa !== pb) return pa - pb;
-    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-  });
-
-  for (const appt of pending) {
-    const categoryKey = appt.consultationType;
-    const missionDurationMinutes = missionCategoryMap.get(categoryKey);
-    if (!missionDurationMinutes) continue;
-
-    const v = validateDurationForCategory(categoryKey, missionDurationMinutes);
-    if (!v.ok) continue;
-
-    const slotStartIso = suggestNextAvailableSlot(mission, bookedSim, v.durationMinutes, null);
-    if (!slotStartIso) continue;
+  for (const appointment of pending) {
+    const plan = planSlotFor({ appointment, mission, missionCategoryMap, bookedSim });
+    if (!plan) continue;
 
     return {
-      appointmentId: appt._id,
-      priorityTag: appt._computedPriorityTag ?? appt.prioritySortKey,
-      categoryKey,
-      durationMinutes: v.durationMinutes,
-      suggestedSlotStart: slotStartIso,
+      appointmentId: appointment._id,
+      priorityTag: appointment._computedPriorityTag ?? appointment.prioritySortKey,
+      categoryKey: plan.categoryKey,
+      durationMinutes: plan.durationMinutes,
+      suggestedSlotStart: plan.slotStartIso,
     };
   }
 
   return null;
-}
+};
 
-/**
- * Reprocesses triage across all upcoming mission schedules.
- * Safe mode only assigns pending appointments to open time slots.
- */
-async function processUpcomingMissionSchedulesPriorityQueue({ staffId } = {}) {
+const processUpcomingMissionSchedulesPriorityQueue = async ({ staffId } = {}) => {
   const today = normalizeDayStart(new Date());
 
   const missions = await MissionSchedule.find({ date: { $gte: today } })
@@ -304,19 +100,17 @@ async function processUpcomingMissionSchedulesPriorityQueue({ staffId } = {}) {
     .lean();
 
   let totalAssigned = 0;
-  for (const m of missions) {
-    const r = await processMissionSchedulePriorityQueue(m._id, { staffId });
-    totalAssigned += r.assigned || 0;
-    const remaining = await Appointment.countDocuments({ status: "pending" });
-    if (remaining === 0) break;
+  for (const mission of missions) {
+    const result = await processMissionSchedulePriorityQueue(mission._id, { staffId });
+    totalAssigned += result.assigned || 0;
+    if ((await Appointment.countDocuments({ status: "pending" })) === 0) break;
   }
 
   return { totalAssigned };
-}
+};
 
 module.exports = {
   processMissionSchedulePriorityQueue,
   processUpcomingMissionSchedulesPriorityQueue,
   getFirstAssignablePendingAppointmentForMission,
 };
-

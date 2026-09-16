@@ -53,9 +53,6 @@ function intervalsOverlap(aStart, aEnd, bStart, bEnd) {
   return aStart < bEnd && bStart < aEnd;
 }
 
-/**
- * Returns true if [slotStart, slotEnd) conflicts with any booked appointment.
- */
 function hasConflict(booked, slotStart, slotEnd, excludeAppointmentId) {
   const ex = excludeAppointmentId ? String(excludeAppointmentId) : null;
   const s = slotStart.getTime();
@@ -70,9 +67,6 @@ function hasConflict(booked, slotStart, slotEnd, excludeAppointmentId) {
   return false;
 }
 
-/**
- * Enumerate candidate start times every STEP_MINUTES within windows that fit duration.
- */
 function listAvailableStarts(mission, bookedAppointments, durationMinutes, excludeAppointmentId) {
   const windows = getMissionDayWindows(mission);
   if (!windows.length) return [];

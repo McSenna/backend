@@ -1,6 +1,5 @@
 "use strict";
 
-// Centralized transporter re-export for full backward compatibility
 const {
   transporter,
   hasCredentials,

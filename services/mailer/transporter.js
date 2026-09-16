@@ -48,7 +48,6 @@ const isEmailEnabled = () => {
 const createCentralTransporter = () => {
   const config = getMailConfig();
 
-  // If email is explicitly disabled (dev mock mode)
   if (!config.enabled || config.provider === "mock") {
     console.log("ℹ️  [MAIL] Mock email transport initialized (EMAIL_ENABLED=false or provider=mock).");
     return {
@@ -93,9 +92,6 @@ const createCentralTransporter = () => {
 
 const transporter = createCentralTransporter();
 
-/**
- * Masks an email for safe logging (e.g. j***n@example.com)
- */
 function maskEmail(email) {
   if (!email || typeof email !== "string") return "unknown";
   const [local, domain] = email.split("@");
@@ -106,9 +102,6 @@ function maskEmail(email) {
   return `${local[0]}***${local[local.length - 1]}@${domain}`;
 }
 
-/**
- * Validates configuration and verifies SMTP connection if configured
- */
 const verifyTransport = () => {
   const config = getMailConfig();
 

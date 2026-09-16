@@ -1,13 +1,5 @@
 "use strict";
 
-/**
- * Central catalogue of machine-readable error codes and HTTP statuses.
- *
- * Codes are contract: the frontend branches on them, so they must stay stable.
- * Messages are human-readable and are supplied at the throw site (or by the
- * global error handler for normalized infrastructure errors).
- */
-
 const HTTP_STATUS = Object.freeze({
   OK: 200,
   CREATED: 201,
@@ -26,7 +18,6 @@ const HTTP_STATUS = Object.freeze({
 });
 
 const ERROR_CODES = Object.freeze({
-  // Validation / input
   VALIDATION_ERROR: "VALIDATION_ERROR",
   MISSING_FIELDS: "MISSING_FIELDS",
   INVALID_ID: "INVALID_ID",
@@ -35,7 +26,6 @@ const ERROR_CODES = Object.freeze({
   PAYLOAD_TOO_LARGE: "PAYLOAD_TOO_LARGE",
   MALFORMED_JSON: "MALFORMED_JSON",
 
-  // Authentication
   AUTHENTICATION_REQUIRED: "AUTHENTICATION_REQUIRED",
   INVALID_CREDENTIALS: "INVALID_CREDENTIALS",
   TOKEN_EXPIRED: "TOKEN_EXPIRED",
@@ -43,16 +33,19 @@ const ERROR_CODES = Object.freeze({
   ACCOUNT_UNVERIFIED: "ACCOUNT_UNVERIFIED",
   ACCOUNT_NOT_FOUND: "ACCOUNT_NOT_FOUND",
   ACCOUNT_DISABLED: "ACCOUNT_DISABLED",
+  ACCOUNT_PENDING_VERIFICATION: "ACCOUNT_PENDING_VERIFICATION",
+  REGISTRATION_REJECTED: "REGISTRATION_REJECTED",
+  ACCOUNT_SUSPENDED: "ACCOUNT_SUSPENDED",
+  ACCOUNT_DEACTIVATED: "ACCOUNT_DEACTIVATED",
+  INVALID_ID_DOCUMENT: "INVALID_ID_DOCUMENT",
+  REQUEST_ALREADY_PROCESSED: "REQUEST_ALREADY_PROCESSED",
 
-  // Authorization
   FORBIDDEN: "FORBIDDEN",
 
-  // Platform authorization
   PLATFORM_ACCESS_DENIED: "PLATFORM_ACCESS_DENIED",
   RESIDENT_WEB_ACCESS_DENIED: "RESIDENT_WEB_ACCESS_DENIED",
   PLATFORM_CONTEXT_MISMATCH: "PLATFORM_CONTEXT_MISMATCH",
 
-  // Not found
   ROUTE_NOT_FOUND: "ROUTE_NOT_FOUND",
   NOT_FOUND: "NOT_FOUND",
   USER_NOT_FOUND: "USER_NOT_FOUND",
@@ -61,7 +54,6 @@ const ERROR_CODES = Object.freeze({
   NOTIFICATION_NOT_FOUND: "NOTIFICATION_NOT_FOUND",
   REGISTRATION_NOT_FOUND: "REGISTRATION_NOT_FOUND",
 
-  // Conflict
   CONFLICT: "CONFLICT",
   DUPLICATE_RESOURCE: "DUPLICATE_RESOURCE",
   EMAIL_EXISTS: "EMAIL_EXISTS",
@@ -71,28 +63,24 @@ const ERROR_CODES = Object.freeze({
   INVALID_STATUS_TRANSITION: "INVALID_STATUS_TRANSITION",
   TRIAGE_ORDER_VIOLATION: "TRIAGE_ORDER_VIOLATION",
 
-  // OTP / registration flow
   OTP_INVALID: "OTP_INVALID",
   OTP_EXPIRED: "OTP_EXPIRED",
   OTP_MAX_ATTEMPTS: "OTP_MAX_ATTEMPTS",
   OTP_COOLDOWN: "OTP_COOLDOWN",
   OTP_RATE_LIMITED: "OTP_RATE_LIMITED",
+  EMAIL_NOT_VERIFIED: "EMAIL_NOT_VERIFIED",
+  EMAIL_VERIFICATION_EXPIRED: "EMAIL_VERIFICATION_EXPIRED",
   INVALID_SESSION: "INVALID_SESSION",
 
-  // Rate limiting
   RATE_LIMIT_EXCEEDED: "RATE_LIMIT_EXCEEDED",
+  LOGIN_RATE_LIMITED: "LOGIN_RATE_LIMITED",
 
-  // Infrastructure
   DATABASE_ERROR: "DATABASE_ERROR",
   SERVICE_UNAVAILABLE: "SERVICE_UNAVAILABLE",
   EMAIL_SERVICE_LIMIT: "EMAIL_SERVICE_LIMIT",
   INTERNAL_SERVER_ERROR: "INTERNAL_SERVER_ERROR",
 });
 
-/**
- * Safe, user-facing messages for errors that are normalized centrally rather
- * than thrown with an explicit message.
- */
 const SAFE_MESSAGES = Object.freeze({
   [ERROR_CODES.AUTHENTICATION_REQUIRED]:
     "Your session has expired. Please log in again.",
@@ -124,6 +112,8 @@ const SAFE_MESSAGES = Object.freeze({
     "The request could not be read. Please try again.",
   [ERROR_CODES.RATE_LIMIT_EXCEEDED]:
     "Too many requests. Please try again shortly.",
+  [ERROR_CODES.LOGIN_RATE_LIMITED]:
+    "Too many sign-in attempts. Please wait a few minutes and try again.",
   [ERROR_CODES.INTERNAL_SERVER_ERROR]:
     "An unexpected error occurred. Please try again later.",
 });

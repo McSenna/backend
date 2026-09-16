@@ -12,19 +12,6 @@ const { unauthorized } = require("../utils/AppError");
 const { ERROR_CODES } = require("../utils/errorCodes");
 const logger = require("../utils/logger");
 
-/**
- * Authenticates the bearer token and confirms the account behind it is still
- * usable.
- *
- * Every rejection here is a 401 carrying a machine code, so the client can tell
- * an expired session (re-login) apart from a malformed token (drop the session)
- * without parsing prose. A missing JWT secret is a server fault, not the
- * caller's, and stays a 500 through the global handler.
- *
- * The account's role, status and platform are re-read on every request rather
- * than trusted from the token, so a suspension, a role change or the platform
- * policy takes effect immediately instead of when the token happens to expire.
- */
 const authenticateSession = async (req) => {
   const authHeader = req.headers.authorization || "";
 
@@ -44,8 +31,6 @@ const authenticateSession = async (req) => {
   }
 
   if (!process.env.JWT_SECRET) {
-    // Misconfiguration, not a client error: let it fall through as a 500 so it
-    // is loud in the logs rather than masquerading as a rejected login.
     logger.error("JWT_SECRET is not configured; cannot verify tokens");
     throw new Error("JWT_SECRET is not configured");
   }
@@ -54,7 +39,6 @@ const authenticateSession = async (req) => {
   try {
     payload = jwt.verify(token, process.env.JWT_SECRET);
   } catch (error) {
-    // jsonwebtoken distinguishes expiry from tampering; preserve that.
     if (error.name === "TokenExpiredError") {
       throw unauthorized(
         "Your session has expired. Please log in again.",
@@ -67,8 +51,6 @@ const authenticateSession = async (req) => {
     );
   }
 
-  // A structurally valid token can still belong to an account that was deleted
-  // or unverified after the token was issued.
   const account = await User.findById(payload.userId)
     .select("_id role verified status")
     .lean();
@@ -87,9 +69,6 @@ const authenticateSession = async (req) => {
     );
   }
 
-  // Account standing is an administrator's decision and can change while a
-  // session is open. A 401 (rather than a 403) is deliberate: the session is
-  // finished, and the client's 401 handling already clears it.
   const accountStatus = resolveUserStatus(account);
   if (BLOCKED_STATUSES.includes(accountStatus)) {
     throw unauthorized(
@@ -100,16 +79,10 @@ const authenticateSession = async (req) => {
     );
   }
 
-  // Sessions issued before platform binding existed carry no claim. Rather
-  // than trusting them as "any platform", the platform is resolved from the
-  // request itself, so an old resident token still cannot be used from a
-  // browser while staff sessions keep working.
   const claimedSessionPlatform = normalizePlatform(payload.platform);
   const requestPlatform = req.clientPlatform || resolveRequestPlatform(req);
   const sessionPlatform = claimedSessionPlatform || requestPlatform.platform;
 
-  // Trust the stored role over the token's copy so a role change takes effect
-  // without waiting for the token to expire.
   req.user = {
     ...payload,
     userId: String(account._id),
@@ -125,11 +98,6 @@ const authenticateSession = async (req) => {
   };
 };
 
-/**
- * The guard every protected route uses: authenticate, then apply the platform
- * matrix. Composed here rather than added route by route so a new endpoint is
- * platform-protected the moment it is authenticated.
- */
 const auth = asyncHandler(async (req, res, next) => {
   await authenticateSession(req);
   return enforcePlatformAccess(req, res, next);

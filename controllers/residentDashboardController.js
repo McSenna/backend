@@ -7,31 +7,10 @@ const asyncHandler = require("../utils/asyncHandler");
 const { notFound } = require("../utils/AppError");
 const { HTTP_STATUS } = require("../utils/errorCodes");
 
-/**
- * Statuses that mean the visit is still ahead of the resident.
- *
- * `pending` counts: the appointment is queued and awaiting a slot, which is
- * upcoming from the resident's point of view even though no date exists yet.
- * `declined` never counts, and there is no `completed` status in the schema —
- * a finished visit is a confirmed one whose slot has passed.
- */
 const UPCOMING_STATUSES = ["pending", "confirmed", "rescheduled"];
 
-/** Statuses that can represent an attended visit once the slot is in the past. */
 const ATTENDED_STATUSES = ["confirmed", "rescheduled"];
 
-/**
- * Everything the Resident Dashboard shows, for the authenticated resident only.
- *
- * One endpoint rather than five: the four cards and the next appointment are
- * counts over the same two collections, and doing them here keeps the phone
- * from downloading every appointment just to call `.length` on it.
- *
- * The resident is taken from `req.user.userId`, which the auth middleware
- * derives from the verified JWT. No identifier is read from the query string or
- * body, so there is no parameter a caller could change to reach another
- * resident's data.
- */
 const getResidentDashboard = asyncHandler(async (req, res) => {
   const residentId = req.user.userId;
   const now = new Date();
@@ -44,8 +23,6 @@ const getResidentDashboard = asyncHandler(async (req, res) => {
     throw notFound("Your resident profile could not be found.");
   }
 
-  // Every query below is pinned to `resident: residentId`, so authorization is
-  // enforced by the query itself rather than by filtering after the fact.
   const ownedByResident = { resident: residentId };
 
   const [
@@ -58,7 +35,6 @@ const getResidentDashboard = asyncHandler(async (req, res) => {
     Appointment.countDocuments({
       ...ownedByResident,
       status: { $in: UPCOMING_STATUSES },
-      // Either not scheduled yet, or scheduled for a moment still to come.
       $or: [{ slotStart: null }, { slotStart: { $gte: now } }],
     }),
 
@@ -68,9 +44,6 @@ const getResidentDashboard = asyncHandler(async (req, res) => {
       slotStart: { $ne: null, $lt: now },
     }),
 
-    // A health record is an appointment in this system — `records.tsx` already
-    // derives the resident's records from their appointments, and there is no
-    // separate records collection to count instead.
     Appointment.countDocuments(ownedByResident),
 
     Notification.countDocuments({ recipient: residentId, isRead: false }),
@@ -96,7 +69,6 @@ const getResidentDashboard = asyncHandler(async (req, res) => {
         id: String(resident._id),
         fullname: resident.fullname || "",
         firstName,
-        // Absent for most accounts; the client renders initials instead.
         profilePhoto: resident.profilePhoto || null,
       },
       statistics: {

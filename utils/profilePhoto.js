@@ -1,23 +1,20 @@
 "use strict";
 
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-const MAX_BYTES = Number(process.env.PROFILE_PHOTO_MAX_BYTES || 2_000_000); 
+const MAX_BYTES = Number(process.env.PROFILE_PHOTO_MAX_BYTES || 2_000_000);
 const DATA_URI_PREFIX_RE = /^data:(image\/[a-zA-Z0-9+.-]+);base64,/;
 
 function isBase64String(s) {
   if (!s || typeof s !== "string") return false;
   const trimmed = s.trim();
-  // Accept base64 with optional padding.
   return /^[A-Za-z0-9+/]+={0,2}$/.test(trimmed) && trimmed.length % 4 === 0;
 }
 
 function detectMimeFromMagic(buffer) {
   if (!buffer || buffer.length < 12) return null;
 
-  // JPEG
   if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "image/jpeg";
 
-  // PNG
   if (
     buffer[0] === 0x89 &&
     buffer[1] === 0x50 &&
@@ -31,12 +28,10 @@ function detectMimeFromMagic(buffer) {
     return "image/png";
   }
 
-  // WEBP
   if (buffer.toString("ascii", 0, 4) === "RIFF" && buffer.toString("ascii", 8, 12) === "WEBP") {
     return "image/webp";
   }
 
-  // GIF
   if (buffer.toString("ascii", 0, 6) === "GIF87a") return "image/gif";
   if (buffer.toString("ascii", 0, 6) === "GIF89a") return "image/gif";
 
@@ -85,7 +80,6 @@ function normalizeProfilePhoto(input) {
     return { ok: false, message: "profilePhoto must be a JPEG, PNG, WEBP, or GIF image" };
   }
 
-  // If a prefix was provided but magic doesn't match, treat as invalid.
   if (mimeFromPrefix && detectedMime && mimeFromPrefix !== detectedMime) {
     return { ok: false, message: "profilePhoto content type does not match provided data URI" };
   }

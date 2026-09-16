@@ -1,8 +1,5 @@
 "use strict";
 
-/**
- * Standard Email Error Classification Codes
- */
 const EmailErrorCode = Object.freeze({
   QUOTA_EXCEEDED: "EMAIL_QUOTA_EXCEEDED",
   AUTH_FAILED: "EMAIL_AUTH_FAILED",
@@ -14,9 +11,6 @@ const EmailErrorCode = Object.freeze({
   UNKNOWN_ERROR: "EMAIL_UNKNOWN_ERROR",
 });
 
-/**
- * Custom Error Class for Classified Mail Service Failures
- */
 class EmailServiceError extends Error {
   constructor(code, message, userMessage, httpStatus = 503, originalError = null) {
     super(message);
@@ -32,9 +26,6 @@ class EmailServiceError extends Error {
   }
 }
 
-/**
- * Inspects Nodemailer/SMTP errors and maps them to a classified EmailServiceError.
- */
 function classifySmtpError(err) {
   if (err instanceof EmailServiceError) {
     return err;
@@ -45,7 +36,6 @@ function classifySmtpError(err) {
   const responseCode = Number(err?.responseCode || 0);
   const sysCode = String(err?.code || "").toUpperCase();
 
-  // 1. Quota Exceeded (Gmail 550-5.4.5 Daily user sending limit exceeded, etc.)
   if (
     responseCode === 550 ||
     rawResponse.includes("daily user sending limit exceeded") ||
@@ -62,7 +52,6 @@ function classifySmtpError(err) {
     );
   }
 
-  // 2. Authentication Failure (535, invalid credentials)
   if (
     responseCode === 535 ||
     rawResponse.includes("authentication failed") ||
@@ -80,7 +69,6 @@ function classifySmtpError(err) {
     );
   }
 
-  // 3. Rate Limited / Temporary Provider Limit (421, 429)
   if (
     responseCode === 421 ||
     responseCode === 429 ||
@@ -97,14 +85,12 @@ function classifySmtpError(err) {
     );
   }
 
-  // 4. Network / Connection Failures
   const networkCodes = ["ECONNREFUSED", "ETIMEDOUT", "ECONNRESET", "ESOCKETTIMEDOUT", "ENOTFOUND", "EAI_AGAIN", "EENVELOPE"];
   if (
     networkCodes.includes(sysCode) ||
     rawMsg.includes("connection closed") ||
     rawMsg.includes("timed out")
   ) {
-    // Note: EENVELOPE without 550 is network/socket, but if 550 it matched Quota above
     return new EmailServiceError(
       EmailErrorCode.NETWORK_ERROR,
       `SMTP connection failure (${sysCode}): ${err.message}`,
@@ -114,7 +100,6 @@ function classifySmtpError(err) {
     );
   }
 
-  // 5. Recipient Failure (551, 553, mailbox not found)
   if (
     responseCode === 551 ||
     responseCode === 553 ||
@@ -131,7 +116,6 @@ function classifySmtpError(err) {
     );
   }
 
-  // 6. Unknown / Fallback
   return new EmailServiceError(
     EmailErrorCode.UNKNOWN_ERROR,
     `Unclassified email error: ${err.message}`,

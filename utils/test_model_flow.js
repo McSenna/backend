@@ -16,11 +16,9 @@ async function runModelAndFlowTests() {
   const testEmail = `test_flow_${Date.now()}@example.com`;
 
   try {
-    // 1. Clean up any existing test records
     await PendingRegistration.deleteMany({ email: testEmail });
     await User.deleteMany({ email: testEmail });
 
-    // 2. Create PendingRegistration with raw OTP
     const plainOtp = "842915";
     const pending = await PendingRegistration.create({
       fullname: "Flow Test Resident",
@@ -36,7 +34,6 @@ async function runModelAndFlowTests() {
       verificationAttempts: 0,
     });
 
-    // 3. Verify OTP is hashed in DB, NOT plain text
     const fetched = await PendingRegistration.findById(pending._id).select("+otp +otpExpires +password");
     console.log("3. Checking if stored OTP is hashed...");
     if (fetched.otp === plainOtp) {
@@ -47,7 +44,6 @@ async function runModelAndFlowTests() {
     }
     console.log("✅ Passed: Stored OTP is securely bcrypt-hashed");
 
-    // 4. Test verifyOtp method
     const correctMatch = await fetched.verifyOtp(plainOtp);
     const wrongMatch = await fetched.verifyOtp("000000");
     if (!correctMatch || wrongMatch) {
@@ -55,7 +51,6 @@ async function runModelAndFlowTests() {
     }
     console.log("✅ Passed: pending.verifyOtp() validates correctly against bcrypt hash");
 
-    // 5. Test attempt counter
     fetched.verificationAttempts = (fetched.verificationAttempts || 0) + 1;
     await fetched.save();
     const updated = await PendingRegistration.findById(pending._id).select("+verificationAttempts");
@@ -64,7 +59,6 @@ async function runModelAndFlowTests() {
     }
     console.log("✅ Passed: verificationAttempts incremented to 1 without destroying record");
 
-    // 6. Clean up
     await PendingRegistration.deleteMany({ email: testEmail });
     console.log("✅ Passed: Cleanup successful");
 

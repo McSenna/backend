@@ -22,12 +22,14 @@ const {
   generateAppointmentDeclinedHTML,
   generateAppointmentReminderHTML,
   generatePasswordResetHTML,
+  generatePasswordChangedHTML,
 } = {
   ...require("./templates/otpTemplate"),
   ...require("./templates/notificationTemplate"),
   ...require("./templates/welcomeTemplate"),
   ...require("./templates/appointmentTemplate"),
   ...require("./templates/passwordResetTemplate"),
+  ...require("./templates/passwordChangedTemplate"),
 };
 
 const {
@@ -39,6 +41,8 @@ const {
   sendAppointmentDeclinedEmail,
   sendAppointmentReminderEmail,
   sendPasswordResetEmail,
+  sendPasswordResetCodeEmail,
+  sendPasswordChangedEmail,
 } = {
   ...require("./senders/otp"),
   ...require("./senders/notification"),
@@ -48,7 +52,6 @@ const {
 };
 
 module.exports = {
-  // Transporter & core mail service
   transporter,
   sendMail,
   hasCredentials,
@@ -60,7 +63,6 @@ module.exports = {
   EmailErrorCode,
   classifySmtpError,
 
-  // Assets & templates
   ASSETS,
   buildAttachments,
   generateOTPEmailHTML,
@@ -71,8 +73,8 @@ module.exports = {
   generateAppointmentDeclinedHTML,
   generateAppointmentReminderHTML,
   generatePasswordResetHTML,
+  generatePasswordChangedHTML,
 
-  // Senders
   sendOTPEmail,
   sendNotificationEmail,
   sendWelcomeEmail,
@@ -81,4 +83,6 @@ module.exports = {
   sendAppointmentDeclinedEmail,
   sendAppointmentReminderEmail,
   sendPasswordResetEmail,
+  sendPasswordResetCodeEmail,
+  sendPasswordChangedEmail,
 };

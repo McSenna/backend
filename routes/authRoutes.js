@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const auth = require("../middleware/authMiddleware");
-const { otpRateLimiter } = require("../middleware/rateLimiter");
+const { otpRateLimiter, loginRateLimiter } = require("../middleware/rateLimiter");
 const {
   register,
   sendOtp,
@@ -9,15 +9,31 @@ const {
   login,
   logout,
 } = require("../controllers/authController");
+const {
+  sendEmailVerificationCode,
+  verifyEmailVerificationCode,
+} = require("../controllers/auth/emailVerificationController");
+const {
+  forgotPassword,
+  verifyResetCode,
+  resetPassword,
+} = require("../controllers/passwordResetController");
 
-// Registration and OTP verification (Rate limited)
 router.post("/register", otpRateLimiter, register);
 router.post("/send-otp", otpRateLimiter, sendOtp);
-router.post("/resend-otp", otpRateLimiter, sendOtp); // Standard alias
+router.post("/resend-otp", otpRateLimiter, sendOtp); 
 router.post("/verify-otp", otpRateLimiter, verifyOtp);
 
-// Standard Authentication
-router.post("/login", login);
+router.post("/email-verification/send", otpRateLimiter, sendEmailVerificationCode);
+router.post("/email-verification/resend", otpRateLimiter, sendEmailVerificationCode);
+router.post("/email-verification/verify", otpRateLimiter, verifyEmailVerificationCode);
+
+router.post("/login", loginRateLimiter, login);
+
+router.post("/forgot-password", otpRateLimiter, forgotPassword);
+router.post("/resend-reset-code", otpRateLimiter, forgotPassword);
+router.post("/verify-reset-code", otpRateLimiter, verifyResetCode);
+router.post("/reset-password", otpRateLimiter, resetPassword);
 router.post("/logout", auth, logout);
 
 module.exports = router;

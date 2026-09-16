@@ -1,14 +1,3 @@
-/**
- * End-to-end verification of the Book an Appointment service catalogue,
- * provider eligibility, and request validation.
- *
- * Seeds throwaway staff and one resident, drives the running server, then
- * deletes everything it created. It also asserts that appointments already in
- * the database were left untouched.
- *
- *   node utils/test_appointment_services.js
- *   TEST_PORT=5099 node utils/test_appointment_services.js
- */
 "use strict";
 
 require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
@@ -48,7 +37,6 @@ function check(name, condition, detail = "") {
   }
 }
 
-/** Raw http.request so the mobile client's exact headers can be reproduced. */
 function api(path, { method = "GET", body, token } = {}) {
   const url = new URL(`${BASE}${path}`);
   const payload = body ? JSON.stringify(body) : null;
@@ -130,7 +118,6 @@ async function seed() {
 async function run() {
   await mongoose.connect(process.env.MONGO_URI);
 
-  // Appointments already in the database must come out untouched.
   const before = await Appointment.find({})
     .select("_id status slotStart")
     .sort({ _id: 1 })
@@ -183,8 +170,6 @@ async function run() {
   const prenatal = await api("/appointment-providers?serviceType=prenatal", { token });
   const prenatalIds = (prenatal.data?.providers ?? []).map((p) => p._id);
   check("prenatal returns 200", prenatal.status === 200, `got ${prenatal.status}`);
-  // Each service is owned by exactly one role, so the provider list is that
-  // role and nobody else — the same rule that decides which queue it lands in.
   check("prenatal offers the midwife", prenatalIds.includes(staff.midwife));
   check("prenatal does not offer the doctor", !prenatalIds.includes(staff.doctor));
   check("prenatal does not offer the BHW", !prenatalIds.includes(staff.bhw));
@@ -204,7 +189,7 @@ async function run() {
   check(
     "a suspended provider is never offered",
     !prenatalIds.includes(staff["doctor-suspended"]) &&
-      !bpIds.includes(staff["doctor-suspended"])
+    !bpIds.includes(staff["doctor-suspended"])
   );
   check(
     "provider rows carry only name and role, no contact details",
@@ -244,7 +229,7 @@ async function run() {
   check(
     "resident never sets the schedule",
     booked.data?.appointment?.slotStart == null &&
-      booked.data?.appointment?.missionSchedule == null
+    booked.data?.appointment?.missionSchedule == null
   );
 
   console.log("\n== Server-side validation ==");
@@ -263,9 +248,6 @@ async function run() {
     `got ${wrongProvider.status}`
   );
 
-  // The routing cannot be steered from the client: the service decides the
-  // queue, so naming a provider from another queue is refused outright rather
-  // than quietly honoured.
   const bpToDoctor = await api("/appointments", {
     method: "POST",
     token,
@@ -349,9 +331,6 @@ async function run() {
     (mine.data?.appointments ?? []).some((a) => a.preferredProvider?.fullname)
   );
 
-  // The two requests this run created: one prenatal (midwife), one BP check
-  // (BHW). Neither belongs to a doctor, which is what makes them a fair test
-  // of whether a queue can show work that is not its own.
   const prenatalId = booked.data?.appointment?._id;
   const bpId = noProvider.data?.appointment?._id;
 
@@ -402,7 +381,6 @@ async function run() {
       ids.includes(String(bpId)) === (role === "bhw")
     );
 
-    // A staff member cannot widen their own scope from the query string.
     const widened = await api("/appointments/pending?role=admin", { token: staffToken });
     const widenedStray = (widened.data?.appointments ?? []).filter(
       (a) => !allowed.includes(a.consultationType)
@@ -461,7 +439,6 @@ async function run() {
       JSON.stringify(stats)
     );
 
-    // The counts must agree with the list the same role can actually read.
     const list = await api("/appointments?status=pending", { token: staffToken });
     check(
       `${role} pending count matches their own pending list`,
@@ -469,7 +446,6 @@ async function run() {
       `${ov.data?.statusCounts?.pending} vs ${(list.data?.appointments ?? []).length}`
     );
 
-    // And a staff member cannot widen the overview from the query string.
     const widened = await api("/appointments/overview?role=admin", { token: staffToken });
     check(
       `${role} cannot widen the overview with ?role=`,
@@ -494,7 +470,6 @@ async function run() {
       token: staffToken,
       body: missionBody,
     });
-    // The button is absent from their UI; this is the rule behind it.
     check(
       `${role} posting a mission directly -> 403`,
       attempt.status === 403,
@@ -541,6 +516,6 @@ run().catch(async (error) => {
   try {
     await cleanup();
     await mongoose.disconnect();
-  } catch {}
+  } catch { }
   process.exit(1);
 });

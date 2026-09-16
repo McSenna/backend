@@ -1,14 +1,5 @@
 "use strict";
 
-/**
- * Server-side logging for technical detail.
- *
- * Developer logs and user-facing messages are deliberately separate concerns:
- * everything here stays on the server. Keys that can carry credentials or
- * tokens are redacted so a stray metadata object never writes a secret to the
- * log stream.
- */
-
 const REDACTED = "[REDACTED]";
 
 const SENSITIVE_KEY_PATTERN =
@@ -59,10 +50,6 @@ const logger = {
     console.error(format("error", message, context));
   },
 
-  /**
-   * Logs a failed request with the request context the on-call developer needs,
-   * plus the stack trace outside production.
-   */
   requestError(err, req, { statusCode, code, isOperational }) {
     const context = {
       method: req?.method,
@@ -75,15 +62,10 @@ const logger = {
       role: req?.user?.role,
     };
 
-    // A stack trace is only useful for a fault nobody anticipated. Attaching
-    // one to every rejected login or validation failure buries the real
-    // incidents in noise.
     if (!isProduction() && !isOperational && err?.stack) {
       context.stack = err.stack;
     }
 
-    // 5xx means the server is at fault and deserves error level; 4xx is the
-    // client's input and is only worth a warning.
     if (statusCode >= 500) {
       logger.error("Request failed", context);
     } else {

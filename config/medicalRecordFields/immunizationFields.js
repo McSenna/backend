@@ -1,0 +1,118 @@
+"use strict";
+
+const IMMUNIZATION_FIELDS = Object.freeze([
+  {
+    key: "vaccineName",
+    label: "Vaccine administered",
+    type: "text",
+    group: "Vaccine",
+    required: true,
+    maxLength: 200,
+    inventoryCategory: "vaccine",
+    helper: "Pick from inventory to fill the lot and expiry automatically.",
+  },
+  {
+    key: "vaccineType",
+    label: "Vaccine type",
+    type: "text",
+    group: "Vaccine",
+    required: false,
+    maxLength: 120,
+  },
+  {
+    key: "dose",
+    label: "Dose",
+    type: "text",
+    group: "Vaccine",
+    required: false,
+    maxLength: 60,
+    helper: "e.g. 0.5 mL",
+  },
+  {
+    key: "doseNumber",
+    label: "Dose number",
+    type: "number",
+    group: "Vaccine",
+    required: true,
+    min: 1,
+    max: 10,
+  },
+  {
+    key: "batchNumber",
+    label: "Batch / lot number",
+    type: "text",
+    group: "Vaccine",
+    required: false,
+    maxLength: 80,
+  },
+  {
+    key: "expiryDate",
+    label: "Expiration date",
+    type: "date",
+    group: "Vaccine",
+    required: false,
+  },
+
+  {
+    key: "route",
+    label: "Route of administration",
+    type: "select",
+    group: "Administration",
+    required: false,
+    options: [
+      { value: "intramuscular", label: "Intramuscular" },
+      { value: "subcutaneous", label: "Subcutaneous" },
+      { value: "intradermal", label: "Intradermal" },
+      { value: "oral", label: "Oral" },
+    ],
+  },
+  {
+    key: "administrationSite",
+    label: "Administration site",
+    type: "select",
+    group: "Administration",
+    required: false,
+    options: [
+      { value: "left_deltoid", label: "Left deltoid" },
+      { value: "right_deltoid", label: "Right deltoid" },
+      { value: "left_thigh", label: "Left thigh" },
+      { value: "right_thigh", label: "Right thigh" },
+      { value: "oral", label: "Oral" },
+      { value: "other", label: "Other" },
+    ],
+  },
+  {
+    key: "administrationDate",
+    label: "Date administered",
+    type: "date",
+    group: "Administration",
+    required: false,
+  },
+
+  {
+    key: "observations",
+    label: "Observation / reaction",
+    type: "textarea",
+    group: "Observation",
+    required: false,
+    maxLength: 2000,
+  },
+  {
+    key: "adverseReaction",
+    label: "Adverse reaction",
+    type: "textarea",
+    group: "Observation",
+    required: false,
+    maxLength: 2000,
+    helper: "Leave blank if none was observed.",
+  },
+  {
+    key: "nextDoseDate",
+    label: "Next immunisation schedule",
+    type: "date",
+    group: "Observation",
+    required: false,
+  },
+]);
+
+module.exports = { IMMUNIZATION_FIELDS };

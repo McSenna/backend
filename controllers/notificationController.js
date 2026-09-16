@@ -48,8 +48,6 @@ exports.markNotificationRead = asyncHandler(async (req, res) => {
   ).lean();
 
   if (!updated) {
-    // Either the notification is not this user's, or it was already read.
-    // Only the former is an error; an already-read notification is a no-op.
     const exists = await Notification.exists({ _id: id, recipient: recipientId });
     if (!exists) {
       throw notFound(

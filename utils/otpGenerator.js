@@ -1,5 +1,8 @@
-const generateOTP = () =>
-  Math.floor(100000 + Math.random() * 900000).toString();
+"use strict";
+
+const crypto = require("crypto");
+
+const generateOTP = () => String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
 
 const generateOTPWithExpiry = (expiryMinutes = 5) => ({
   otp: generateOTP(),

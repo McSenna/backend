@@ -3,13 +3,7 @@
 const { forbidden, unauthorized } = require("../utils/AppError");
 const { ERROR_CODES } = require("../utils/errorCodes");
 
-/**
- * Restricts a route to the given roles.
- *
- * Reading `req.user.role` unguarded would throw a TypeError — and so a 500 —
- * if this ever ran before the auth middleware; an explicit 401 says what is
- * actually wrong.
- */
+
 const roleCheck = (roles) => (req, _res, next) => {
   const allowed = Array.isArray(roles) ? roles : [roles];
 

@@ -1,16 +1,3 @@
-/**
- * End-to-end verification of the MaslogCare platform access matrix.
- *
- * Seeds one throwaway account per role and account status, drives the running
- * server over HTTP as both a browser and the native app, then deletes every
- * account and log entry it created.
- *
- *   node utils/test_platform_access.js          # against localhost:5000
- *   TEST_PORT=5099 node utils/test_platform_access.js
- *
- * The registration section runs in-process with a stubbed mailer so the test
- * never sends real email.
- */
 "use strict";
 
 require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
@@ -26,7 +13,6 @@ const PASSWORD = "TestPass123!";
 const ROLES = ["admin", "doctor", "midwife", "bhw", "resident"];
 const emailFor = (key) => `${TAG}.${key}@maslogcare.test`;
 
-/** Headers a browser attaches on its own and page JS cannot remove. */
 const BROWSER_HEADERS = {
   Origin: "http://localhost:8081",
   Referer: "http://localhost:8081/",
@@ -37,7 +23,6 @@ const BROWSER_HEADERS = {
     "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36",
 };
 
-/** React Native sends none of those; just a JSON content type and its claim. */
 const NATIVE_HEADERS = { "User-Agent": "okhttp/4.9.2" };
 
 let passed = 0;
@@ -58,13 +43,6 @@ function check(name, condition, detail = "") {
 const http = require("http");
 const { URL } = require("url");
 
-/**
- * Raw http.request rather than global fetch: undici adds `Sec-Fetch-Mode: cors`
- * to every request it makes, which would make each "native" call look like a
- * browser to the server. React Native's networking (OkHttp on Android) sends
- * no Fetch Metadata headers, so the harness has to control the header list
- * exactly for the test to mean anything.
- */
 function api(path, { method = "GET", body, headers = {}, token } = {}) {
   const url = new URL(`${BASE}${path}`);
   const payload = body ? JSON.stringify(body) : null;
@@ -123,8 +101,6 @@ async function seed() {
   specs.push({ key: "resident-pending", role: "resident", status: "pending", verified: false });
   specs.push({ key: "doctor-suspended", role: "doctor", status: "suspended", verified: true });
 
-  // Clears anything an interrupted earlier run left behind, including its
-  // log entries, so orphaned rows cannot accumulate in the database.
   await cleanup();
 
   for (const spec of specs) {
@@ -213,7 +189,7 @@ async function run() {
   check(
     "resident on Android Chrome -> 403",
     residentPhoneBrowser.status === 403 &&
-      residentPhoneBrowser.data?.code === "RESIDENT_WEB_ACCESS_DENIED"
+    residentPhoneBrowser.data?.code === "RESIDENT_WEB_ACCESS_DENIED"
   );
 
   console.log("\n== 4/57. A forged clientPlatform claim does not help ==");
@@ -340,8 +316,8 @@ async function run() {
   check(
     "32/33. /users reports platformAccess per role",
     sample?.platformAccess?.label === "Mobile Only" &&
-      sample?.platformAccess?.web === false &&
-      sample?.platformAccess?.mobile === true,
+    sample?.platformAccess?.web === false &&
+    sample?.platformAccess?.mobile === true,
     JSON.stringify(sample?.platformAccess)
   );
   const staffSample = adminList.data?.users?.find((u) => u.email === emailFor("doctor"));
@@ -385,8 +361,8 @@ async function run() {
   check(
     "unknown email and wrong password are indistinguishable",
     unknown.status === wrongPassword.status &&
-      unknown.data?.code === wrongPassword.data?.code &&
-      unknown.data?.message === wrongPassword.data?.message,
+    unknown.data?.code === wrongPassword.data?.code &&
+    unknown.data?.message === wrongPassword.data?.message,
     `${unknown.status}/${unknown.data?.code} vs ${wrongPassword.status}/${wrongPassword.data?.code}`
   );
   const residentWrongPassword = await api("/login", {
@@ -408,7 +384,7 @@ async function run() {
   check("RESIDENT_WEB_LOGIN_BLOCKED entries were written", blockedLogs.length > 0);
   if (blockedLogs.length) {
     const log = blockedLogs[0];
-    check("blocked entry records role + client platform + failure", 
+    check("blocked entry records role + client platform + failure",
       log.role === "resident" && log.clientPlatform === "web" && log.success === false);
     check("blocked entry severity is error/warning", ["error", "warning"].includes(log.severity));
     const serialized = JSON.stringify(log);
@@ -424,17 +400,15 @@ async function run() {
   check("successful logins record their platform", successLogs.length > 0);
 
   console.log("\n== 7/9. Registration issues a session only where the role may hold one ==");
-  // In-process rather than over HTTP: verifying an OTP sends a welcome email,
-  // and a test must not put real mail on the wire.
   const mailerPath = require.resolve("../services/mailer");
   require.cache[mailerPath] = {
     id: mailerPath,
     filename: mailerPath,
     loaded: true,
     exports: {
-      sendOTPEmail: async () => {},
-      sendWelcomeEmail: async () => {},
-      verifyTransport: () => {},
+      sendOTPEmail: async () => { },
+      sendWelcomeEmail: async () => { },
+      verifyTransport: () => { },
     },
   };
   const authController = require("../controllers/authController");
@@ -476,9 +450,6 @@ async function run() {
         return this;
       },
     };
-    // asyncHandler returns the handler's promise and only calls next() on
-    // failure, so awaiting it — rather than waiting for next() — is what
-    // actually observes a successful response.
     let handlerError = null;
     await authController.verifyOtp(req, res, (err) => {
       handlerError = err;
@@ -491,9 +462,9 @@ async function run() {
   check(
     "resident verifies OTP on web -> account created, no session",
     webSignup.statusCode === 201 &&
-      webSignup.body?.success === true &&
-      webSignup.body?.token === null &&
-      webSignup.body?.code === "RESIDENT_WEB_ACCESS_DENIED",
+    webSignup.body?.success === true &&
+    webSignup.body?.token === null &&
+    webSignup.body?.code === "RESIDENT_WEB_ACCESS_DENIED",
     `got ${webSignup.statusCode} token=${webSignup.body?.token} code=${webSignup.body?.code}`
   );
   check(
@@ -545,6 +516,6 @@ run().catch(async (error) => {
   try {
     await cleanup();
     await mongoose.disconnect();
-  } catch {}
+  } catch { }
   process.exit(1);
 });

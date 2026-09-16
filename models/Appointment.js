@@ -7,31 +7,19 @@ const AppointmentSchema = new mongoose.Schema(
     resident: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     consultationType: { type: String, required: true },
     description: { type: String, default: "", maxlength: 4000 },
-    /** Anything the resident adds beyond the reason for the visit. Optional. */
     additionalNotes: { type: String, default: "", maxlength: 1000 },
     isUrgent: { type: Boolean, default: false },
 
-    /**
-     * The health worker the resident asked for.
-     *
-     * A preference, not an assignment: the queue still decides the schedule,
-     * and `assignedBy` records who actually took the appointment. Kept
-     * separate so a resident's request can never be mistaken for a staff
-     * decision. Null when the resident expressed no preference.
-     */
     preferredProvider: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
 
     status: {
       type: String,
-      enum: ["pending", "confirmed", "declined", "rescheduled"],
+      enum: ["pending", "confirmed", "declined", "rescheduled", "processing", "completed"],
       default: "pending",
       index: true,
     },
 
-    /** Stored as strict 0–4 triage priority tag (lower number = higher priority). */
-    // 0 → Age 0–1 (infants), 1 → Age 60+ (elderly), 2 → Age 2–12, 3 → Age 13–17, 4 → Age 18–59
     ageTier: { type: Number, required: true, min: 0, max: 4 },
-    // Lower sorts first. Sorting tie-breaker is handled by createdAt in queries.
     prioritySortKey: { type: Number, required: true, min: 0, max: 4, index: true },
     ageAtSubmission: { type: Number },
 
@@ -44,11 +32,66 @@ const AppointmentSchema = new mongoose.Schema(
     assignedAt: { type: Date, default: null },
 
     declineReason: { type: String, default: "", maxlength: 1000 },
+
+    approvedAt: { type: Date, default: null },
+
+    processingAt: { type: Date, default: null },
+
+    completedAt: { type: Date, default: null },
+
+    completedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+
+    medicalRecord: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "MedicalRecord",
+      default: null,
+    },
+
+    statusHistory: {
+      type: [
+        {
+          _id: false,
+          status: {
+            type: String,
+            enum: ["pending", "confirmed", "declined", "rescheduled", "processing", "completed"],
+            required: true,
+          },
+          timestamp: { type: Date, required: true },
+          changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+          note: { type: String, default: "", maxlength: 300 },
+        },
+      ],
+      default: () => [],
+    },
   },
   { timestamps: true }
 );
 
+const QUEUE_ACTIVE_STATUSES = Object.freeze(["confirmed", "rescheduled", "processing"]);
+
+const COMPLETABLE_STATUSES = Object.freeze(["confirmed", "rescheduled", "processing"]);
+
+function pushStatusHistory(appointment, status, changedBy = null, note = "") {
+  const history = appointment.statusHistory || [];
+  const last = history[history.length - 1];
+  if (last && last.status === status) return;
+  history.push({
+    status,
+    timestamp: new Date(),
+    changedBy: changedBy || null,
+    note: typeof note === "string" ? note.slice(0, 300) : "",
+  });
+  appointment.statusHistory = history;
+}
+
 AppointmentSchema.index({ status: 1, prioritySortKey: 1, createdAt: 1 });
 AppointmentSchema.index({ missionSchedule: 1, slotStart: 1 });
 
-module.exports = mongoose.model("Appointment", AppointmentSchema, "appointments");
+AppointmentSchema.index({ status: 1, completedAt: -1 });
+
+const Appointment = mongoose.model("Appointment", AppointmentSchema, "appointments");
+
+module.exports = Appointment;
+module.exports.QUEUE_ACTIVE_STATUSES = QUEUE_ACTIVE_STATUSES;
+module.exports.COMPLETABLE_STATUSES = COMPLETABLE_STATUSES;
+module.exports.pushStatusHistory = pushStatusHistory;

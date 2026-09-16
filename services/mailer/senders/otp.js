@@ -4,21 +4,12 @@ const { sendMail, maskEmail, isEmailEnabled } = require("../mailService");
 const { generateOTPEmailHTML } = require("../templates/otpTemplate");
 const { buildAttachments } = require("../assets");
 
-/**
- * Sends OTP verification email using the centralized mail service.
- *
- * @param {string} email - Destination email
- * @param {string} otp - 6-digit OTP code
- * @param {string} [fullname="User"] - Recipient full name
- * @returns {Promise<Object>} Delivery info
- */
 const sendOTPEmail = async (email, otp, fullname = "User") => {
   const masked = maskEmail(email);
   const isProd = process.env.NODE_ENV === "production";
 
   console.log(`[OTP] Request received for ${masked}`);
 
-  // In development mode with mock/disabled email, log OTP to console for local testing
   if (!isEmailEnabled() || process.env.EMAIL_PROVIDER === "mock") {
     if (!isProd) {
       console.log(`[DEV ONLY] Simulation OTP for ${masked}: [${otp}]`);

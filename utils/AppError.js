@@ -2,16 +2,6 @@
 
 const { HTTP_STATUS, ERROR_CODES } = require("./errorCodes");
 
-/**
- * Operational application error.
- *
- * "Operational" means the failure was anticipated by the application (a missing
- * record, a rejected input, a permission failure) as opposed to a programming
- * fault. The global error handler trusts the message of an operational error
- * and forwards it to the client verbatim, in production as well as development.
- * Anything that is not an AppError is treated as unexpected and its message is
- * withheld from the client in production.
- */
 class AppError extends Error {
   constructor(
     message,
@@ -33,12 +23,6 @@ class AppError extends Error {
     Error.captureStackTrace(this, this.constructor);
   }
 }
-
-/**
- * Named constructors for the failure shapes this application actually produces.
- * They keep status/code pairing consistent so no controller has to remember
- * that "duplicate" means 409 and "invalid id" means 400.
- */
 
 const badRequest = (message, code = ERROR_CODES.VALIDATION_ERROR, details) =>
   new AppError(message, HTTP_STATUS.BAD_REQUEST, code, details);
