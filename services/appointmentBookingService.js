@@ -68,6 +68,7 @@ const listResidentAppointments = (residentId) =>
     .populate("preferredProvider", "fullname role")
     .populate("assignedBy", "fullname role")
     .populate("completedBy", "fullname role")
+    .populate("medicalRecord")
     .lean();
 
 module.exports = { bookAppointment, listResidentAppointments };

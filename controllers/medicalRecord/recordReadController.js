@@ -10,50 +10,57 @@ const { getCategoryKeysForRole } = require("../../config/consultationCategories"
 const { getCompletionForm } = require("../../config/medicalRecordFields");
 const { createSystemLog } = require("../../services/systemLogService");
 const { normalizeRole } = require("../../services/medicalRecord/serviceOwnership");
+const {
+  describeAccess,
+  forResident,
+  redactForViewer,
+} = require("../../services/medicalRecord/residentRecordView");
 
 const APPOINTMENT_SELECT =
   "consultationType slotStart slotEnd status createdAt approvedAt completedAt missionSchedule";
 
+const RECORD_POPULATE = [
+  { path: "provider", select: "fullname role" },
+  { path: "resident", select: "fullname email dateOfBirth gender" },
+  { path: "appointment", select: APPOINTMENT_SELECT },
+];
+
+const findRecordByRecordOrAppointmentId = async (id) => {
+  const byId = await MedicalRecord.findById(id).populate(RECORD_POPULATE).lean();
+  if (byId) return byId;
+  return MedicalRecord.findOne({ appointment: id }).populate(RECORD_POPULATE).lean();
+};
+
 exports.getMedicalRecord = asyncHandler(async (req, res) => {
   const id = assertValidObjectId(req.params.id, "medical record");
 
-  const record = await MedicalRecord.findById(id)
-    .populate("provider", "fullname role")
-    .populate("resident", "fullname email dateOfBirth gender")
-    .populate({ path: "appointment", select: APPOINTMENT_SELECT })
-    .lean();
+  const record = await findRecordByRecordOrAppointmentId(id);
 
   if (!record) {
-    throw notFound("Medical record not found.", ERROR_CODES.NOT_FOUND);
+    throw notFound("No medical details are available for this visit yet.", ERROR_CODES.NOT_FOUND);
   }
 
-  const role = normalizeRole(req.user);
-  const userId = String(req.user.userId);
-  const isOwner = String(record.resident?._id ?? record.resident) === userId;
-  const isAuthor = String(record.provider?._id ?? record.provider) === userId;
-  const ownsService = getCategoryKeysForRole(role).includes(record.serviceType);
+  const access = describeAccess(record, req.user);
 
-  if (!isOwner && !isAuthor && !ownsService) {
+  if (!access.isOwner && !access.isAuthor && !access.ownsService) {
     throw forbidden("You do not have permission to view this medical record.");
   }
-
-  if (role === "resident") delete record.notes;
 
   void createSystemLog({
     req,
     action: "RECORD_VIEWED",
-    user: { _id: req.user.userId, role },
-    role,
+    user: { _id: req.user.userId, role: access.role },
+    role: access.role,
     description: "Medical record viewed",
     resource: "MedicalRecord",
     resourceId: String(record._id),
-    metadata: { serviceType: record.serviceType, viewedOwn: isOwner },
+    metadata: { serviceType: record.serviceType, viewedOwn: access.isOwner },
   });
 
   return res.json({
     success: true,
     message: "Medical record loaded successfully.",
-    medicalRecord: record,
+    medicalRecord: redactForViewer(record, access),
     form: getCompletionForm(record.serviceType),
   });
 });
@@ -66,13 +73,12 @@ exports.getMyMedicalRecords = asyncHandler(async (req, res) => {
       path: "appointment",
       select: "consultationType slotStart slotEnd status createdAt approvedAt completedAt",
     })
-    .select("-notes")
     .lean();
 
   return res.json({
     success: true,
     message: "Medical records loaded successfully.",
-    medicalRecords: records,
+    medicalRecords: records.map(forResident),
   });
 });
 

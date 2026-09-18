@@ -14,7 +14,7 @@ const AppointmentSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["pending", "confirmed", "declined", "rescheduled", "processing", "completed"],
+      enum: ["pending", "confirmed", "declined", "rescheduled", "processing", "completed", "cancelled"],
       default: "pending",
       index: true,
     },
@@ -32,6 +32,7 @@ const AppointmentSchema = new mongoose.Schema(
     assignedAt: { type: Date, default: null },
 
     declineReason: { type: String, default: "", maxlength: 1000 },
+    cancelReason: { type: String, default: "", maxlength: 1000 },
 
     approvedAt: { type: Date, default: null },
 
@@ -53,7 +54,7 @@ const AppointmentSchema = new mongoose.Schema(
           _id: false,
           status: {
             type: String,
-            enum: ["pending", "confirmed", "declined", "rescheduled", "processing", "completed"],
+            enum: ["pending", "confirmed", "declined", "rescheduled", "processing", "completed", "cancelled"],
             required: true,
           },
           timestamp: { type: Date, required: true },

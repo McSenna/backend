@@ -8,6 +8,7 @@ const {
   verifyOtp,
   login,
   logout,
+  changePassword,
 } = require("../controllers/authController");
 const {
   sendEmailVerificationCode,
@@ -35,5 +36,6 @@ router.post("/resend-reset-code", otpRateLimiter, forgotPassword);
 router.post("/verify-reset-code", otpRateLimiter, verifyResetCode);
 router.post("/reset-password", otpRateLimiter, resetPassword);
 router.post("/logout", auth, logout);
+router.post("/change-password", auth, otpRateLimiter, changePassword);
 
 module.exports = router;

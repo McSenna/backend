@@ -1,6 +1,7 @@
 "use strict";
 
 const Appointment = require("../models/Appointment");
+const MedicalRecord = require("../models/MedicalRecord");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
@@ -10,6 +11,8 @@ const { HTTP_STATUS } = require("../utils/errorCodes");
 const UPCOMING_STATUSES = ["pending", "confirmed", "rescheduled"];
 
 const ATTENDED_STATUSES = ["confirmed", "rescheduled"];
+
+const COMPLETED_STATUS = "completed";
 
 const getResidentDashboard = asyncHandler(async (req, res) => {
   const residentId = req.user.userId;
@@ -38,13 +41,9 @@ const getResidentDashboard = asyncHandler(async (req, res) => {
       $or: [{ slotStart: null }, { slotStart: { $gte: now } }],
     }),
 
-    Appointment.countDocuments({
-      ...ownedByResident,
-      status: { $in: ATTENDED_STATUSES },
-      slotStart: { $ne: null, $lt: now },
-    }),
+    Appointment.countDocuments({ ...ownedByResident, status: COMPLETED_STATUS }),
 
-    Appointment.countDocuments(ownedByResident),
+    MedicalRecord.countDocuments(ownedByResident),
 
     Notification.countDocuments({ recipient: residentId, isRead: false }),
 

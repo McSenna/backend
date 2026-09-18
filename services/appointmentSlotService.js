@@ -96,4 +96,9 @@ const validateAndAssignSlot = async ({
   return appointment;
 };
 
-module.exports = { loadBookedForMission, resolveDuration, validateAndAssignSlot };
+module.exports = {
+  loadBookedForMission,
+  resolveDuration,
+  validateAndAssignSlot,
+  assertSlotIsAvailable,
+};

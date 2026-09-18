@@ -17,11 +17,17 @@ const STAFF_ADMIN = ["doctor", "admin", "midwife"];
 
 const MISSION_MANAGE = ["doctor", "admin"];
 
+const RESIDENT_OR_STAFF = ["resident", "doctor", "admin", "midwife"];
+
 router.get("/consultation-categories", auth, missionController.getConsultationCategories);
 router.get("/appointment-providers", auth, appointmentController.listServiceProviders);
 
 router.post("/appointments", auth, roleCheck(RESIDENT), appointmentController.createAppointment);
 router.get("/appointments/me", auth, roleCheck(RESIDENT), appointmentController.getMyAppointments);
+
+router.get("/appointments/:id/reschedule-options", auth, roleCheck(RESIDENT_OR_STAFF), appointmentController.getRescheduleOptions);
+router.patch("/appointments/:id/reschedule", auth, roleCheck(RESIDENT_OR_STAFF), appointmentController.rescheduleAppointment);
+router.patch("/appointments/:id/cancel", auth, roleCheck(RESIDENT_OR_STAFF), appointmentController.cancelAppointment);
 
 router.get("/appointments/pending", auth, roleCheck(STAFF_READ), appointmentController.getPendingAppointments);
 router.get("/appointments", auth, roleCheck(STAFF_READ), appointmentController.listAppointments);
@@ -42,8 +48,8 @@ router.patch("/appointments/:id/reassign", auth, roleCheck(STAFF_ADMIN), appoint
 router.patch("/appointments/:id/reject", auth, roleCheck(STAFF_ADMIN), appointmentController.rejectAppointment);
 
 router.post("/mission-schedule", auth, roleCheck(MISSION_MANAGE), missionController.createMissionSchedule);
-router.get("/mission-schedule", auth, roleCheck(STAFF_ADMIN), missionController.listMissionSchedules);
-router.get("/mission-schedule/:id/available-slots", auth, roleCheck(STAFF_ADMIN), missionController.getAvailableSlots);
+router.get("/mission-schedule", auth, roleCheck(RESIDENT_OR_STAFF), missionController.listMissionSchedules);
+router.get("/mission-schedule/:id/available-slots", auth, roleCheck(RESIDENT_OR_STAFF), missionController.getAvailableSlots);
 router.get("/mission-schedule/:id", auth, roleCheck(STAFF_ADMIN), missionController.getMissionSchedule);
 
 router.patch("/mission-schedule/:id", auth, roleCheck(MISSION_MANAGE), missionController.updateMissionSchedule);

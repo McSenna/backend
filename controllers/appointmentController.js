@@ -15,6 +15,11 @@ const {
 const { rejectAppointment } = require("./appointment/declineController");
 const { suggestSlot } = require("./appointment/slotSuggestionController");
 const {
+  cancelAppointment,
+  rescheduleAppointment,
+  getRescheduleOptions,
+} = require("./appointment/residentActionController");
+const {
   STAFF_ROLES,
   SLOT_OCCUPYING_STATUSES,
   resolveQueueScope,
@@ -32,6 +37,9 @@ module.exports = {
   assignAppointment,
   reassignAppointment,
   rejectAppointment,
+  cancelAppointment,
+  rescheduleAppointment,
+  getRescheduleOptions,
   suggestSlot,
   STAFF_ROLES,
   SLOT_OCCUPYING_STATUSES,
