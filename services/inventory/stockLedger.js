@@ -31,7 +31,7 @@ const recalculateItemStock = async (itemId, session = null) => {
   const update = InventoryItem.findByIdAndUpdate(
     itemId,
     { currentStock, nearestExpiry },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (session) update.session(session);
   return update;

@@ -2,6 +2,11 @@
 
 require("dotenv").config();
 
+// Mission hours ("08:00"–"12:00"), day boundaries and e-mailed appointment times
+// are all computed with the server's local clock. Pin it so a host running in
+// UTC does not shift every slot by eight hours.
+process.env.TZ = process.env.APP_TIMEZONE || "Asia/Manila";
+
 const { createApp } = require("./app");
 const { validateEnv } = require("./config/env");
 const connectDB = require("./config/db");

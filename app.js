@@ -16,9 +16,15 @@ const profileRoutes = require("./routes/profileRoutes");
 const systemLogRoutes = require("./routes/systemLogRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
+const supportTicketRoutes = require("./routes/supportTicketRoutes");
 
 function createApp() {
   const app = express();
+
+  const trustProxy = String(process.env.TRUST_PROXY || "").trim();
+  if (trustProxy) {
+    app.set("trust proxy", /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
+  }
 
   app.use(cors(buildCorsOptions()));
 
@@ -41,6 +47,7 @@ function createApp() {
   app.use("/api", systemLogRoutes);
   app.use("/api", dashboardRoutes);
   app.use("/api", inventoryRoutes);
+  app.use("/api", supportTicketRoutes);
 
   app.use(notFoundHandler);
   app.use(globalErrorHandler);

@@ -2,6 +2,7 @@
 
 const User = require("../../models/User");
 const { resolveUserStatus } = require("../../models/User");
+const { bucketOfStatus } = require("./residentQuery");
 
 const referenceFor = (id) => `RES-${String(id).slice(-6).toUpperCase()}`;
 
@@ -38,7 +39,8 @@ const summarizeResidents = async () => {
   const summary = { total: 0, active: 0, inactive: 0, pending: 0, suspended: 0 };
   buckets.forEach(({ _id, count }) => {
     summary.total += count;
-    if (_id in summary) summary[_id] += count;
+    const bucket = bucketOfStatus(_id);
+    if (bucket) summary[bucket] += count;
   });
   return summary;
 };

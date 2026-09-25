@@ -26,8 +26,17 @@ const resolveDayWindows = ({ morning, afternoon, startTime, endTime }, fallback)
   }
 
   const [mStart, mEnd, aStart, aEnd] = minutes;
-  if (!(mEnd > mStart) && !(aEnd > aStart)) {
+  // An empty window (start === end) is how a single-window mission is stored,
+  // but a reversed one is a typo that used to be dropped without a word.
+  if (mEnd < mStart || aEnd < aStart || (!(mEnd > mStart) && !(aEnd > aStart))) {
     throw badRequest("The end time must be after the start time.", ERROR_CODES.VALIDATION_ERROR);
+  }
+  // Overlapping windows made the slot generator list the shared times twice.
+  if (mEnd > mStart && aEnd > aStart && mStart < aEnd && aStart < mEnd) {
+    throw badRequest(
+      "The morning and afternoon hours must not overlap.",
+      ERROR_CODES.VALIDATION_ERROR
+    );
   }
 
   return { morningStart, morningEnd, afternoonStart, afternoonEnd };

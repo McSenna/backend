@@ -7,7 +7,7 @@ const {
   formatAppointmentDetails,
   formatConsultationTypeLabel,
   formatSlotStartForNotification,
-} = require("../appointmentNotifications");
+} = require("../appointment/notifications");
 
 const warn = (message) => (error) => logger.warn(message, { errorMessage: error?.message ?? error });
 

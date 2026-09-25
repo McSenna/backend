@@ -1,5 +1,8 @@
 "use strict";
 
+const { QUEUE_ACTIVE_STATUSES } = require("../../models/Appointment");
+const { BOOKED_STATUSES, SLOT_OCCUPYING_STATUSES, queueFilter } = require("../queueScope");
+
 const TREND_DAYS = 60;
 
 const ROLE_INVENTORY_CATEGORIES = {
@@ -9,12 +12,10 @@ const ROLE_INVENTORY_CATEGORIES = {
   admin: ["vaccine", "medicine", "supply"],
 };
 
-const WAITING_STATUSES = ["confirmed", "rescheduled"];
-const ACTIVE_STATUSES = ["confirmed", "rescheduled", "processing"];
-const SLOT_OCCUPYING_STATUSES = ["confirmed", "rescheduled", "processing", "completed"];
+const WAITING_STATUSES = BOOKED_STATUSES;
+const ACTIVE_STATUSES = QUEUE_ACTIVE_STATUSES;
 
-const scopeFilter = (categoryKeys) =>
-  categoryKeys === null ? {} : { consultationType: { $in: categoryKeys } };
+const scopeFilter = queueFilter;
 
 const serviceScopeFilter = (categoryKeys) =>
   categoryKeys === null ? {} : { serviceType: { $in: categoryKeys } };

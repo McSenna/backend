@@ -21,7 +21,7 @@ const upsertBatch = ({ item, payload, actor, batchNumber, expiryDate, receivedDa
         ...(payload.remarks ? { remarks: String(payload.remarks).slice(0, 500) } : {}),
       },
     },
-    { new: true, upsert: true, setDefaultsOnInsert: true, session }
+    { returnDocument: "after", upsert: true, setDefaultsOnInsert: true, session }
   );
 
 const stockIn = async ({ item, payload, actor }) => {

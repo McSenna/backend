@@ -1,7 +1,7 @@
 "use strict";
 
 const { pushStatusHistory } = require("../../models/Appointment");
-const { loadAppointmentOrFail } = require("../appointmentLookup");
+const { loadAppointmentOrFail } = require("../appointment/lookup");
 const { processMissionSchedulePriorityQueue } = require("../triageQueue");
 const logger = require("../../utils/logger");
 const {

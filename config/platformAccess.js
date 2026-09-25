@@ -12,7 +12,7 @@ const PLATFORM_ACCESS = Object.freeze({
   doctor: Object.freeze([PLATFORMS.WEB, PLATFORMS.MOBILE]),
   midwife: Object.freeze([PLATFORMS.WEB, PLATFORMS.MOBILE]),
   bhw: Object.freeze([PLATFORMS.WEB, PLATFORMS.MOBILE]),
-  resident: Object.freeze([PLATFORMS.WEB, PLATFORMS.MOBILE]),
+  resident: Object.freeze([PLATFORMS.MOBILE]),
 });
 
 const FALLBACK_ALLOWED_PLATFORMS = Object.freeze([PLATFORMS.MOBILE]);

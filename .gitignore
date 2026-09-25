@@ -1,46 +1,18 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# Dependencies
 node_modules/
 
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
+# Environment — secrets live here; commit only the example
 .env
 .env.*
 !.env.example
-.env*.local
 
-# typescript
-*.tsbuildinfo
+# User uploads (ID documents, support attachments) — personal data, never commit.
+# The server creates these folders itself with owner-only permissions.
+storage/
 
-app-example
+# Logs
+npm-debug.*
+*.log
 
-# generated native folders
-/ios
-/android
+# OS
+.DS_Store

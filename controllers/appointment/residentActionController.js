@@ -6,7 +6,7 @@ const {
   cancelAppointmentByResident,
   rescheduleAppointmentByResident,
   getRescheduleOptionsForAppointment,
-} = require("../../services/appointmentResidentActionService");
+} = require("../../services/appointment/residentActionService");
 
 exports.cancelAppointment = asyncHandler(async (req, res) => {
   const appointmentId = assertValidObjectId(req.params.id, "appointment");

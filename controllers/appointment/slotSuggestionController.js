@@ -1,16 +1,15 @@
 "use strict";
 
 const asyncHandler = require("../../utils/asyncHandler");
-const { badRequest } = require("../../utils/AppError");
+const { badRequest, notFound } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
 const { assertValidObjectId } = require("../../utils/objectId");
 const { suggestNextAvailableSlot } = require("../../utils/slotAvailability");
 const MissionSchedule = require("../../models/MissionSchedule");
-const { notFound } = require("../../utils/AppError");
 const {
   loadBookedForMission,
-  resolveDuration,
-} = require("../../services/appointmentSlotService");
+  resolveMissionDuration,
+} = require("../../services/appointment/slotService");
 
 exports.suggestSlot = asyncHandler(async (req, res) => {
   const { missionScheduleId, categoryKey, durationMinutes, excludeAppointmentId } = req.query;
@@ -27,10 +26,7 @@ exports.suggestSlot = asyncHandler(async (req, res) => {
     throw notFound("Mission schedule not found.", ERROR_CODES.MISSION_NOT_FOUND);
   }
 
-  const resolvedDuration = resolveDuration(
-    categoryKey,
-    durationMinutes != null ? Number(durationMinutes) : undefined
-  );
+  const resolvedDuration = resolveMissionDuration(mission, categoryKey, durationMinutes);
 
   const booked = await loadBookedForMission(mission._id);
   const suggestedNextSlotStart = suggestNextAvailableSlot(

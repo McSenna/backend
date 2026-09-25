@@ -4,8 +4,8 @@ const asyncHandler = require("../../utils/asyncHandler");
 const { assertValidObjectId } = require("../../utils/objectId");
 const { HTTP_STATUS } = require("../../utils/errorCodes");
 const { createSystemLog } = require("../../services/systemLogService");
-const { declineAppointment } = require("../../services/appointmentDeclineService");
-const { announceDecline } = require("../../services/appointmentDeclineFlow");
+const { declineAppointment } = require("../../services/appointment/declineService");
+const { announceDecline } = require("../../services/appointment/declineFlow");
 
 exports.rejectAppointment = asyncHandler(async (req, res) => {
   const appointmentId = assertValidObjectId(req.params.id, "appointment");

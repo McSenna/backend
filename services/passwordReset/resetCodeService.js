@@ -23,7 +23,7 @@ const assertCooldownElapsed = (existing) => {
 
 const issueResetCode = async (email, req) => {
   const user = await User.findOne({ email })
-    .select("_id fullname email verified status")
+    .select("_id fullname email role verified status")
     .lean();
   if (!user) return;
 

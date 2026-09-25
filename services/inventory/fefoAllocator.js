@@ -66,7 +66,7 @@ const decrementBatch = async ({ step, refreshed, runningStock, session }) => {
   const applied = await InventoryBatch.findOneAndUpdate(
     { _id: step.batch._id, quantityRemaining: { $gte: step.quantity }, status: "active" },
     { $inc: { quantityRemaining: -step.quantity } },
-    { new: true, session }
+    { returnDocument: "after", session }
   );
 
   if (!applied) {

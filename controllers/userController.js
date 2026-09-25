@@ -1,7 +1,10 @@
 "use strict";
 
 const User = require("../models/User");
+const ResidentVerification = require("../models/ResidentVerification");
 const { VALID_STATUSES, resolveUserStatus } = require("../models/User");
+const { SIGN_IN_READY_STATUSES } = require("../models/user/userStatus");
+const { approve: approveVerification } = require("../services/userRequest/verificationDecisionService");
 const { createSystemLog } = require("../services/systemLogService");
 const { describePlatformAccess } = require("../config/platformAccess");
 const asyncHandler = require("../utils/asyncHandler");
@@ -31,11 +34,29 @@ exports.getAllUsers = asyncHandler(async (_req, res) => {
   });
 });
 
+// One entry per VALID_STATUSES value; the admin UI sends "approved" and
+// "deactivated" for residents, which used to produce "User undefined successfully."
 const STATUS_VERBS = {
   active: "activated",
+  approved: "approved",
   inactive: "deactivated",
+  deactivated: "deactivated",
   pending: "set to pending",
   suspended: "suspended",
+  rejected: "rejected",
+};
+
+// Approving a resident from the Users screen skips the ID-review queue, so close
+// the pending verification the same way the review flow would. Otherwise the
+// request stays in the queue and can later be "rejected" on an approved account.
+const approvePendingVerification = async (userId, adminId) => {
+  const pending = await ResidentVerification.findOne({
+    user: userId,
+    verificationStatus: "pending",
+  })
+    .select("_id")
+    .lean();
+  if (pending) await approveVerification({ id: pending._id, adminId });
 };
 
 exports.updateUserStatus = asyncHandler(async (req, res) => {
@@ -68,11 +89,16 @@ exports.updateUserStatus = asyncHandler(async (req, res) => {
   }
 
   const previousStatus = resolveUserStatus(existing);
+  const makesSignInReady = SIGN_IN_READY_STATUSES.includes(nextStatus);
+
+  if (makesSignInReady && existing.role === "resident") {
+    await approvePendingVerification(existing._id, actorId);
+  }
 
   const user = await User.findByIdAndUpdate(
     id,
-    { $set: { status: nextStatus } },
-    { new: true, runValidators: true }
+    { $set: makesSignInReady ? { status: nextStatus, verified: true } : { status: nextStatus } },
+    { returnDocument: "after", runValidators: true }
   )
     .select("-password")
     .lean();

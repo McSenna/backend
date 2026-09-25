@@ -6,13 +6,6 @@ const { HTTP_STATUS, ERROR_CODES, SAFE_MESSAGES } = require("../utils/errorCodes
 const asyncHandler = require("../utils/asyncHandler");
 const { normalizeError, isProduction } = require("./errors/errorTranslators");
 
-class ApiError extends AppError {
-  constructor(statusCode, message, code = ERROR_CODES.INTERNAL_SERVER_ERROR) {
-    super(message, statusCode, code);
-    this.name = "ApiError";
-  }
-}
-
 // eslint-disable-next-line no-unused-vars -- Express identifies error middleware by arity.
 const globalErrorHandler = (err, req, res, next) => {
   const { statusCode, code, message, details, unexpected } = normalizeError(err);
@@ -51,7 +44,6 @@ const notFoundHandler = (req, _res, next) => {
 };
 
 module.exports = {
-  ApiError,
   AppError,
   globalErrorHandler,
   notFoundHandler,

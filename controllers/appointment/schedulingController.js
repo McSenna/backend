@@ -2,8 +2,8 @@
 
 const asyncHandler = require("../../utils/asyncHandler");
 const { assertValidObjectId } = require("../../utils/objectId");
-const { assignSlot, reassignSlot } = require("../../services/appointmentSchedulingService");
-const { announceScheduleChange } = require("../../services/appointmentScheduleFlow");
+const { assignSlot, reassignSlot } = require("../../services/appointment/schedulingService");
+const { announceScheduleChange } = require("../../services/appointment/scheduleFlow");
 const { assignPlan, reassignPlan } = require("./schedulePlans");
 
 const scheduleHandler = ({ apply, buildPlan, message }) =>

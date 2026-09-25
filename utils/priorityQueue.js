@@ -22,13 +22,7 @@ function ageToTier(ageYears) {
   return 4;
 }
 
-function computePrioritySortKey({ dateOfBirth, consultationTypeKey, isUrgent }) {
-  const age = computeAgeYears(dateOfBirth);
-  return ageToTier(age);
-}
-
 module.exports = {
   computeAgeYears,
   ageToTier,
-  computePrioritySortKey,
 };

@@ -5,32 +5,37 @@ const { ageToTier, computeAgeYears } = require("../../utils/priorityQueue");
 
 const DEFAULT_PRIORITY = 4;
 
-const computePriority = (residentDOB) => {
-  const ageYears = computeAgeYears(residentDOB);
-  return { ageYears, priorityTag: ageToTier(ageYears) };
-};
-
+/**
+ * Recomputes the age tier of each pending appointment (a resident can age into
+ * a different tier while waiting), writes it onto the objects in place, and
+ * persists only the rows whose stored tier actually changed.
+ */
 const tagPendingAppointments = async (pendingAppointments) => {
   const bulkOps = [];
 
   for (const appointment of pendingAppointments) {
-    const { ageYears, priorityTag } = computePriority(appointment?.resident?.dateOfBirth);
+    const ageYears = computeAgeYears(appointment?.resident?.dateOfBirth);
+    const priorityTag = ageToTier(ageYears);
 
-    bulkOps.push({
-      updateOne: {
-        filter: { _id: appointment._id },
-        update: {
-          $set: {
-            ageTier: priorityTag,
-            prioritySortKey: priorityTag,
-            ageAtSubmission: ageYears,
+    const stale =
+      appointment.ageTier !== priorityTag ||
+      appointment.prioritySortKey !== priorityTag ||
+      appointment.ageAtSubmission !== ageYears;
+
+    if (stale) {
+      bulkOps.push({
+        updateOne: {
+          filter: { _id: appointment._id },
+          update: {
+            $set: { ageTier: priorityTag, prioritySortKey: priorityTag, ageAtSubmission: ageYears },
           },
         },
-      },
-    });
+      });
+    }
 
-    appointment._computedPriorityTag = priorityTag;
-    appointment._computedAgeYears = ageYears;
+    appointment.ageTier = priorityTag;
+    appointment.prioritySortKey = priorityTag;
+    appointment.ageAtSubmission = ageYears;
   }
 
   if (bulkOps.length) {
@@ -39,8 +44,8 @@ const tagPendingAppointments = async (pendingAppointments) => {
 };
 
 const byPriorityThenCreated = (a, b) => {
-  const pa = a._computedPriorityTag ?? a.prioritySortKey ?? DEFAULT_PRIORITY;
-  const pb = b._computedPriorityTag ?? b.prioritySortKey ?? DEFAULT_PRIORITY;
+  const pa = a.prioritySortKey ?? DEFAULT_PRIORITY;
+  const pb = b.prioritySortKey ?? DEFAULT_PRIORITY;
   if (pa !== pb) return pa - pb;
   return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
 };

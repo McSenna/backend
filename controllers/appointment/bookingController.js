@@ -6,7 +6,7 @@ const { createSystemLog } = require("../../services/systemLogService");
 const {
   bookAppointment,
   listResidentAppointments,
-} = require("../../services/appointmentBookingService");
+} = require("../../services/appointment/bookingService");
 
 exports.createAppointment = asyncHandler(async (req, res) => {
   const { appointment, populated, categoryKey, providerId } = await bookAppointment({

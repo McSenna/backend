@@ -8,7 +8,7 @@ const { badRequest, notFound } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
 const { CONSULTATION_CATEGORIES } = require("../../config/consultationCategories");
 const { normalizeDateInput } = require("../../services/mission/missionPayload");
-const { BOOKED_STATUSES } = require("../../services/mission/missionRebooking");
+const { BOOKED_STATUSES } = require("../../services/queueScope");
 
 exports.listMissionSchedules = asyncHandler(async (req, res) => {
   const { date } = req.query;

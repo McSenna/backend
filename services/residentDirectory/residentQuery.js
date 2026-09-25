@@ -26,18 +26,33 @@ const SORTS = {
   name_desc: { fullname: -1, _id: -1 },
 };
 
-const STATUS_FILTERS = ["active", "inactive", "pending", "suspended"];
+// The directory shows four buckets, but residents are stored with the resident
+// lifecycle statuses: an approved resident is "approved" (not "active") and the
+// admin UI deactivates residents as "deactivated" (not "inactive"). Each bucket
+// therefore covers every stored status that means the same thing.
+const STATUS_BUCKETS = Object.freeze({
+  active: ["active", "approved"],
+  inactive: ["inactive", "deactivated"],
+  pending: ["pending"],
+  suspended: ["suspended"],
+});
+
+const STATUS_FILTERS = Object.keys(STATUS_BUCKETS);
+
+const bucketOfStatus = (status) =>
+  STATUS_FILTERS.find((bucket) => STATUS_BUCKETS[bucket].includes(status)) ?? null;
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const statusQuery = (status) => {
-  if (status === "active") {
-    return { $or: [{ status: "active" }, { status: { $exists: false }, verified: true }] };
+const statusQuery = (bucket) => {
+  const stored = { status: { $in: STATUS_BUCKETS[bucket] } };
+  if (bucket === "active") {
+    return { $or: [stored, { status: { $exists: false }, verified: true }] };
   }
-  if (status === "pending") {
-    return { $or: [{ status: "pending" }, { status: { $exists: false }, verified: false }] };
+  if (bucket === "pending") {
+    return { $or: [stored, { status: { $exists: false }, verified: false }] };
   }
-  return { status };
+  return stored;
 };
 
 const searchQuery = (term) => {
@@ -84,4 +99,4 @@ const readListOptions = (query) => ({
   search: String(query.search || "").trim().slice(0, 120),
 });
 
-module.exports = { RESIDENT_FIELDS, SORTS, buildResidentQuery, readListOptions };
+module.exports = { RESIDENT_FIELDS, SORTS, bucketOfStatus, buildResidentQuery, readListOptions };

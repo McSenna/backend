@@ -3,6 +3,7 @@
 const { createSystemLog } = require("../systemLogService");
 const { forbidden } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
+const { SIGN_IN_READY_STATUSES } = require("../../models/user/userStatus");
 
 const RESIDENT_DENIALS = {
   pending: {
@@ -64,7 +65,7 @@ const assertResidentMaySignIn = async ({ req, user, platform, accountStatus }) =
     throw forbidden(denial.message, denial.code);
   }
 
-  if (accountStatus !== "approved") {
+  if (!SIGN_IN_READY_STATUSES.includes(accountStatus)) {
     throw forbidden(
       "Your account is not approved to access MaslogCare.",
       ERROR_CODES.FORBIDDEN
@@ -79,10 +80,10 @@ const assertStaffMaySignIn = async ({ req, user, platform, accountStatus }) => {
   if (accountStatus === "deactivated" || accountStatus === "inactive") {
     throw forbidden("Account Deactivated", ERROR_CODES.ACCOUNT_DEACTIVATED);
   }
-  if (accountStatus === "pending") {
+  if (accountStatus === "pending" || accountStatus === "rejected") {
     throw forbidden("Account Pending Verification", ERROR_CODES.ACCOUNT_PENDING_VERIFICATION);
   }
-  if (!user.verified && accountStatus !== "active" && accountStatus !== "approved") {
+  if (!user.verified && !SIGN_IN_READY_STATUSES.includes(accountStatus)) {
     await logLoginFailure({
       req,
       user,

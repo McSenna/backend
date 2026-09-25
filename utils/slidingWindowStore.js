@@ -38,12 +38,11 @@ class SlidingWindowStore {
   }
 }
 
+// req.ip only honours X-Forwarded-For when app "trust proxy" is set (TRUST_PROXY).
+// Reading the header directly let any client send a fresh fake IP per request
+// and skip the per-device login and OTP limits.
 function clientIpOf(req) {
-  return (
-    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-    req.socket?.remoteAddress ||
-    "unknown-ip"
-  );
+  return req.ip || req.socket?.remoteAddress || "unknown-ip";
 }
 
 module.exports = { SlidingWindowStore, clientIpOf };

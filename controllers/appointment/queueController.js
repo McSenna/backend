@@ -9,11 +9,11 @@ const {
 const {
   loadPendingQueue,
   loadAppointments,
-} = require("../../services/appointmentQueueService");
+} = require("../../services/appointment/queueService");
 const {
   loadQueueOverview,
   loadCategoryAnalytics,
-} = require("../../services/appointmentAnalyticsService");
+} = require("../../services/appointment/analyticsService");
 
 const resolveVisibleKeys = (req) => {
   const { scopeRole, categoryKeys } = resolveQueueScope(req);

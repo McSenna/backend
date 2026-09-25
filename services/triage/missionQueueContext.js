@@ -5,8 +5,7 @@ const MissionSchedule = require("../../models/MissionSchedule");
 const { validateDurationForCategory } = require("../../config/consultationCategories");
 const { suggestNextAvailableSlot } = require("../../utils/slotAvailability");
 const { tagPendingAppointments, byPriorityThenCreated } = require("./triagePriority");
-
-const BOOKED_STATUSES = ["confirmed", "rescheduled", "processing", "completed"];
+const { SLOT_OCCUPYING_STATUSES } = require("../queueScope");
 
 const PENDING_SELECT = "consultationType createdAt ageTier prioritySortKey ageAtSubmission _id";
 
@@ -21,7 +20,7 @@ const buildMissionCategoryMap = (mission) => {
 const loadBookedSimulation = async (missionId) => {
   const booked = await Appointment.find({
     missionSchedule: missionId,
-    status: { $in: BOOKED_STATUSES },
+    status: { $in: SLOT_OCCUPYING_STATUSES },
   })
     .select("slotStart slotEnd _id")
     .lean();
@@ -72,4 +71,4 @@ const planSlotFor = ({ appointment, mission, missionCategoryMap, bookedSim }) =>
   return { categoryKey, durationMinutes: validated.durationMinutes, slotStartIso };
 };
 
-module.exports = { BOOKED_STATUSES, loadMissionQueue, planSlotFor };
+module.exports = { loadMissionQueue, planSlotFor };

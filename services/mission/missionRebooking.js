@@ -5,8 +5,7 @@ const {
   getMissionDayWindows,
   isIntervalInsideWindows,
 } = require("../../utils/slotAvailability");
-
-const BOOKED_STATUSES = ["confirmed", "rescheduled"];
+const { BOOKED_STATUSES } = require("../queueScope");
 
 const RESET_TO_PENDING = {
   status: "pending",
@@ -64,4 +63,4 @@ const releaseAllAppointments = (missionId) =>
     { $set: { ...RESET_TO_PENDING, declineReason: "" } }
   );
 
-module.exports = { BOOKED_STATUSES, releaseAppointmentsThatNoLongerFit, releaseAllAppointments };
+module.exports = { releaseAppointmentsThatNoLongerFit, releaseAllAppointments };

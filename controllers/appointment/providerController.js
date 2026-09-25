@@ -3,7 +3,7 @@
 const asyncHandler = require("../../utils/asyncHandler");
 const { badRequest } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
-const { listEligibleProviders } = require("../../services/appointmentProviderService");
+const { listEligibleProviders } = require("../../services/appointment/providerService");
 
 exports.listServiceProviders = asyncHandler(async (req, res) => {
   const key = String(req.query.serviceType || req.query.consultationType || "").trim();

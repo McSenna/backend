@@ -1,10 +1,13 @@
 "use strict";
 
 const { pushStatusHistory } = require("../../models/Appointment");
-const { loadAppointmentOrFail, loadMissionOrFail } = require("../appointmentLookup");
-const { assertSlotIsAvailable } = require("../appointmentSlotService");
+const { loadAppointmentOrFail, loadMissionOrFail } = require("../appointment/lookup");
+const {
+  assertMissionOffersCategory,
+  assertSlotIsAvailable,
+  missionDurationFor,
+} = require("../appointment/slotService");
 const { processMissionSchedulePriorityQueue } = require("../triageQueue");
-const { resolveDurationMinutes } = require("../../config/consultationCategories");
 const { assertValidObjectId } = require("../../utils/objectId");
 const { badRequest } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
@@ -19,11 +22,6 @@ const {
   notify,
   serviceLabelOf,
 } = require("./shared");
-
-const missionDurationFor = (mission, consultationType) => {
-  const missionCategory = mission.categories?.find((c) => c.categoryKey === consultationType);
-  return missionCategory?.durationMinutes || resolveDurationMinutes(consultationType) || 30;
-};
 
 const parseFutureSlotStart = (slotStart) => {
   const date = new Date(slotStart);
@@ -94,6 +92,7 @@ const rescheduleAppointmentByResident = async ({
   assertStatusAllows(appointment, RESCHEDULABLE_STATUSES, "rescheduled");
 
   const mission = await loadMissionOrFail(missionId);
+  assertMissionOffersCategory(mission, appointment.consultationType);
   const durationMinutes = missionDurationFor(mission, appointment.consultationType);
 
   const slotStartDate = parseFutureSlotStart(slotStart);

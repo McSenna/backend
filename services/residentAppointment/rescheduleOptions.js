@@ -2,8 +2,8 @@
 
 const Appointment = require("../../models/Appointment");
 const MissionSchedule = require("../../models/MissionSchedule");
-const { loadAppointmentOrFail } = require("../appointmentLookup");
-const { resolveDurationMinutes } = require("../../config/consultationCategories");
+const { loadAppointmentOrFail } = require("../appointment/lookup");
+const { missionDurationFor } = require("../appointment/slotService");
 const { listAvailableStarts } = require("../../utils/slotAvailability");
 const {
   RESCHEDULABLE_STATUSES,
@@ -42,14 +42,7 @@ const loadBookedForMissions = async (missionIds) => {
 };
 
 const buildScheduleOption = ({ mission, booked, appointment, nowTime }) => {
-  const missionCategory = mission.categories?.find(
-    (category) => category.categoryKey === appointment.consultationType
-  );
-
-  const durationMinutes =
-    missionCategory?.durationMinutes ||
-    resolveDurationMinutes(appointment.consultationType) ||
-    30;
+  const durationMinutes = missionDurationFor(mission, appointment.consultationType);
 
   const availableSlotStarts = listAvailableStarts(
     mission,
@@ -75,7 +68,12 @@ const getRescheduleOptionsForAppointment = async ({ appointmentId, residentId, a
   assertOwnership(appointment, residentId, actorRole, "view");
   assertStatusAllows(appointment, RESCHEDULABLE_STATUSES, "rescheduled");
 
-  const missions = await MissionSchedule.find({ date: { $gte: startOfToday() } })
+  // Only missions that run this service can take the booking; any other mission
+  // would drop it back to pending the next time that mission is edited.
+  const missions = await MissionSchedule.find({
+    date: { $gte: startOfToday() },
+    "categories.categoryKey": appointment.consultationType,
+  })
     .sort({ date: 1 })
     .lean();
 

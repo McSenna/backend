@@ -39,7 +39,7 @@ exports.updateMyProfile = asyncHandler(async (req, res) => {
   const user = await User.findByIdAndUpdate(
     req.user.userId,
     { $set: update },
-    { new: true, runValidators: true }
+    { returnDocument: "after", runValidators: true }
   )
     .select("-password")
     .lean();

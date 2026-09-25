@@ -81,13 +81,9 @@ const authenticate = async ({ req, email, password, platform }) => {
   const normalizedEmail = email.toLowerCase().trim();
   const user = await findLoginCandidate({ req, normalizedEmail, platform });
 
-  await assertAccountMaySignIn({
-    req,
-    user,
-    platform,
-    accountStatus: resolveUserStatus(user),
-  });
-
+  // The password is checked before any account-state guard so a wrong password
+  // always gets the generic error; otherwise the pending/suspended/rejected
+  // messages would confirm the email exists without knowing the password.
   if (!(await user.comparePassword(password))) {
     await logLoginFailure({
       req,
@@ -98,6 +94,13 @@ const authenticate = async ({ req, email, password, platform }) => {
     });
     throw invalidCredentials();
   }
+
+  await assertAccountMaySignIn({
+    req,
+    user,
+    platform,
+    accountStatus: resolveUserStatus(user),
+  });
 
   await assertPlatformAllowed({ req, user, platform });
 

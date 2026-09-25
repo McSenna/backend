@@ -17,9 +17,9 @@ const claimPendingAppointment = ({ appointment, mission, plan, staffId, now }) =
     { _id: appointment._id, status: "pending" },
     {
       $set: {
-        ageTier: appointment._computedPriorityTag ?? appointment.prioritySortKey,
-        prioritySortKey: appointment._computedPriorityTag ?? appointment.prioritySortKey,
-        ageAtSubmission: appointment._computedAgeYears ?? appointment.ageAtSubmission,
+        ageTier: appointment.ageTier,
+        prioritySortKey: appointment.prioritySortKey,
+        ageAtSubmission: appointment.ageAtSubmission,
 
         missionSchedule: mission._id,
         assignedCategoryKey: plan.categoryKey,
@@ -31,7 +31,7 @@ const claimPendingAppointment = ({ appointment, mission, plan, staffId, now }) =
         status: "confirmed",
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   );
 
 const processMissionSchedulePriorityQueue = async (missionScheduleId, { staffId } = {}) => {
@@ -81,7 +81,7 @@ const getFirstAssignablePendingAppointmentForMission = async (missionScheduleId)
 
     return {
       appointmentId: appointment._id,
-      priorityTag: appointment._computedPriorityTag ?? appointment.prioritySortKey,
+      priorityTag: appointment.prioritySortKey,
       categoryKey: plan.categoryKey,
       durationMinutes: plan.durationMinutes,
       suggestedSlotStart: plan.slotStartIso,

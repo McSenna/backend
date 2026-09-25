@@ -11,9 +11,9 @@ const { extensionForMime } = require("./storage/mimeDetection");
 
 const VERIFICATION_STORAGE_DIR = path.resolve(__dirname, "../storage/verifications");
 
-if (!fs.existsSync(VERIFICATION_STORAGE_DIR)) {
-  fs.mkdirSync(VERIFICATION_STORAGE_DIR, { recursive: true, mode: 0o700 });
-}
+// ID documents are personal data: owner-only access, even if the folder pre-exists with looser permissions.
+fs.mkdirSync(VERIFICATION_STORAGE_DIR, { recursive: true, mode: 0o700 });
+fs.chmodSync(VERIFICATION_STORAGE_DIR, 0o700);
 
 const isInsideStorage = (candidate) => {
   const relative = path.relative(VERIFICATION_STORAGE_DIR, candidate);

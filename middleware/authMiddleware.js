@@ -62,14 +62,17 @@ const authenticateSession = async (req) => {
     );
   }
 
-  if (!account.verified) {
+  // An explicit status is authoritative; resolveUserStatus only falls back to the
+  // legacy `verified` flag when none is set. Checking `verified` separately here
+  // used to reject accounts the admin had approved from the Users screen, which
+  // left `verified` false: they could sign in but every later request got a 401.
+  const accountStatus = resolveUserStatus(account);
+  if (accountStatus === "pending" && !account.verified) {
     throw unauthorized(
       "Your account is not active. Please verify your email or contact the health center.",
       ERROR_CODES.ACCOUNT_UNVERIFIED
     );
   }
-
-  const accountStatus = resolveUserStatus(account);
   if (BLOCKED_STATUSES.includes(accountStatus)) {
     throw unauthorized(
       accountStatus === "suspended"
