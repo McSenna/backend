@@ -20,6 +20,7 @@ function mapToNotificationItem(n) {
     isRead: Boolean(n.isRead),
     createdAt: n.createdAt ? new Date(n.createdAt).toISOString() : null,
     appointmentId: n.appointment ? String(n.appointment) : null,
+    announcementId: n.announcement ? String(n.announcement) : null,
   };
 }
 

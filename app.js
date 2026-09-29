@@ -17,6 +17,7 @@ const systemLogRoutes = require("./routes/systemLogRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const supportTicketRoutes = require("./routes/supportTicketRoutes");
+const announcementRoutes = require("./routes/announcementRoutes");
 
 function createApp() {
   const app = express();
@@ -48,6 +49,7 @@ function createApp() {
   app.use("/api", dashboardRoutes);
   app.use("/api", inventoryRoutes);
   app.use("/api", supportTicketRoutes);
+  app.use("/api", announcementRoutes);
 
   app.use(notFoundHandler);
   app.use(globalErrorHandler);

@@ -2,6 +2,9 @@
 
 const User = require("../../models/User");
 const SystemLog = require("../../models/SystemLog");
+const ResidentVerification = require("../../models/ResidentVerification");
+const SupportTicket = require("../../models/SupportTicket");
+const InventoryItem = require("../../models/InventoryItem");
 const { DAY_MS } = require("../../utils/dateWindow");
 
 const clampLimit = (value, fallback, max) => {
@@ -65,4 +68,30 @@ const loadDashboardData = ({ now, usersLimit, activitiesLimit, monthWindow, dayW
   ]);
 };
 
-module.exports = { clampLimit, percentChange, loadDashboardData };
+/** Support tickets that still need a staff reply. */
+const OPEN_TICKET_STATUSES = ["open", "in_review"];
+
+const EXPIRY_WARNING_DAYS = 30;
+
+/** Counts behind the dashboard's "needs attention" items; each maps to a screen that resolves it. */
+const loadAttentionCounts = async (now) => {
+  const expiryCutoff = new Date(now.getTime() + EXPIRY_WARNING_DAYS * DAY_MS);
+
+  const [pendingRegistrations, openSupportTickets, lowStockItems, expiringItems] = await Promise.all([
+    ResidentVerification.countDocuments({ verificationStatus: "pending" }),
+    SupportTicket.countDocuments({ status: { $in: OPEN_TICKET_STATUSES } }),
+    InventoryItem.countDocuments({
+      isActive: true,
+      $expr: { $lte: ["$currentStock", "$reorderLevel"] },
+    }),
+    InventoryItem.countDocuments({
+      isActive: true,
+      currentStock: { $gt: 0 },
+      nearestExpiry: { $ne: null, $lt: expiryCutoff },
+    }),
+  ]);
+
+  return { pendingRegistrations, openSupportTickets, lowStockItems, expiringItems };
+};
+
+module.exports = { clampLimit, percentChange, loadDashboardData, loadAttentionCounts };

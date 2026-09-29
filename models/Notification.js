@@ -15,6 +15,11 @@ const NotificationSchema = new mongoose.Schema(
       ref: "Appointment",
       default: null,
     },
+    announcement: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Announcement",
+      default: null,
+    },
     type: {
       type: String,
       required: true,

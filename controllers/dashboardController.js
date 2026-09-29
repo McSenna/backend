@@ -7,6 +7,7 @@ const {
   clampLimit,
   percentChange,
   loadDashboardData,
+  loadAttentionCounts,
 } = require("../services/adminDashboard/adminMetrics");
 const {
   buildRoleDistribution,
@@ -27,7 +28,7 @@ const getAdminDashboard = asyncHandler(async (req, res) => {
   const monthWindow = buildMonthWindow(TREND_MONTHS, now);
   const dayWindow = buildDayWindow(TREND_DAYS, now);
 
-  const [
+  const [[
     totalUsers,
     totalUsersBaseline,
     activeUsers,
@@ -41,7 +42,10 @@ const getAdminDashboard = asyncHandler(async (req, res) => {
     recentLogs,
     registrationBuckets,
     activityBuckets,
-  ] = await loadDashboardData({ now, usersLimit, activitiesLimit, monthWindow, dayWindow });
+  ], attention] = await Promise.all([
+    loadDashboardData({ now, usersLimit, activitiesLimit, monthWindow, dayWindow }),
+    loadAttentionCounts(now),
+  ]);
 
   return res.status(HTTP_STATUS.OK).json({
     success: true,
@@ -56,6 +60,7 @@ const getAdminDashboard = asyncHandler(async (req, res) => {
       totalPatients,
       totalPatientsGrowth: percentChange(totalPatients, totalPatientsBaseline),
     },
+    attention,
     roleDistribution: buildRoleDistribution(roleCounts),
     registrationTrend: buildDenseSeries(registrationBuckets.map(monthlyKey), monthWindow),
     activityTrend: buildDenseSeries(activityBuckets.map(dailyKey), dayWindow),

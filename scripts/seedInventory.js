@@ -12,7 +12,7 @@ const Supplier = require("../models/Supplier");
 const User = require("../models/User");
 const { recalculateItemStock } = require("../services/inventoryService");
 const logger = require("../utils/logger");
-const { SUPPLIERS, ITEMS } = require("./seed/inventorySeedData");
+const { SUPPLIERS, ITEMS, daysAgo, daysFromNow } = require("./seed/inventorySeedData");
 
 async function seedInventory({ force = false } = {}) {
   const existing = await InventoryItem.countDocuments({});
