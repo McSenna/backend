@@ -1,7 +1,7 @@
 "use strict";
 
 const mongoose = require("mongoose");
-const { ANNOUNCEMENT_LIMITS } = require("../config/announcements");
+const { ANNOUNCEMENT_AUDIENCES, ANNOUNCEMENT_LIMITS } = require("../config/announcements");
 
 /**
  * One shared document per announcement. Every account reads the same row from
@@ -24,6 +24,11 @@ const AnnouncementSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    // Rows written before audiences existed read as Everyone, no end date, posted.
+    audience: { type: String, enum: ANNOUNCEMENT_AUDIENCES, default: "Everyone" },
+    expiresAt: { type: Date, default: null },
+    // A draft is visible to admins only and has notified nobody.
+    isDraft: { type: Boolean, default: false },
     recipientCount: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true }

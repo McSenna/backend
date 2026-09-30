@@ -342,6 +342,94 @@ async function runTests() {
   const badCursor = await request("/announcements?cursor=nope", { headers: headersFor(resident, "mobile") });
   check("malformed cursor is rejected with 400", badCursor.status === 400);
 
+  console.log("\nDrafts and audiences");
+
+  const residentHeaders = headersFor(resident, "mobile");
+  const doctorHeaders = headersFor(doctor);
+  const feedTitles = async (headers) =>
+    ((await request("/announcements?limit=50", { headers })).body.announcements || []).map((a) => a.title);
+
+  const draft = await post({ ...validBody(), title: "Draft clinic hours", isDraft: true });
+  const draftItem = draft.body.announcement || {};
+  check("a draft is saved with 201", draft.status === 201 && draftItem.isDraft === true, JSON.stringify(draft.body));
+  check("a draft notifies nobody", draftItem.recipientCount === 0 && (await Notification.countDocuments({ title: "Draft clinic hours" })) === 0);
+  check("a draft stays out of the shared feed", !(await feedTitles(residentHeaders)).includes("Draft clinic hours"));
+  const draftDetail = await request(`/announcements/${draftItem.id}`, { headers: residentHeaders });
+  check("a draft cannot be opened from the feed", draftDetail.status === 404);
+  const adminTitles = ((await request("/admin/announcements?limit=50", { headers: adminHeaders })).body.announcements || []).map((a) => a.title);
+  check("admins still see the draft", adminTitles.includes("Draft clinic hours"));
+
+  const staffOnly = await post({ ...validBody(), title: "Staff meeting notes", audience: "Staff" });
+  const staffAlerts = await Notification.find({ title: "Staff meeting notes" }).lean();
+  const staffRecipients = new Set(staffAlerts.map((n) => String(n.recipient)));
+  check("a staff announcement echoes its audience", staffOnly.body.announcement?.audience === "Staff");
+  check(
+    "a staff announcement reaches staff only",
+    staffRecipients.size === 2 && staffRecipients.has(String(doctor._id)) && staffRecipients.has(String(otherAdmin._id))
+  );
+  check("residents do not see staff announcements", !(await feedTitles(residentHeaders)).includes("Staff meeting notes"));
+  check("staff see staff announcements", (await feedTitles(doctorHeaders)).includes("Staff meeting notes"));
+
+  const badAudience = await post({ ...validBody(), audience: "Visitors" });
+  check("an unknown audience is rejected", badAudience.status === 400 && Boolean(badAudience.body.fieldErrors?.audience));
+
+  const endsBeforeEvent = await post({ ...validBody(), eventAt: inDays(5), expiresAt: inDays(4) });
+  check(
+    "an end date before the event is rejected",
+    endsBeforeEvent.status === 400 && Boolean(endsBeforeEvent.body.fieldErrors?.expiresAt)
+  );
+
+  const ending = await post({ ...validBody(), title: "Ended outreach", expiresAt: inDays(10) });
+  check("an end date is stored and echoed", ending.status === 201 && typeof ending.body.announcement?.expiresAt === "string");
+  await Announcement.updateOne({ _id: ending.body.announcement.id }, { $set: { expiresAt: new Date(Date.now() - 60000) } });
+  check("an ended announcement leaves the shared feed", !(await feedTitles(residentHeaders)).includes("Ended outreach"));
+
+  console.log("\nEdit");
+
+  const patch = (id, body, headers = adminHeaders) =>
+    request(`/admin/announcements/${id}`, { method: "PATCH", headers, body });
+  const draftBody = { ...validBody(), title: "Draft clinic hours", audience: "Patients" };
+
+  const doctorPatch = await patch(draftItem.id, { ...draftBody, isDraft: false }, doctorHeaders);
+  check("non-admins cannot edit", doctorPatch.status === 403);
+
+  const published = await patch(draftItem.id, { ...draftBody, isDraft: false });
+  check(
+    "posting a draft sends it to its audience",
+    published.status === 200 && published.body.announcement?.isDraft === false && published.body.announcement?.recipientCount === 1,
+    JSON.stringify(published.body)
+  );
+  const draftAlerts = await Notification.find({ title: "Draft clinic hours" }).lean();
+  check("the posted draft reached the patient", draftAlerts.length === 1 && String(draftAlerts[0].recipient) === String(resident._id));
+
+  const backToDraft = await patch(draftItem.id, { ...draftBody, isDraft: true });
+  check("a posted announcement cannot go back to drafts", backToDraft.status === 400 && Boolean(backToDraft.body.fieldErrors?.isDraft));
+
+  await Announcement.updateOne({ _id: announcement.id }, { $set: { eventAt: new Date(Date.now() - 2 * 86400000) } });
+  const pastEventAt = (await Announcement.findById(announcement.id).lean()).eventAt.toISOString();
+  const renamed = await patch(announcement.id, { ...validBody(), title: "Vaccination drive moved indoors", eventAt: pastEventAt });
+  check("an unchanged past event date does not block an edit", renamed.status === 200, JSON.stringify(renamed.body));
+  check(
+    "editing updates the alerts already delivered",
+    (await Notification.countDocuments({ announcement: announcement.id, title: "Vaccination drive moved indoors" })) === 3
+  );
+  check("the edit is written to the system log", Boolean(await SystemLog.findOne({ action: "ANNOUNCEMENT_UPDATED" }).lean()));
+
+  const missingPatch = await patch(new mongoose.Types.ObjectId(), validBody());
+  check("editing a missing announcement answers 404", missingPatch.status === 404);
+
+  console.log("\nDelete");
+
+  const remove = (id, headers = adminHeaders) => request(`/admin/announcements/${id}`, { method: "DELETE", headers });
+
+  check("non-admins cannot delete", (await remove(announcement.id, doctorHeaders)).status === 403);
+  const removed = await remove(announcement.id);
+  check("admin delete returns 200", removed.status === 200 && removed.body.id === announcement.id);
+  check("the announcement is gone", !(await Announcement.findById(announcement.id)));
+  check("its inbox alerts are gone", (await Notification.countDocuments({ announcement: announcement.id })) === 0);
+  check("the delete is written to the system log", Boolean(await SystemLog.findOne({ action: "ANNOUNCEMENT_DELETED" }).lean()));
+  check("deleting again answers 404", (await remove(announcement.id)).status === 404);
+
   console.log("\nDelivery failure");
 
   const before = await Announcement.countDocuments();

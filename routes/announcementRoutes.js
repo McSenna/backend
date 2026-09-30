@@ -16,5 +16,7 @@ router.get("/announcements/:id", auth, announcementController.getAnnouncementByI
 
 router.get("/admin/announcements", auth, adminOnly, announcementController.getAdminAnnouncements);
 router.post("/admin/announcements", auth, adminOnly, announcementController.createAnnouncement);
+router.patch("/admin/announcements/:id", auth, adminOnly, announcementController.updateAnnouncement);
+router.delete("/admin/announcements/:id", auth, adminOnly, announcementController.deleteAnnouncement);
 
 module.exports = router;
