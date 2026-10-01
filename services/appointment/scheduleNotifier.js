@@ -10,6 +10,7 @@ const {
   truncateNotificationBody,
   createNotifications,
 } = require("./notifications");
+const { visitLabels } = require("./visitLabels");
 
 const loadScheduledAppointment = (appointmentId) =>
   Appointment.findById(appointmentId)
@@ -21,12 +22,14 @@ const loadScheduledAppointment = (appointmentId) =>
 const buildScheduleDetails = (populated) => {
   const doctorLabel = populated.assignedBy?.fullname ?? null;
   const appointmentTypeLabel = formatConsultationTypeLabel(populated.consultationType);
+  const labels = visitLabels(populated, doctorLabel);
   return {
     doctorLabel,
     appointmentTypeLabel,
     details: {
-      ...formatAppointmentDetails(populated.slotStart, doctorLabel, null),
+      ...formatAppointmentDetails(populated.slotStart, labels.worker, labels.location),
       appointmentType: appointmentTypeLabel,
+      ...(labels.patientName ? { patientName: labels.patientName } : {}),
     },
     timeLabel: formatSlotStartForNotification(populated.slotStart),
   };

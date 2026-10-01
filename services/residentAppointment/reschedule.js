@@ -1,12 +1,11 @@
 "use strict";
 
-const { pushStatusHistory } = require("../../models/Appointment");
 const { loadAppointmentOrFail, loadMissionOrFail } = require("../appointment/lookup");
-const {
-  assertMissionOffersCategory,
-  assertSlotIsAvailable,
-  missionDurationFor,
-} = require("../appointment/slotService");
+const { assertMissionOffersCategory, missionDurationFor } = require("../appointment/slotService");
+const { commitResidentReschedule } = require("./rescheduleCommit");
+const { buildRescheduleNotifications } = require("./rescheduleNotice");
+const { isWeeklyService } = require("../../config/consultationCategories");
+const { rescheduleWeeklyByResident } = require("../immunization/weeklyReschedule");
 const { processMissionSchedulePriorityQueue } = require("../triageQueue");
 const { assertValidObjectId } = require("../../utils/objectId");
 const { badRequest } = require("../../utils/AppError");
@@ -46,74 +45,47 @@ const releasePreviousMission = async (previousMissionId, nextMissionId) => {
   }
 };
 
-const buildNotifications = ({ appointment, serviceLabel, labels, staffId }) => {
-  const when = `${labels.date} at ${labels.time}`;
-
-  return [
-    {
-      recipient: appointment.resident,
-      appointment: appointment._id,
-      type: "appointment_rescheduled",
-      title: "Appointment Rescheduled",
-      body: `Your ${serviceLabel} appointment has been rescheduled to ${when}.`,
-      time: labels.time,
-      tone: "info",
-    },
-    staffId
-      ? {
-          recipient: staffId,
-          appointment: appointment._id,
-          type: "appointment_rescheduled",
-          title: "Appointment Rescheduled by Resident",
-          body: `A ${serviceLabel} appointment you scheduled was moved by the resident to ${when}.`,
-          time: labels.time,
-          tone: "info",
-        }
-      : null,
-  ];
-};
-
 const rescheduleAppointmentByResident = async ({
   req,
   appointmentId,
   residentId,
   missionScheduleId,
   slotStart,
+  appointmentDate,
   actorRole,
 }) => {
-  if (!missionScheduleId || !slotStart) {
-    throw badRequest("Mission schedule and new time slot are required.", ERROR_CODES.MISSING_FIELDS);
-  }
-
-  const missionId = assertValidObjectId(missionScheduleId, "mission schedule");
-
   const appointment = await loadAppointmentOrFail(appointmentId);
   assertOwnership(appointment, residentId, actorRole, "reschedule");
   assertStatusAllows(appointment, RESCHEDULABLE_STATUSES, "rescheduled");
+
+  // A weekly service (immunization) moves to another day with a server-assigned time.
+  if (isWeeklyService(appointment.consultationType)) {
+    return rescheduleWeeklyByResident({ req, appointment, residentId, actorRole, appointmentDate });
+  }
+
+  if (!missionScheduleId || !slotStart) {
+    throw badRequest("Mission schedule and new time slot are required.", ERROR_CODES.MISSING_FIELDS);
+  }
+  const missionId = assertValidObjectId(missionScheduleId, "mission schedule");
 
   const mission = await loadMissionOrFail(missionId);
   assertMissionOffersCategory(mission, appointment.consultationType);
   const durationMinutes = missionDurationFor(mission, appointment.consultationType);
 
   const slotStartDate = parseFutureSlotStart(slotStart);
-  const slotEndDate = new Date(slotStartDate.getTime() + durationMinutes * 60 * 1000);
-
-  await assertSlotIsAvailable({ appointment, mission, slotStartDate, slotEndDate });
 
   const previousMissionId = appointment.missionSchedule;
   const previousSlotStart = appointment.slotStart;
   const staffId = appointment.assignedBy;
 
-  appointment.missionSchedule = mission._id;
-  appointment.assignedCategoryKey = appointment.consultationType;
-  appointment.assignedDurationMinutes = durationMinutes;
-  appointment.slotStart = slotStartDate;
-  appointment.slotEnd = slotEndDate;
-  appointment.status = "rescheduled";
-  if (!appointment.approvedAt) appointment.approvedAt = new Date();
-
-  pushStatusHistory(appointment, "rescheduled", residentId, "Rescheduled by resident");
-  await appointment.save();
+  const updated = await commitResidentReschedule({
+    appointmentId: appointment._id,
+    residentId,
+    actorRole,
+    mission,
+    durationMinutes,
+    slotStartDate,
+  });
 
   await releasePreviousMission(previousMissionId, mission._id);
 
@@ -121,7 +93,7 @@ const rescheduleAppointmentByResident = async ({
   const labels = formatSlotLabels(slotStartDate);
 
   await notify(
-    buildNotifications({ appointment, serviceLabel, labels, staffId }),
+    buildRescheduleNotifications({ appointment: updated, serviceLabel, labels, staffId }),
     "resident-reschedule"
   );
 
@@ -137,7 +109,8 @@ const rescheduleAppointmentByResident = async ({
       missionScheduleId: String(mission._id),
       previousSlotStart: previousSlotStart ? new Date(previousSlotStart).toISOString() : null,
       slotStart: slotStartDate.toISOString(),
-      slotEnd: slotEndDate.toISOString(),
+      slotEnd: updated.slotEnd.toISOString(),
+      reschedulePriority: Boolean(updated.reschedulePriorityAt),
     },
   });
 

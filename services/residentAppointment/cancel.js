@@ -76,6 +76,7 @@ const cancelAppointmentByResident = async ({ req, appointmentId, residentId, rea
   appointment.slotEnd = null;
   appointment.assignedCategoryKey = null;
   appointment.assignedDurationMinutes = null;
+  appointment.immunizationSlotKey = null;
 
   pushStatusHistory(appointment, "cancelled", residentId, trimmedReason || "Cancelled by resident");
   await appointment.save();

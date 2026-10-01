@@ -10,6 +10,8 @@ const {
   loadBookedForMission,
   resolveMissionDuration,
 } = require("../../services/appointment/slotService");
+const { assertServiceDay } = require("../../services/appointment/serviceDayRules");
+const { assertMissionService } = require("../../services/appointment/missionServiceRules");
 
 exports.suggestSlot = asyncHandler(async (req, res) => {
   const { missionScheduleId, categoryKey, durationMinutes, excludeAppointmentId } = req.query;
@@ -26,6 +28,8 @@ exports.suggestSlot = asyncHandler(async (req, res) => {
     throw notFound("Mission schedule not found.", ERROR_CODES.MISSION_NOT_FOUND);
   }
 
+  assertMissionService(categoryKey);
+  assertServiceDay(categoryKey, mission.date);
   const resolvedDuration = resolveMissionDuration(mission, categoryKey, durationMinutes);
 
   const booked = await loadBookedForMission(mission._id);

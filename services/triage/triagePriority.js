@@ -2,6 +2,7 @@
 
 const Appointment = require("../../models/Appointment");
 const { ageToTier, computeAgeYears } = require("../../utils/priorityQueue");
+const { reschedulePriorityRank } = require("../appointment/reschedulePriority");
 
 const DEFAULT_PRIORITY = 4;
 
@@ -14,7 +15,8 @@ const tagPendingAppointments = async (pendingAppointments) => {
   const bulkOps = [];
 
   for (const appointment of pendingAppointments) {
-    const ageYears = computeAgeYears(appointment?.resident?.dateOfBirth);
+    // An immunization is for the child, so the child's age sets the tier.
+    const ageYears = computeAgeYears(appointment?.childDateOfBirth ?? appointment?.resident?.dateOfBirth);
     const priorityTag = ageToTier(ageYears);
 
     const stale =
@@ -44,6 +46,12 @@ const tagPendingAppointments = async (pendingAppointments) => {
 };
 
 const byPriorityThenCreated = (a, b) => {
+  // A resident who rescheduled a first-slot service (immunization) and was sent
+  // back to pending, e.g. by a mission edit, is re-slotted ahead of new requests.
+  const ra = reschedulePriorityRank(a);
+  const rb = reschedulePriorityRank(b);
+  if (ra !== rb) return ra < rb ? -1 : 1;
+
   const pa = a.prioritySortKey ?? DEFAULT_PRIORITY;
   const pb = b.prioritySortKey ?? DEFAULT_PRIORITY;
   if (pa !== pb) return pa - pb;

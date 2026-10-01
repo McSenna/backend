@@ -20,6 +20,9 @@ const MissionScheduleSchema = new mongoose.Schema(
     categories: { type: [CategoryOnMissionSchema], default: [] },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     notes: { type: String, default: "", maxlength: 2000 },
+    // Incremented inside every slot-writing transaction (services/appointment/slotLock.js)
+    // so two bookings on the same day conflict and retry instead of double-booking.
+    bookingVersion: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

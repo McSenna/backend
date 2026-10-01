@@ -1,7 +1,11 @@
 "use strict";
 
 const { listServiceProviders } = require("./appointment/providerController");
-const { createAppointment, getMyAppointments } = require("./appointment/bookingController");
+const {
+  createAppointment,
+  getBookingOptions,
+  getMyAppointments,
+} = require("./appointment/bookingController");
 const {
   getPendingAppointments,
   listAppointments,
@@ -29,6 +33,7 @@ const {
 module.exports = {
   listServiceProviders,
   createAppointment,
+  getBookingOptions,
   getMyAppointments,
   getPendingAppointments,
   listAppointments,

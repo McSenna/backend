@@ -23,6 +23,7 @@ router.get("/consultation-categories", auth, missionController.getConsultationCa
 router.get("/appointment-providers", auth, appointmentController.listServiceProviders);
 
 router.post("/appointments", auth, roleCheck(RESIDENT), appointmentController.createAppointment);
+router.get("/appointments/booking-options", auth, roleCheck(RESIDENT), appointmentController.getBookingOptions);
 router.get("/appointments/me", auth, roleCheck(RESIDENT), appointmentController.getMyAppointments);
 
 router.get("/appointments/:id/reschedule-options", auth, roleCheck(RESIDENT_OR_STAFF), appointmentController.getRescheduleOptions);

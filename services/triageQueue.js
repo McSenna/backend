@@ -5,6 +5,8 @@ const MissionSchedule = require("../models/MissionSchedule");
 const User = require("../models/User");
 const { loadMissionQueue, planSlotFor } = require("./triage/missionQueueContext");
 const { announceAutoConfirm } = require("./triage/autoConfirmNotifier");
+const { loadBookedForMission } = require("./appointment/slotService");
+const { withMissionSlotLock } = require("./appointment/slotLock");
 
 const normalizeDayStart = (value) => {
   const date = new Date(value);
@@ -12,27 +14,38 @@ const normalizeDayStart = (value) => {
   return date;
 };
 
-const claimPendingAppointment = ({ appointment, mission, plan, staffId, now }) =>
-  Appointment.findOneAndUpdate(
-    { _id: appointment._id, status: "pending" },
-    {
-      $set: {
-        ageTier: appointment.ageTier,
-        prioritySortKey: appointment.prioritySortKey,
-        ageAtSubmission: appointment.ageAtSubmission,
+const claimPendingAppointment = ({ appointment, mission, missionCategoryMap, staffId, now }) =>
+  withMissionSlotLock(mission._id, async (session) => {
+    // Plan against the slots committed right now, not the snapshot the queue was
+    // ranked from: a reschedule or staff booking may have taken a slot since.
+    const booked = await loadBookedForMission(mission._id, session);
+    const plan = planSlotFor({ appointment, mission, missionCategoryMap, bookedSim: booked });
+    if (!plan) return null;
 
-        missionSchedule: mission._id,
-        assignedCategoryKey: plan.categoryKey,
-        assignedDurationMinutes: plan.durationMinutes,
-        slotStart: new Date(plan.slotStartIso),
-        slotEnd: new Date(new Date(plan.slotStartIso).getTime() + plan.durationMinutes * 60 * 1000),
-        assignedBy: staffId ?? null,
-        assignedAt: now,
-        status: "confirmed",
+    const slotStart = new Date(plan.slotStartIso);
+    const slotEnd = new Date(slotStart.getTime() + plan.durationMinutes * 60 * 1000);
+
+    return Appointment.findOneAndUpdate(
+      { _id: appointment._id, status: "pending" },
+      {
+        $set: {
+          ageTier: appointment.ageTier,
+          prioritySortKey: appointment.prioritySortKey,
+          ageAtSubmission: appointment.ageAtSubmission,
+
+          missionSchedule: mission._id,
+          assignedCategoryKey: plan.categoryKey,
+          assignedDurationMinutes: plan.durationMinutes,
+          slotStart,
+          slotEnd,
+          assignedBy: staffId ?? null,
+          assignedAt: now,
+          status: "confirmed",
+        },
       },
-    },
-    { returnDocument: "after" }
-  );
+      { returnDocument: "after", session }
+    );
+  });
 
 const processMissionSchedulePriorityQueue = async (missionScheduleId, { staffId } = {}) => {
   const queue = await loadMissionQueue(missionScheduleId, "dateOfBirth fullname email");
@@ -49,10 +62,10 @@ const processMissionSchedulePriorityQueue = async (missionScheduleId, { staffId 
   let assigned = 0;
 
   for (const appointment of pending) {
-    const plan = planSlotFor({ appointment, mission, missionCategoryMap, bookedSim });
-    if (!plan) continue;
+    // Cheap pre-check on the snapshot; the claim re-plans under the lock.
+    if (!planSlotFor({ appointment, mission, missionCategoryMap, bookedSim })) continue;
 
-    const updated = await claimPendingAppointment({ appointment, mission, plan, staffId, now });
+    const updated = await claimPendingAppointment({ appointment, mission, missionCategoryMap, staffId, now });
     if (!updated) continue;
 
     announceAutoConfirm({ appointment, updated, staffId, doctorLabel });

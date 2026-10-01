@@ -17,7 +17,7 @@ const {
 } = require("../../services/medicalRecord/residentRecordView");
 
 const APPOINTMENT_SELECT =
-  "consultationType slotStart slotEnd status createdAt approvedAt completedAt missionSchedule";
+  "consultationType slotStart slotEnd status createdAt approvedAt completedAt missionSchedule childName childDateOfBirth";
 
 const RECORD_POPULATE = [
   { path: "provider", select: "fullname role" },

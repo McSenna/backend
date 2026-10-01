@@ -11,6 +11,9 @@ const {
   validateAndAssignSlot,
 } = require("./slotService");
 const { loadAppointmentOrFail, loadMissionOrFail } = require("./lookup");
+const { assertMissionService } = require("./missionServiceRules");
+const { isWeeklyService } = require("../../config/consultationCategories");
+const { placePendingWeekly } = require("../immunization/weeklyPlacement");
 
 const assertSlotPayload = ({ missionScheduleId, categoryKey, slotStart }) => {
   if (!missionScheduleId || !categoryKey || !slotStart) {
@@ -48,10 +51,14 @@ const assertCategoryMatchesRequest = (appointment, categoryKey) => {
 };
 
 const assignSlot = async ({ appointmentId, payload, staffId }) => {
+  const appointment = await loadAppointmentOrFail(appointmentId);
+  // A weekly request (immunization) goes on its own schedule, never a mission slot.
+  if (isWeeklyService(appointment.consultationType)) {
+    return placePendingWeekly({ appointment, payload, staffId });
+  }
+
   const { missionScheduleId, categoryKey, slotStart } = payload;
   assertSlotPayload(payload);
-
-  const appointment = await loadAppointmentOrFail(appointmentId);
   if (appointment.status !== "pending") {
     throw conflict(
       `Only pending appointments can be scheduled. This appointment is already ${appointment.status}.`,
@@ -65,7 +72,7 @@ const assignSlot = async ({ appointmentId, payload, staffId }) => {
 
   await assertTriageOrder(missionScheduleId, appointment);
 
-  await validateAndAssignSlot({
+  return validateAndAssignSlot({
     appointment,
     mission,
     categoryKey,
@@ -74,8 +81,6 @@ const assignSlot = async ({ appointmentId, payload, staffId }) => {
     staffId,
     isReassign: false,
   });
-
-  return appointment;
 };
 
 const reassignSlot = async ({ appointmentId, payload, staffId }) => {
@@ -83,6 +88,7 @@ const reassignSlot = async ({ appointmentId, payload, staffId }) => {
   assertSlotPayload(payload);
 
   const appointment = await loadAppointmentOrFail(appointmentId);
+  assertMissionService(appointment.consultationType);
   if (!BOOKED_STATUSES.includes(appointment.status)) {
     throw conflict(
       `Only confirmed or rescheduled appointments can be moved. This appointment is ${appointment.status}.`,
@@ -93,7 +99,7 @@ const reassignSlot = async ({ appointmentId, payload, staffId }) => {
   const mission = await loadMissionOrFail(missionScheduleId);
   assertMissionOffersCategory(mission, categoryKey);
 
-  await validateAndAssignSlot({
+  return validateAndAssignSlot({
     appointment,
     mission,
     categoryKey,
@@ -102,8 +108,6 @@ const reassignSlot = async ({ appointmentId, payload, staffId }) => {
     staffId,
     isReassign: true,
   });
-
-  return appointment;
 };
 
 module.exports = { assignSlot, reassignSlot };

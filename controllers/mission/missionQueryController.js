@@ -46,7 +46,7 @@ exports.getMissionSchedule = asyncHandler(async (req, res) => {
     missionSchedule: mission._id,
     status: { $in: BOOKED_STATUSES },
   })
-    .select("slotStart slotEnd assignedCategoryKey resident status")
+    .select("slotStart slotEnd assignedCategoryKey resident status childName")
     .populate("resident", "fullname email")
     .lean();
 

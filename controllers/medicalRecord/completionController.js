@@ -13,6 +13,7 @@ const {
   normalizeRole,
 } = require("../../services/medicalRecord/serviceOwnership");
 const { commitCompletion } = require("../../services/medicalRecord/completionService");
+const { assertCompletionDayReached } = require("../../services/appointment/serviceDayRules");
 const {
   alreadyCompletedResponse,
   assertCompletable,
@@ -40,6 +41,7 @@ exports.completeAppointment = asyncHandler(async (req, res) => {
   }
 
   assertCompletable(existing.status);
+  assertCompletionDayReached(existing);
 
   const { validation, dispense } = validateSubmission(existing.consultationType, req.body);
 

@@ -92,6 +92,13 @@ function listAvailableStarts(mission, bookedAppointments, durationMinutes, exclu
   return candidates;
 }
 
+/** Free starts that are still ahead of `nowTime`, earliest first. */
+function listOpenStarts(mission, bookedAppointments, durationMinutes, excludeAppointmentId, nowTime = Date.now()) {
+  return listAvailableStarts(mission, bookedAppointments, durationMinutes, excludeAppointmentId).filter(
+    (startIso) => new Date(startIso).getTime() > nowTime
+  );
+}
+
 function suggestNextAvailableSlot(mission, bookedAppointments, durationMinutes, excludeAppointmentId) {
   const list = listAvailableStarts(mission, bookedAppointments, durationMinutes, excludeAppointmentId);
   return list[0] || null;
@@ -104,5 +111,6 @@ module.exports = {
   isIntervalInsideWindows,
   hasConflict,
   listAvailableStarts,
+  listOpenStarts,
   suggestNextAvailableSlot,
 };

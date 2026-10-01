@@ -8,11 +8,16 @@ const mongoose = require("mongoose");
 const User = require("../../models/User");
 const Appointment = require("../../models/Appointment");
 const SystemLog = require("../../models/SystemLog");
+const MissionSchedule = require("../../models/MissionSchedule");
 
 const BASE = process.env.TEST_BASE_URL || `http://127.0.0.1:${process.env.TEST_PORT || 5000}/api`;
 const TAG = "svc-e2e";
 const PASSWORD = "TestPass123!";
 const emailFor = (key) => `${TAG}.${key}@maslogcare.test`;
+// Far enough ahead to be bookable whenever this runs; prenatal and BP checking have no fixed weekday.
+const MISSION_DAY = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+MISSION_DAY.setHours(0, 0, 0, 0);
+const slotAt = (hour) => new Date(MISSION_DAY.getTime() + hour * 60 * 60 * 1000).toISOString();
 
 const APPROVED_LABELS = [
   "General Checkup",
@@ -82,6 +87,7 @@ async function cleanup() {
     .lean();
   const ids = users.map((u) => u._id);
   await Appointment.deleteMany({ resident: { $in: ids } });
+  await MissionSchedule.deleteMany({ notes: TAG });
   await SystemLog.deleteMany({ userId: { $in: ids } });
   await User.deleteMany({ email: { $regex: `^${TAG}\\.` } });
   return ids.length;
@@ -112,6 +118,17 @@ async function seed() {
     });
     created[spec.key] = String(doc._id);
   }
+  const mission = await MissionSchedule.create({
+    date: MISSION_DAY,
+    categories: [
+      { categoryKey: "prenatal", durationMinutes: 20 },
+      { categoryKey: "bp_checking", durationMinutes: 5 },
+      { categoryKey: "consultation", durationMinutes: 20 },
+    ],
+    createdBy: created.doctor,
+    notes: TAG,
+  });
+  created.missionId = String(mission._id);
   return created;
 }
 
@@ -203,7 +220,13 @@ async function run() {
   const noService = await api("/appointment-providers", { token });
   check("missing service -> 400", noService.status === 400, `got ${noService.status}`);
 
-  console.log("\n== Booking a request ==");
+  console.log("\n== Booking an appointment ==");
+  let keyCount = 0;
+  const at = (hour) => ({
+    missionScheduleId: staff.missionId,
+    slotStart: slotAt(hour),
+    requestKey: `${TAG}-${Date.now().toString(36)}-${(keyCount += 1)}`,
+  });
   const booked = await api("/appointments", {
     method: "POST",
     token,
@@ -212,9 +235,10 @@ async function run() {
       description: "Second trimester check-up.",
       additionalNotes: "Prefers a morning visit.",
       preferredProvider: staff.midwife,
+      ...at(9),
     },
   });
-  check("valid request -> 201", booked.status === 201, `got ${booked.status} ${booked.data?.code}`);
+  check("valid booking -> 201", booked.status === 201, `got ${booked.status} ${booked.data?.code}`);
   check("stored against the approved service key", booked.data?.appointment?.consultationType === "prenatal");
   check(
     "preferred provider is recorded and populated",
@@ -225,11 +249,11 @@ async function run() {
     "additional notes are stored",
     booked.data?.appointment?.additionalNotes === "Prefers a morning visit."
   );
-  check("request joins the queue as pending", booked.data?.appointment?.status === "pending");
+  check("booking is confirmed immediately", booked.data?.appointment?.status === "confirmed");
   check(
-    "resident never sets the schedule",
-    booked.data?.appointment?.slotStart == null &&
-    booked.data?.appointment?.missionSchedule == null
+    "the chosen date and time are stored",
+    booked.data?.appointment?.slotStart === slotAt(9) &&
+    String(booked.data?.appointment?.missionSchedule?._id) === staff.missionId
   );
 
   console.log("\n== Server-side validation ==");
@@ -240,6 +264,7 @@ async function run() {
       consultationType: "prenatal",
       description: "Check-up",
       preferredProvider: staff.bhw,
+      ...at(10),
     },
   });
   check(
@@ -255,6 +280,7 @@ async function run() {
       consultationType: "bp_checking",
       description: "Routine BP reading.",
       preferredProvider: staff.doctor,
+      ...at(10),
     },
   });
   check(
@@ -270,6 +296,7 @@ async function run() {
       consultationType: "prenatal",
       description: "Maternal check.",
       preferredProvider: staff.doctor,
+      ...at(10),
     },
   });
   check(
@@ -285,6 +312,7 @@ async function run() {
       consultationType: "consultation",
       description: "Check-up",
       preferredProvider: staff["doctor-suspended"],
+      ...at(10),
     },
   });
   check(
@@ -296,14 +324,14 @@ async function run() {
   const noType = await api("/appointments", {
     method: "POST",
     token,
-    body: { description: "Check-up" },
+    body: { description: "Check-up", ...at(10) },
   });
   check("missing service type -> 400", noType.status === 400, `got ${noType.status}`);
 
   const badType = await api("/appointments", {
     method: "POST",
     token,
-    body: { consultationType: "blood_pressure_monitoring", description: "Check-up" },
+    body: { consultationType: "blood_pressure_monitoring", description: "Check-up", ...at(10) },
   });
   check(
     "a retired service key -> 400",
@@ -314,18 +342,18 @@ async function run() {
   const noProvider = await api("/appointments", {
     method: "POST",
     token,
-    body: { consultationType: "bp_checking", description: "Routine BP reading." },
+    body: { consultationType: "bp_checking", description: "Routine BP reading.", ...at(10) },
   });
   check(
-    "a request with no provider preference is still accepted",
+    "a booking with no provider preference is still accepted",
     noProvider.status === 201 && noProvider.data?.appointment?.preferredProvider == null,
     `got ${noProvider.status}`
   );
 
-  console.log("\n== Reading the requests back ==");
+  console.log("\n== Reading the bookings back ==");
   const mine = await api("/appointments/me", { token });
   check("my appointments -> 200", mine.status === 200, `got ${mine.status}`);
-  check("both requests are listed", (mine.data?.appointments ?? []).length === 2);
+  check("both bookings are listed", (mine.data?.appointments ?? []).length === 2);
   check(
     "the preferred provider is populated for display",
     (mine.data?.appointments ?? []).some((a) => a.preferredProvider?.fullname)
@@ -371,14 +399,21 @@ async function run() {
       rows.map((a) => a.queueRole).join(",")
     );
 
-    const ids = rows.map((a) => String(a._id));
+    // Bookings are confirmed on creation, so they show in the confirmed list, never in pending.
+    const confirmed = await api("/appointments?status=confirmed", { token: staffToken });
+    const confirmedIds = (confirmed.data?.appointments ?? []).map((a) => String(a._id));
+    const pendingIds = rows.map((a) => String(a._id));
     check(
-      `the prenatal request is ${role === "midwife" ? "in" : "absent from"} the ${role} queue`,
-      ids.includes(String(prenatalId)) === (role === "midwife")
+      `the prenatal booking is ${role === "midwife" ? "in" : "absent from"} the ${role} confirmed list`,
+      confirmedIds.includes(String(prenatalId)) === (role === "midwife")
     );
     check(
-      `the BP request is ${role === "bhw" ? "in" : "absent from"} the ${role} queue`,
-      ids.includes(String(bpId)) === (role === "bhw")
+      `the BP booking is ${role === "bhw" ? "in" : "absent from"} the ${role} confirmed list`,
+      confirmedIds.includes(String(bpId)) === (role === "bhw")
+    );
+    check(
+      `neither booking waits in the ${role} pending queue`,
+      !pendingIds.includes(String(prenatalId)) && !pendingIds.includes(String(bpId))
     );
 
     const widened = await api("/appointments/pending?role=admin", { token: staffToken });

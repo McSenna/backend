@@ -22,11 +22,14 @@ const announceScheduleChange = async ({ req, appointment, missionScheduleId, pla
 
   sendScheduleEmail(plan.sendEmail, resident, details, plan.emailFailureMessage);
 
-  await reprocessMissionQueue(missionScheduleId, {
-    staffId: actorId,
-    route: plan.route,
-    failureMessage: plan.queueFailureMessage,
-  });
+  // A weekly visit has no mission whose queue could take the freed slot.
+  if (missionScheduleId) {
+    await reprocessMissionQueue(missionScheduleId, {
+      staffId: actorId,
+      route: plan.route,
+      failureMessage: plan.queueFailureMessage,
+    });
+  }
 
   await createSystemLog({
     req,

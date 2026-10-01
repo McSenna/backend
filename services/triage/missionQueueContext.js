@@ -2,12 +2,14 @@
 
 const Appointment = require("../../models/Appointment");
 const MissionSchedule = require("../../models/MissionSchedule");
-const { validateDurationForCategory } = require("../../config/consultationCategories");
-const { suggestNextAvailableSlot } = require("../../utils/slotAvailability");
+const { isWeeklyService, validateDurationForCategory } = require("../../config/consultationCategories");
+const { listOpenStarts } = require("../../utils/slotAvailability");
 const { tagPendingAppointments, byPriorityThenCreated } = require("./triagePriority");
 const { SLOT_OCCUPYING_STATUSES } = require("../queueScope");
+const { isServiceDay } = require("../appointment/serviceDayRules");
 
-const PENDING_SELECT = "consultationType createdAt ageTier prioritySortKey ageAtSubmission _id";
+const PENDING_SELECT =
+  "consultationType createdAt ageTier prioritySortKey ageAtSubmission reschedulePriorityAt childDateOfBirth _id";
 
 const buildMissionCategoryMap = (mission) => {
   const map = new Map();
@@ -59,13 +61,18 @@ const loadMissionQueue = async (missionScheduleId, residentFields) => {
 
 const planSlotFor = ({ appointment, mission, missionCategoryMap, bookedSim }) => {
   const categoryKey = appointment.consultationType;
+  // Missions never place a weekly visit (immunization), even one an older mission still lists.
+  if (isWeeklyService(categoryKey)) return null;
   const missionDurationMinutes = missionCategoryMap.get(categoryKey);
   if (!missionDurationMinutes) return null;
+  if (!isServiceDay(categoryKey, mission.date)) return null;
 
   const validated = validateDurationForCategory(categoryKey, missionDurationMinutes);
   if (!validated.ok) return null;
 
-  const slotStartIso = suggestNextAvailableSlot(mission, bookedSim, validated.durationMinutes, null);
+  // Future starts only: triage also re-runs on a past mission when a resident
+  // moves off it, and must never confirm someone into a time that has passed.
+  const [slotStartIso] = listOpenStarts(mission, bookedSim, validated.durationMinutes, null);
   if (!slotStartIso) return null;
 
   return { categoryKey, durationMinutes: validated.durationMinutes, slotStartIso };

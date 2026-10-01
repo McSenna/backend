@@ -31,6 +31,22 @@ const AppointmentSchema = new mongoose.Schema(
     assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     assignedAt: { type: Date, default: null },
 
+    // Set when a resident reschedules a first-slot service (immunization). Kept
+    // apart from `status` so the priority survives a return to the pending queue;
+    // the earliest timestamp goes first. Staff moves never set it.
+    reschedulePriorityAt: { type: Date, default: null },
+
+    // Random key the app sends with each booking attempt, so a retried or
+    // double-tapped request returns the first booking instead of making another.
+    bookingRequestKey: { type: String, default: null, maxlength: 64 },
+
+    // Immunization only: the child the visit is for. The account holder is the parent.
+    childName: { type: String, default: null, trim: true, maxlength: 120 },
+    childDateOfBirth: { type: Date, default: null },
+    // Immunization only: the slot start while the visit holds its position, null
+    // once it is cancelled or declined. Unique, so no two active visits share a time.
+    immunizationSlotKey: { type: String, default: null },
+
     declineReason: { type: String, default: "", maxlength: 1000 },
     cancelReason: { type: String, default: "", maxlength: 1000 },
 
@@ -89,6 +105,17 @@ AppointmentSchema.index({ status: 1, prioritySortKey: 1, createdAt: 1 });
 AppointmentSchema.index({ missionSchedule: 1, slotStart: 1 });
 
 AppointmentSchema.index({ status: 1, completedAt: -1 });
+
+AppointmentSchema.index(
+  { immunizationSlotKey: 1 },
+  { unique: true, partialFilterExpression: { immunizationSlotKey: { $type: "string" } } }
+);
+
+// Older and staff-created rows have no key, so only keyed bookings are unique.
+AppointmentSchema.index(
+  { resident: 1, bookingRequestKey: 1 },
+  { unique: true, partialFilterExpression: { bookingRequestKey: { $type: "string" } } }
+);
 
 const Appointment = mongoose.model("Appointment", AppointmentSchema, "appointments");
 

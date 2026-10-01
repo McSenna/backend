@@ -11,6 +11,8 @@ const {
   loadBookedForMission,
   resolveMissionDuration,
 } = require("../../services/appointment/slotService");
+const { assertServiceDay } = require("../../services/appointment/serviceDayRules");
+const { assertMissionService } = require("../../services/appointment/missionServiceRules");
 
 exports.getAvailableSlots = asyncHandler(async (req, res) => {
   const id = assertValidObjectId(req.params.id, "mission schedule");
@@ -32,6 +34,8 @@ exports.getAvailableSlots = asyncHandler(async (req, res) => {
     );
   }
 
+  assertMissionService(categoryKey);
+  assertServiceDay(categoryKey, mission.date);
   const resolvedDuration = resolveMissionDuration(mission, categoryKey, durationMinutes);
 
   // Must use the same occupancy rule as the assign step (processing and completed

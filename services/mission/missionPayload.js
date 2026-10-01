@@ -3,6 +3,7 @@
 const { getCategory, resolveDurationMinutes } = require("../../config/consultationCategories");
 const { parseHHMM } = require("../../utils/slotAvailability");
 const { badRequest } = require("../../utils/AppError");
+const { assertMissionService } = require("../appointment/missionServiceRules");
 const { ERROR_CODES } = require("../../utils/errorCodes");
 
 const normalizeDateInput = (value) => {
@@ -60,6 +61,7 @@ const normalizeCategories = (categories) => {
         ERROR_CODES.VALIDATION_ERROR
       );
     }
+    assertMissionService(key);
     const durationMinutes = resolveDurationMinutes(key, entry.durationMinutes);
     if (durationMinutes == null) {
       throw badRequest(

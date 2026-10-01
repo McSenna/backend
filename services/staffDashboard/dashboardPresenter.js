@@ -1,6 +1,7 @@
 "use strict";
 
 const { getCategory, CONSULTATION_CATEGORIES } = require("../../config/consultationCategories");
+const { patientNameOf } = require("../appointment/visitLabels");
 const { getServiceFields } = require("../../config/medicalRecordFields");
 
 const DASHBOARD_SAFE_DETAILS = {
@@ -37,15 +38,15 @@ const toDashboardAppointment = (appointment) => ({
   slotStart: appointment.slotStart,
   slotEnd: appointment.slotEnd,
   isUrgent: Boolean(appointment.isUrgent),
-  patientName: appointment.resident?.fullname ?? "Unnamed patient",
+  patientName: patientNameOf(appointment),
   medicalRecord: appointment.medicalRecord ? String(appointment.medicalRecord) : null,
 });
 
 const toRecentActivity = (record) => ({
   _id: String(record._id),
   medicalRecord: String(record._id),
-  appointment: record.appointment ? String(record.appointment) : null,
-  patientName: record.resident?.fullname ?? "Unnamed patient",
+  appointment: record.appointment ? String(record.appointment._id ?? record.appointment) : null,
+  patientName: patientNameOf({ childName: record.appointment?.childName, resident: record.resident }),
   providerName: record.provider?.fullname ?? "",
   serviceType: record.serviceType,
   serviceLabel: getCategory(record.serviceType)?.label ?? record.serviceType,

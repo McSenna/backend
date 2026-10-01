@@ -31,7 +31,8 @@ exports.cancelAppointment = asyncHandler(async (req, res) => {
 
 exports.rescheduleAppointment = asyncHandler(async (req, res) => {
   const appointmentId = assertValidObjectId(req.params.id, "appointment");
-  const { missionScheduleId, slotStart } = req.body || {};
+  // Mission services send the chosen mission and start; a weekly service (immunization) sends only the day.
+  const { missionScheduleId, slotStart, appointmentDate } = req.body || {};
 
   const result = await rescheduleAppointmentByResident({
     req,
@@ -39,6 +40,7 @@ exports.rescheduleAppointment = asyncHandler(async (req, res) => {
     residentId: req.user.userId,
     missionScheduleId,
     slotStart,
+    appointmentDate,
     actorRole: req.user.role,
   });
 

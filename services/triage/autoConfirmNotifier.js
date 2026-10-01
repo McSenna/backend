@@ -3,6 +3,7 @@
 const Notification = require("../../models/Notification");
 const logger = require("../../utils/logger");
 const { sendAppointmentConfirmationEmail } = require("../mailer");
+const { visitLabels } = require("../appointment/visitLabels");
 const {
   formatAppointmentDetails,
   formatConsultationTypeLabel,
@@ -11,12 +12,19 @@ const {
 
 const warn = (message) => (error) => logger.warn(message, { errorMessage: error?.message ?? error });
 
+const confirmedBody = ({ labels, appointmentTypeLabel, details, doctorLabel }) =>
+  labels.weekly
+    ? `Your ${appointmentTypeLabel} appointment is confirmed. Date: ${details.date}. Time: ${details.time}, assigned first come, first served.`
+    : `Your ${appointmentTypeLabel} appointment is confirmed. Date: ${details.date}. Time: ${details.time}. Doctor: ${doctorLabel || "Medical mission team"}.`;
+
 const announceAutoConfirm = ({ appointment, updated, staffId, doctorLabel }) => {
   const resident = appointment?.resident;
   const appointmentTypeLabel = formatConsultationTypeLabel(appointment.consultationType);
+  const labels = visitLabels(updated, doctorLabel);
   const details = {
-    ...formatAppointmentDetails(updated.slotStart, doctorLabel, null),
+    ...formatAppointmentDetails(updated.slotStart, labels.worker, labels.location),
     appointmentType: appointmentTypeLabel,
+    ...(labels.patientName ? { patientName: labels.patientName } : {}),
   };
   const timeLabel = formatSlotStartForNotification(updated.slotStart);
 
@@ -25,7 +33,7 @@ const announceAutoConfirm = ({ appointment, updated, staffId, doctorLabel }) => 
     appointment: updated._id,
     type: "appointment_confirmed",
     title: "Appointment confirmed",
-    body: `Your ${appointmentTypeLabel} appointment is confirmed. Date: ${details.date}. Time: ${details.time}. Doctor: ${doctorLabel || "Medical mission team"}.`,
+    body: confirmedBody({ labels, appointmentTypeLabel, details, doctorLabel }),
     time: timeLabel,
     tone: "success",
   }).catch(warn("Auto-confirm notification failed"));

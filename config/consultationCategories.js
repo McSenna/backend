@@ -28,6 +28,17 @@ const CONSULTATION_CATEGORIES = [
     durationMinutes: 10,
     residentBookable: true,
     queueRole: "midwife",
+    // Date#getDay() numbering: the health center's immunization day is Wednesday.
+    serviceWeekdays: [3],
+    // A resident's reschedule takes the day's first open slot and queues first.
+    rescheduleToFirstSlot: true,
+    // Runs on its own weekly schedule, never on a doctor's medical mission. Each
+    // listed weekday has positions of `durationMinutes` from the window start,
+    // and the server hands them out first come, first served.
+    scheduling: "weekly",
+    // Mornings only, as the health office decided on 2026-10-01.
+    serviceWindows: [{ start: "08:00", end: "12:00" }],
+    bookingHorizonWeeks: 8,
   },
   {
     key: "consultation",
@@ -73,6 +84,11 @@ function normalizeRole(role) {
 
 function getCategory(key) {
   return byKey[key] || null;
+}
+
+/** True for a service with its own weekly schedule (immunization), which missions never carry. */
+function isWeeklyService(key) {
+  return getCategory(key)?.scheduling === "weekly";
 }
 
 function getQueueRole(key) {
@@ -136,6 +152,7 @@ module.exports = {
   SERVICE_QUEUE_MAPPING,
   canCreateMission,
   getCategory,
+  isWeeklyService,
   getQueueRole,
   getCategoryKeysForRole,
   getResidentBookableCategories,

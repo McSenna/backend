@@ -9,6 +9,7 @@ const { getCategory } = require("../../config/consultationCategories");
 const { conflict, notFound } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
 const { dispenseItems } = require("../inventoryService");
+const { assertCompletionDayReached } = require("../appointment/serviceDayRules");
 
 const buildRecordPayload = ({ appointment, providerId, providerRole, value, completedAt }) => ({
   resident: appointment.resident,
@@ -68,6 +69,8 @@ const commitCompletion = async ({
           ERROR_CODES.INVALID_STATUS_TRANSITION
         );
       }
+      // Re-read inside the transaction: a reschedule may have moved the slot.
+      assertCompletionDayReached(appointment, completedAt);
 
       const [record] = await MedicalRecord.create(
         [
@@ -91,7 +94,7 @@ const commitCompletion = async ({
           context: {
             appointmentId: appointment._id,
             patientId: appointment.resident,
-            patientName: existing.resident?.fullname || "",
+            patientName: existing.childName || existing.resident?.fullname || "",
             medicalRecordId: record._id,
             serviceLabel: getCategory(appointment.consultationType)?.label || "",
           },

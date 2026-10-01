@@ -12,13 +12,14 @@ const {
   rescheduleRowPartial,
 } = require("./appointmentReminderCards");
 
-const generateAppointmentConfirmationHTML = (fullname, { date, time, worker, location, appointmentType }) => {
+// `patientName` is set when the visit is for someone else (a child's immunization).
+const generateAppointmentConfirmationHTML = (fullname, { date, time, worker, location, appointmentType, patientName }) => {
   const year      = new Date().getFullYear();
   const firstName = String(fullname).split(" ")[0];
   const body = [
     heroPartial("heroNotif", `Appointment Confirmed`,
       `Your appointment at <strong style="color:${C.textDark};">MaslogCare</strong> has been successfully scheduled. Please review the details below.`),
-    appointmentInfoCard({ patientName: fullname, appointmentType, date, time, worker, location, statusKind: "confirmed" }),
+    appointmentInfoCard({ patientName: patientName || fullname, appointmentType, date, time, worker, location, statusKind: "confirmed" }),
     appointmentReminderRow(),     
     ignoreNoticePartial(),        
   ].join("\n");

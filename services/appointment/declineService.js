@@ -32,6 +32,7 @@ const declineAppointment = async ({ appointmentId, reason, actorId }) => {
   appointment.slotEnd = null;
   appointment.assignedCategoryKey = null;
   appointment.assignedDurationMinutes = null;
+  appointment.immunizationSlotKey = null;
   await appointment.save();
 
   return {

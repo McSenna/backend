@@ -10,7 +10,7 @@ const {
   SLOT_OCCUPYING_STATUSES,
 } = require("./dashboardConstants");
 
-const QUEUE_SELECT = "consultationType status slotStart slotEnd resident isUrgent";
+const QUEUE_SELECT = "consultationType status slotStart slotEnd resident isUrgent childName";
 
 const summaryFacets = (match, { start, end, breakdownStart }) => {
   const todayScheduled = {
@@ -77,6 +77,7 @@ const recentRecords = (recordMatch) =>
     .limit(8)
     .populate("resident", "fullname")
     .populate("provider", "fullname")
+    .populate("appointment", "childName")
     .select("serviceType serviceDetails completedAt resident provider appointment itemsGiven")
     .lean();
 

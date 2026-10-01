@@ -18,6 +18,7 @@ const {
   releaseAppointmentsThatNoLongerFit,
   releaseAllAppointments,
 } = require("../../services/mission/missionRebooking");
+const { assertCategoriesFitDay } = require("../../services/appointment/serviceDayRules");
 const { DEFAULT_WINDOWS, assertDateIsFree, logScheduleChange } = require("./missionShared");
 
 exports.createMissionSchedule = asyncHandler(async (req, res) => {
@@ -35,6 +36,7 @@ exports.createMissionSchedule = asyncHandler(async (req, res) => {
 
   const windows = resolveDayWindows(req.body, DEFAULT_WINDOWS);
   const categories = normalizeCategories(req.body.categories);
+  assertCategoriesFitDay(categories, day);
 
   const mission = await MissionSchedule.create({
     date: day,
@@ -81,6 +83,7 @@ exports.updateMissionSchedule = asyncHandler(async (req, res) => {
 
   const windows = resolveDayWindows(req.body, mission);
   const categories = normalizeCategories(req.body.categories);
+  assertCategoriesFitDay(categories, day);
 
   mission.date = day;
   Object.assign(mission, windows);

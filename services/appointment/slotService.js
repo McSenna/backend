@@ -11,13 +11,19 @@ const {
 const { badRequest, conflict } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
 const { SLOT_OCCUPYING_STATUSES } = require("../queueScope");
+const { assertServiceDay } = require("./serviceDayRules");
+const { assertMissionService } = require("./missionServiceRules");
+const { withMissionSlotLock } = require("./slotLock");
 
-const loadBookedForMission = (missionId) =>
+const STALE_MESSAGE = "This appointment has already been updated. Please refresh and try again.";
+
+const loadBookedForMission = (missionId, session = null) =>
   Appointment.find({
     missionSchedule: missionId,
     status: { $in: SLOT_OCCUPYING_STATUSES },
   })
     .select("slotStart slotEnd _id")
+    .session(session)
     .lean();
 
 const resolveDuration = (categoryKey, durationMinutes) => {
@@ -41,12 +47,17 @@ const resolveMissionDuration = (mission, categoryKey, requestedMinutes) => {
   );
 };
 
+// Also re-checks the service day: a mission saved before a day rule existed
+// can still list the service, and must not take new bookings for it.
 const assertMissionOffersCategory = (mission, categoryKey) => {
-  if (missionDurationFor(mission, categoryKey) != null) return;
-  throw badRequest(
-    "This mission schedule has no slots for the selected consultation category.",
-    ERROR_CODES.VALIDATION_ERROR
-  );
+  assertMissionService(categoryKey);
+  if (missionDurationFor(mission, categoryKey) == null) {
+    throw badRequest(
+      "This mission schedule has no slots for the selected consultation category.",
+      ERROR_CODES.VALIDATION_ERROR
+    );
+  }
+  assertServiceDay(categoryKey, mission.date);
 };
 
 const resolveSlotInterval = (slotStart, durationMinutes) => {
@@ -63,7 +74,7 @@ const resolveSlotInterval = (slotStart, durationMinutes) => {
   };
 };
 
-const assertSlotIsAvailable = async ({ appointment, mission, slotStartDate, slotEndDate }) => {
+const assertSlotIsAvailable = async ({ appointment, mission, slotStartDate, slotEndDate, session = null }) => {
   const windows = getMissionDayWindows(mission);
   if (!windows.length) {
     throw badRequest(
@@ -78,7 +89,7 @@ const assertSlotIsAvailable = async ({ appointment, mission, slotStartDate, slot
     );
   }
 
-  const booked = await loadBookedForMission(mission._id);
+  const booked = await loadBookedForMission(mission._id, session);
   if (hasConflict(booked, slotStartDate, slotEndDate, String(appointment._id))) {
     throw conflict(
       "The selected appointment schedule is no longer available. Please choose another time.",
@@ -99,24 +110,32 @@ const validateAndAssignSlot = async ({
   const resolvedDuration = resolveMissionDuration(mission, categoryKey, durationMinutes);
   const { slotStartDate, slotEndDate } = resolveSlotInterval(slotStart, resolvedDuration);
 
-  await assertSlotIsAvailable({ appointment, mission, slotStartDate, slotEndDate });
+  return withMissionSlotLock(mission._id, async (session) => {
+    // The caller validated a copy read before the lock; act on a fresh one.
+    const current = await Appointment.findById(appointment._id).session(session);
+    if (!current || current.status !== appointment.status) {
+      throw conflict(STALE_MESSAGE, ERROR_CODES.INVALID_STATUS_TRANSITION);
+    }
 
-  const hadSlot = Boolean(appointment.slotStart && appointment.missionSchedule);
+    await assertSlotIsAvailable({ appointment: current, mission, slotStartDate, slotEndDate, session });
 
-  appointment.missionSchedule = mission._id;
-  appointment.assignedCategoryKey = categoryKey;
-  appointment.assignedDurationMinutes = resolvedDuration;
-  appointment.slotStart = slotStartDate;
-  appointment.slotEnd = slotEndDate;
-  appointment.assignedBy = staffId;
-  appointment.assignedAt = new Date();
-  appointment.status = isReassign && hadSlot ? "rescheduled" : "confirmed";
+    const hadSlot = Boolean(current.slotStart && current.missionSchedule);
 
-  if (!appointment.approvedAt) appointment.approvedAt = new Date();
-  pushStatusHistory(appointment, appointment.status, staffId);
+    current.missionSchedule = mission._id;
+    current.assignedCategoryKey = categoryKey;
+    current.assignedDurationMinutes = resolvedDuration;
+    current.slotStart = slotStartDate;
+    current.slotEnd = slotEndDate;
+    current.assignedBy = staffId;
+    current.assignedAt = new Date();
+    current.status = isReassign && hadSlot ? "rescheduled" : "confirmed";
 
-  await appointment.save();
-  return appointment;
+    if (!current.approvedAt) current.approvedAt = new Date();
+    pushStatusHistory(current, current.status, staffId);
+
+    await current.save({ session });
+    return current;
+  });
 };
 
 module.exports = {

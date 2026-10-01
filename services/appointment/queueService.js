@@ -16,18 +16,24 @@ const loadPendingQueue = async (visibleKeys) => {
   return pending.sort(byPriorityThenCreated);
 };
 
-const loadAppointments = ({ visibleKeys, status, missionScheduleId }) => {
+const loadAppointments = async ({ visibleKeys, status, missionScheduleId }) => {
   const filter = { ...queueFilter(visibleKeys) };
   if (status) filter.status = status;
   if (missionScheduleId && mongoose.isValidObjectId(missionScheduleId)) {
     filter.missionSchedule = missionScheduleId;
   }
 
-  return Appointment.find(filter)
+  const rows = await Appointment.find(filter)
     .sort({ createdAt: -1 })
     .populate("resident", RESIDENT_QUEUE_FIELDS)
     .populate("missionSchedule", "date")
     .lean();
+
+  // Pending requests are listed in the order staff must schedule them, which is
+  // the order assigning a slot enforces (rescheduled first, then age tier).
+  if (status !== "pending") return rows;
+  await tagPendingAppointments(rows);
+  return rows.sort(byPriorityThenCreated);
 };
 
 module.exports = { loadPendingQueue, loadAppointments };

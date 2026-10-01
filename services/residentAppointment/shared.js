@@ -35,10 +35,21 @@ const assertOwnership = (appointment, residentId, actorRole, action) => {
   );
 };
 
+// The resident usually hits these after the appointment changed elsewhere
+// (staff started, completed, or declined it), so each says what happened.
+const LOCKED_STATUS_MESSAGES = Object.freeze({
+  completed: "Completed appointments cannot be rescheduled or cancelled.",
+  cancelled: "This appointment has already been cancelled.",
+  declined: "The health team declined this request, so it can no longer be changed.",
+  processing: "Your visit has already started, so this appointment can no longer be changed.",
+  pending: "This request has no schedule yet. You can move it once the health team assigns a date.",
+});
+
 const assertStatusAllows = (appointment, allowedStatuses, action) => {
   if (allowedStatuses.includes(appointment.status)) return;
   throw conflict(
-    `An appointment that is ${appointment.status} can no longer be ${action}.`,
+    LOCKED_STATUS_MESSAGES[appointment.status] ??
+      `An appointment that is ${appointment.status} can no longer be ${action}.`,
     ERROR_CODES.INVALID_STATUS_TRANSITION
   );
 };

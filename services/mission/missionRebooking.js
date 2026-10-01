@@ -6,6 +6,15 @@ const {
   isIntervalInsideWindows,
 } = require("../../utils/slotAvailability");
 const { BOOKED_STATUSES } = require("../queueScope");
+const { CONSULTATION_CATEGORIES } = require("../../config/consultationCategories");
+
+// Weekly visits (immunization) never depend on a mission: older ones booked
+// through a mission keep their time when that mission is edited or deleted.
+const MISSION_SERVICE_FILTER = {
+  consultationType: {
+    $nin: CONSULTATION_CATEGORIES.filter((category) => category.scheduling === "weekly").map((category) => category.key),
+  },
+};
 
 const RESET_TO_PENDING = {
   status: "pending",
@@ -44,6 +53,7 @@ const releaseAppointmentsThatNoLongerFit = async (mission) => {
   const booked = await Appointment.find({
     missionSchedule: mission._id,
     status: { $in: BOOKED_STATUSES },
+    ...MISSION_SERVICE_FILTER,
   });
 
   const resetOps = booked
@@ -59,7 +69,7 @@ const releaseAppointmentsThatNoLongerFit = async (mission) => {
 
 const releaseAllAppointments = (missionId) =>
   Appointment.updateMany(
-    { missionSchedule: missionId, status: { $in: BOOKED_STATUSES } },
+    { missionSchedule: missionId, status: { $in: BOOKED_STATUSES }, ...MISSION_SERVICE_FILTER },
     { $set: { ...RESET_TO_PENDING, declineReason: "" } }
   );
 
