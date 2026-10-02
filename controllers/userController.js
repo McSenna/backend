@@ -6,33 +6,13 @@ const { VALID_STATUSES, resolveUserStatus } = require("../models/User");
 const { SIGN_IN_READY_STATUSES } = require("../models/user/userStatus");
 const { approve: approveVerification } = require("../services/userRequest/verificationDecisionService");
 const { createSystemLog } = require("../services/systemLogService");
-const { describePlatformAccess } = require("../config/platformAccess");
+const { serializeUser } = require("../services/userDirectory/userPresenter");
 const asyncHandler = require("../utils/asyncHandler");
 const { HTTP_STATUS, ERROR_CODES } = require("../utils/errorCodes");
 const { isValidObjectId } = require("../utils/objectId");
 const { badRequest, forbidden, notFound } = require("../utils/AppError");
-
-const serializeUser = (user) => ({
-  ...user,
-  phone: user.phone || "",
-  status: resolveUserStatus(user),
-  platformAccess: describePlatformAccess(user.role),
-  lastLogin: user.lastLogin || null,
-});
-
-exports.getAllUsers = asyncHandler(async (_req, res) => {
-  const users = await User.find({})
-    .select("-password")
-    .sort({ createdAt: -1 })
-    .lean();
-
-  return res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: "Users loaded successfully.",
-    count: users.length,
-    users: users.map(serializeUser),
-  });
-});
+const { getAllUsers, getUserSummary } = require("./user/userListController");
+const { updateUsersStatus } = require("./user/bulkStatusController");
 
 // One entry per VALID_STATUSES value; the admin UI sends "approved" and
 // "deactivated" for residents, which used to produce "User undefined successfully."
@@ -128,3 +108,7 @@ exports.updateUserStatus = asyncHandler(async (req, res) => {
     user: serializeUser(user),
   });
 });
+
+exports.getAllUsers = getAllUsers;
+exports.getUserSummary = getUserSummary;
+exports.updateUsersStatus = updateUsersStatus;
