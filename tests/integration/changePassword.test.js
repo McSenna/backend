@@ -74,7 +74,7 @@ async function teardown() {
 async function runTests() {
   console.log("\n--- Testing Change Password API ---\n");
 
-  const originalPassword = "InitialPassword123!";
+  const originalPassword = "InitialPass123!";
   const user = await User.create({
     fullname: "Maria Santos",
     email: "maria.change@maslogcare.test",
@@ -103,7 +103,7 @@ async function runTests() {
   // Test 1: Reject unauthenticated request
   const unauthRes = await request("/change-password", {
     method: "POST",
-    body: { currentPassword: originalPassword, newPassword: "NewSecurePassword456!" },
+    body: { currentPassword: originalPassword, newPassword: "NewSecure456!" },
   });
   check("Rejects unauthenticated request with 401", unauthRes.status === 401);
 
@@ -111,7 +111,7 @@ async function runTests() {
   const missingCurrentRes = await request("/change-password", {
     method: "POST",
     headers: authHeader,
-    body: { newPassword: "NewSecurePassword456!" },
+    body: { newPassword: "NewSecure456!" },
   });
   check(
     "Rejects missing current password with 400",
@@ -137,8 +137,8 @@ async function runTests() {
     headers: authHeader,
     body: {
       currentPassword: originalPassword,
-      newPassword: "NewSecurePassword456!",
-      confirmPassword: "DifferentPassword456!",
+      newPassword: "NewSecure456!",
+      confirmPassword: "Different456!",
     },
   });
   check(
@@ -182,8 +182,8 @@ async function runTests() {
     method: "POST",
     headers: authHeader,
     body: {
-      currentPassword: "WrongPassword999!",
-      newPassword: "NewSecurePassword456!",
+      currentPassword: "WrongPass999!",
+      newPassword: "NewSecure456!",
     },
   });
   check(
@@ -193,7 +193,7 @@ async function runTests() {
   );
 
   // Test 8: Successfully change password with valid payload
-  const newPassword = "NewSecurePassword456!";
+  const newPassword = "NewSecure456!";
   const successRes = await request("/change-password", {
     method: "POST",
     headers: authHeader,

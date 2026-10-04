@@ -5,24 +5,10 @@ const asyncHandler = require("../utils/asyncHandler");
 const { assertValidObjectId } = require("../utils/objectId");
 const { notFound } = require("../utils/AppError");
 const { ERROR_CODES, HTTP_STATUS } = require("../utils/errorCodes");
+const { mapToNotificationItem } = require("../services/notification/notificationPresenter");
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
-
-function mapToNotificationItem(n) {
-  return {
-    id: String(n._id),
-    title: n.title,
-    body: n.body,
-    time: n.time ?? "",
-    tone: n.tone,
-    type: n.type ?? "system",
-    isRead: Boolean(n.isRead),
-    createdAt: n.createdAt ? new Date(n.createdAt).toISOString() : null,
-    appointmentId: n.appointment ? String(n.appointment) : null,
-    announcementId: n.announcement ? String(n.announcement) : null,
-  };
-}
 
 function parseLimit(raw) {
   const parsed = Number.parseInt(raw, 10);

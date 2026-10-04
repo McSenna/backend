@@ -1,5 +1,7 @@
 "use strict";
 
+const { PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } = require("../../config/passwordPolicy");
+
 const OTP_TTL_MINUTES = 10;
 const RESEND_COOLDOWN_SECONDS = 45;
 const MAX_VERIFY_ATTEMPTS = 5;
@@ -19,7 +21,10 @@ const readCode = (body) => String(body?.code || body?.otp || "").trim();
 
 const validatePasswordStrength = (password) => {
   const problems = [];
-  if (password.length < 8) problems.push("Password must be at least 8 characters.");
+  if (password.length < PASSWORD_MIN_LENGTH)
+    problems.push(`Password must be at least ${PASSWORD_MIN_LENGTH} characters.`);
+  if (password.length > PASSWORD_MAX_LENGTH)
+    problems.push(`Password must not exceed ${PASSWORD_MAX_LENGTH} characters.`);
   if (!/[a-z]/.test(password)) problems.push("Password must contain a lowercase letter.");
   if (!/[A-Z]/.test(password)) problems.push("Password must contain an uppercase letter.");
   if (!/\d/.test(password)) problems.push("Password must contain a number.");

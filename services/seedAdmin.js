@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const { RESIDENCY } = require("../config/residency");
+const { PASSWORD_MAX_LENGTH } = require("../config/passwordPolicy");
 
 const ADMIN_EMAIL = "maslog@admin.gov.ph";
 const MIDWIFE_EMAIL = "midwife@maslog.gov.ph";
@@ -24,7 +25,7 @@ const MIDWIFE_SEED = {
   dateOfBirth: new Date("1990-01-15"),
   email: MIDWIFE_EMAIL,
   profilePhoto: "",
-  password: process.env.MIDWIFE_DEFAULT_PASSWORD || "MaslogMidwife@2025",
+  password: process.env.MIDWIFE_DEFAULT_PASSWORD || "MaslogMW@2025",
   verified: true,
   role: "midwife",
   address: HEALTH_CENTER_ADDRESS,
@@ -36,7 +37,7 @@ const DOCTOR_SEED = {
   dateOfBirth: new Date("1985-06-01"),
   email: DOCTOR_EMAIL,
   profilePhoto: "",
-  password: process.env.DOCTOR_DEFAULT_PASSWORD || "MaslogDoctor@2025",
+  password: process.env.DOCTOR_DEFAULT_PASSWORD || "MaslogDoc@2025",
   verified: true,
   role: "doctor",
   address: HEALTH_CENTER_ADDRESS,
@@ -57,6 +58,25 @@ const BHW_SEED = {
 
 const DEFAULT_ACCOUNTS = [ADMIN_SEED, MIDWIFE_SEED, DOCTOR_SEED, BHW_SEED];
 
+// Former defaults longer than PASSWORD_MAX_LENGTH. The app's password inputs stop at
+// that length, so accounts still on one of these could never sign in again.
+const LEGACY_DEFAULT_PASSWORDS = {
+  midwife: "MaslogMidwife@2025",
+  doctor: "MaslogDoctor@2025",
+};
+
+const retireLegacyDefault = async (seed) => {
+  const legacy = LEGACY_DEFAULT_PASSWORDS[seed.role];
+  if (!legacy || seed.password.length > PASSWORD_MAX_LENGTH) return;
+
+  const user = await User.findOne({ email: seed.email, role: seed.role }).select("+password");
+  if (!user || !(await user.comparePassword(legacy))) return;
+
+  user.password = seed.password;
+  await user.save();
+  console.log(`Default ${seed.role} password updated to fit the ${PASSWORD_MAX_LENGTH}-character limit`);
+};
+
 const seedAdmin = async () => {
   try {
     for (const seed of DEFAULT_ACCOUNTS) {
@@ -64,6 +84,8 @@ const seedAdmin = async () => {
       if (!existing) {
         await User.create(seed);
         console.log(`Default ${seed.role} account created for:`, seed.email);
+      } else {
+        await retireLegacyDefault(seed);
       }
     }
   } catch (error) {

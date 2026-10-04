@@ -10,6 +10,7 @@ const {
   updateUsersStatus,
 } = require("../controllers/userController");
 const { getResidents } = require("../controllers/residentDirectoryController");
+const { linkMasterRecord, unlinkMasterRecord } = require("../controllers/user/masterLinkController");
 const {
   getUserRequests,
   getUserRequestById,
@@ -30,6 +31,8 @@ router.get("/residents", auth, roleCheck(["bhw", "admin"]), getResidents);
 
 router.patch("/users/status", auth, roleCheck(["admin"]), updateUsersStatus);
 router.patch("/users/:id/status", auth, roleCheck(["admin"]), updateUserStatus);
+router.patch("/admin/users/:id/master-link", auth, roleCheck(["admin"]), linkMasterRecord);
+router.post("/admin/users/:id/master-unlink", auth, roleCheck(["admin"]), unlinkMasterRecord);
 
 router.get("/admin/user-requests", auth, roleCheck(["admin"]), getUserRequests);
 router.get("/admin/user-requests/:id", auth, roleCheck(["admin"]), getUserRequestById);

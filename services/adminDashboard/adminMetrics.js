@@ -18,6 +18,12 @@ const percentChange = (current, baseline) => {
   return Math.round(((current - baseline) / baseline) * 100);
 };
 
+const RECENT_USER_FIELDS = "fullname email profilePhoto role verified createdAt";
+
+// Newest accounts first; _id breaks ties between accounts created in the same instant.
+const newestUsers = (filter, limit) =>
+  User.find(filter).select(RECENT_USER_FIELDS).sort({ createdAt: -1, _id: -1 }).limit(limit).lean();
+
 const loadDashboardData = ({ now, usersLimit, activitiesLimit, monthWindow, dayWindow }) => {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY_MS);
@@ -33,11 +39,11 @@ const loadDashboardData = ({ now, usersLimit, activitiesLimit, monthWindow, dayW
     User.countDocuments({ role: "resident" }),
     User.countDocuments({ role: "resident", createdAt: { $lt: startOfMonth } }),
     User.aggregate([{ $group: { _id: "$role", count: { $sum: 1 } } }]),
-    User.find({})
-      .select("fullname email profilePhoto role verified createdAt")
-      .sort({ createdAt: -1 })
-      .limit(usersLimit)
-      .lean(),
+    newestUsers({}, usersLimit),
+    // The "Newest accounts" card's Residents and Staff filters each show their own newest accounts,
+    // which the overall list may not contain (a busy week of resident sign-ups pushes staff out).
+    newestUsers({ role: "resident" }, usersLimit),
+    newestUsers({ role: { $ne: "resident" } }, usersLimit),
     SystemLog.find({})
       .sort({ createdAt: -1 })
       .limit(activitiesLimit)

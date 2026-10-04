@@ -3,8 +3,16 @@
 const { tooManyRequests } = require("../utils/AppError");
 const { SlidingWindowStore, clientIpOf } = require("../utils/slidingWindowStore");
 
-const otpIpStore = new SlidingWindowStore(15 * 60 * 1000, 15);
-const otpEmailStore = new SlidingWindowStore(15 * 60 * 1000, 5);
+// Sending a code and checking a code have separate budgets. When they shared
+// one, a few wrong-code attempts or a password reset on one account used up
+// the device's quota, and the next account on that phone could not get a code.
+const otpSendIpStore = new SlidingWindowStore(15 * 60 * 1000, 15);
+const otpSendEmailStore = new SlidingWindowStore(15 * 60 * 1000, 5);
+
+// Each code also locks itself after its own wrong-attempt limit, so this
+// only stops one device hammering many accounts.
+const otpVerifyIpStore = new SlidingWindowStore(15 * 60 * 1000, 30);
+const otpVerifyEmailStore = new SlidingWindowStore(15 * 60 * 1000, 10);
 
 const loginIpStore = new SlidingWindowStore(15 * 60 * 1000, 30);
 const loginEmailStore = new SlidingWindowStore(15 * 60 * 1000, 8);
@@ -30,13 +38,22 @@ function buildLimiter({ ipStore, emailStore, code, deviceMessage, accountMessage
   };
 }
 
-const otpRateLimiter = buildLimiter({
-  ipStore: otpIpStore,
-  emailStore: otpEmailStore,
+const otpSendRateLimiter = buildLimiter({
+  ipStore: otpSendIpStore,
+  emailStore: otpSendEmailStore,
   code: "OTP_RATE_LIMITED",
   deviceMessage: "Too many requests from this device. Please wait before trying again.",
   accountMessage:
     "Too many verification requests for this email. Please wait a few minutes before trying again.",
+});
+
+const otpVerifyRateLimiter = buildLimiter({
+  ipStore: otpVerifyIpStore,
+  emailStore: otpVerifyEmailStore,
+  code: "OTP_RATE_LIMITED",
+  deviceMessage: "Too many requests from this device. Please wait before trying again.",
+  accountMessage:
+    "Too many verification attempts for this email. Please wait a few minutes before trying again.",
 });
 
 const loginRateLimiter = buildLimiter({
@@ -52,4 +69,4 @@ function clearLoginAttempts(email) {
   if (key) loginEmailStore.reset(key);
 }
 
-module.exports = { otpRateLimiter, loginRateLimiter, clearLoginAttempts };
+module.exports = { otpSendRateLimiter, otpVerifyRateLimiter, loginRateLimiter, clearLoginAttempts };

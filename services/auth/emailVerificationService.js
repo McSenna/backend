@@ -62,7 +62,14 @@ const sendEmailVerification = async (rawEmail) => {
 
   const plainOtp = record.otp;
   await record.save();
-  await deliverOtpEmail(email, plainOtp, "");
+
+  try {
+    await deliverOtpEmail(email, plainOtp, "");
+  } catch (error) {
+    // The code never reached the user, so it must not hold them to the resend cooldown.
+    await EmailVerification.updateOne({ _id: record._id }, { $unset: { lastOtpSentAt: 1 } });
+    throw error;
+  }
 
   return {
     email,

@@ -2,6 +2,8 @@
 
 require("dotenv").config();
 
+const http = require("http");
+
 // Mission hours ("08:00"–"12:00"), day boundaries and e-mailed appointment times
 // are all computed with the server's local clock. Pin it so a host running in
 // UTC does not shift every slot by eight hours.
@@ -13,12 +15,15 @@ const connectDB = require("./config/db");
 const logger = require("./utils/logger");
 const { seedAdmin } = require("./services/seedAdmin");
 const { verifyTransport } = require("./services/mailer");
+const { migrateMedicalRecordSources } = require("./services/medicalRecord/sourceMigration");
+const { startRealtime, stopRealtime } = require("./realtime");
 
 const PORT = process.env.PORT || 5000;
 
 async function bootstrap() {
   validateEnv();
   await connectDB();
+  await migrateMedicalRecordSources();
   await seedAdmin();
   verifyTransport();
 }
@@ -26,6 +31,8 @@ async function bootstrap() {
 function attachShutdownHandlers(server) {
   const shutdown = (signal) => {
     logger.info(`Received ${signal}; shutting down`);
+    // Open sockets would keep server.close() waiting until the timeout below.
+    void stopRealtime();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 10000).unref();
   };
@@ -58,7 +65,10 @@ async function startServer() {
     process.exit(1);
   }
 
-  const server = createApp().listen(PORT, "0.0.0.0", () => {
+  // Socket.IO shares this server, so REST and realtime use one port and one TLS setup.
+  const server = http.createServer(createApp());
+  startRealtime(server);
+  server.listen(PORT, "0.0.0.0", () => {
     logger.info(`Server running on port ${PORT}`);
   });
 

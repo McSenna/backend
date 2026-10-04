@@ -74,7 +74,7 @@ async function runApiE2E() {
   const registerPayload = {
     fullname: "E2E Resident Test",
     email: e2eEmail,
-    password: "StrongPassword123!",
+    password: "StrongPass123!",
     gender: "female",
     dateOfBirth: "1998-04-12",
     address: "Purok 2, Barangay Maslog",

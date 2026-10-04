@@ -24,7 +24,13 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
     await issueResetCode(email, req);
   } catch (error) {
     if (error?.statusCode === HTTP_STATUS.TOO_MANY_REQUESTS) throw error;
-    logger.error("Password reset request failed", { errorName: error?.name });
+    // The response stays neutral so it never reveals whether an account exists,
+    // which makes this log the only place a failed send shows up.
+    logger.error("Password reset request failed", {
+      route: "auth",
+      errorName: error?.name,
+      errorCode: error?.code,
+    });
   }
 
   return res.status(HTTP_STATUS.OK).json({

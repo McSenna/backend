@@ -75,7 +75,7 @@ const makeUser = (role, status, extra = {}) =>
   User.create({
     fullname: `${role} ${status} ${++emailSeq}`,
     email: `${role}.${status}.${emailSeq}@maslogcare.test`,
-    password: "InitialPassword123!",
+    password: "InitialPass123!",
     role,
     verified: status === "approved" || status === "active",
     status,
@@ -169,6 +169,52 @@ async function runTests() {
     `got ${attention.expiringItems}`
   );
   check("still returns the existing metrics", typeof loaded.body.metrics?.totalUsers === "number");
+
+  console.log("\nNewest accounts");
+
+  // Seven residents joined after every staff account: the overall newest five are all residents.
+  const base = Date.now() - 30 * DAY_MS;
+  await insertRaw(User, [
+    { fullname: "Staff Early", email: "staff.early@maslogcare.test", role: "bhw", verified: true, createdAt: new Date(base) },
+    { fullname: "Staff Later", email: "staff.later@maslogcare.test", role: "midwife", verified: true, createdAt: new Date(base + DAY_MS) },
+    ...Array.from({ length: 7 }, (_, index) => ({
+      fullname: `Resident New ${index + 1}`,
+      email: `resident.new.${index + 1}@maslogcare.test`,
+      role: "resident",
+      verified: true,
+      // A few minutes from now, so they are newer than every account made above.
+      createdAt: new Date(Date.now() + (index + 1) * 60 * 1000),
+    })),
+  ]);
+
+  const newest = await request("/admin/dashboard?usersLimit=5", { headers: headersFor(admin) });
+  const names = (list) => (list ?? []).map((user) => user.fullname);
+  const isNewestFirst = (list) => (list ?? []).every((user, index, all) => index === 0 || new Date(all[index - 1].createdAt) >= new Date(user.createdAt));
+
+  check("shows at most five accounts", newest.body.recentUsers?.length === 5, `got ${newest.body.recentUsers?.length}`);
+  check(
+    "lists the five most recently created accounts, newest first",
+    JSON.stringify(names(newest.body.recentUsers)) ===
+      JSON.stringify(["Resident New 7", "Resident New 6", "Resident New 5", "Resident New 4", "Resident New 3"]),
+    JSON.stringify(names(newest.body.recentUsers))
+  );
+  check("lists only residents, newest first", (newest.body.recentResidents ?? []).every((user) => user.role === "resident") && newest.body.recentResidents?.length === 5 && isNewestFirst(newest.body.recentResidents));
+  check(
+    "lists staff even when residents fill the overall five",
+    newest.body.recentStaff?.length > 0 &&
+      (newest.body.recentStaff ?? []).every((user) => user.role !== "resident") &&
+      isNewestFirst(newest.body.recentStaff) &&
+      names(newest.body.recentStaff).indexOf("Staff Later") < names(newest.body.recentStaff).indexOf("Staff Early"),
+    JSON.stringify(names(newest.body.recentStaff))
+  );
+  const staffTotal = await User.countDocuments({ role: { $ne: "resident" } });
+  check("shows every staff account when there are fewer than five", newest.body.recentStaff?.length === Math.min(5, staffTotal), `got ${newest.body.recentStaff?.length} of ${staffTotal}`);
+  const residentCount = (newest.body.roleDistribution ?? []).find((entry) => entry.role === "resident")?.count;
+  check(
+    "keeps the totals for the card's counts",
+    newest.body.metrics.totalUsers === (await User.countDocuments({})) && residentCount === (await User.countDocuments({ role: "resident" })),
+    JSON.stringify({ total: newest.body.metrics.totalUsers, residents: residentCount })
+  );
 }
 
 (async () => {

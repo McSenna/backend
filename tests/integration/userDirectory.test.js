@@ -73,7 +73,7 @@ const makeUser = (role, status, extra = {}) =>
   User.create({
     fullname: `${role} ${status} ${++emailSeq}`,
     email: `${role}.${status}.${emailSeq}@maslogcare.test`,
-    password: "InitialPassword123!",
+    password: "InitialPass123!",
     role,
     verified: status === "approved" || status === "active",
     status,
@@ -152,8 +152,8 @@ async function runTests() {
   check("summary counts listed accounts only", JSON.stringify(summary.body.summary) === JSON.stringify(expected), json(summary));
 
   console.log("\nList");
-  const page = await request("/users?page=1&pageSize=2&tab=masterlist", { headers: headersFor(admin) });
-  check("pages the masterlist", page.body.users.length === 2 && page.body.pagination.total === 6, json(page));
+  const page = await request("/users?page=1&pageSize=2&tab=accounts", { headers: headersFor(admin) });
+  check("pages all accounts", page.body.users.length === 2 && page.body.pagination.total === 6, json(page));
   check("never returns password hashes", page.body.users.every((user) => !("password" in user)), json(page));
   check("sorts by last login, newest first", page.body.users[0].email === resident.email, page.body.users[0].email);
 
@@ -166,7 +166,7 @@ async function runTests() {
   const filtered = await request("/users?page=1&tab=active&status=approved&role=resident", { headers: headersFor(admin) });
   check("status and role filters combine", filtered.body.pagination.total === 1, json(filtered));
 
-  const searched = await request("/users?page=1&tab=masterlist&query=sitio%20test", { headers: headersFor(admin) });
+  const searched = await request("/users?page=1&tab=accounts&query=sitio%20test", { headers: headersFor(admin) });
   check("search matches location", searched.body.pagination.total === 1, json(searched));
   const regexInput = await request("/users?page=1&query=.*", { headers: headersFor(admin) });
   check("search treats input as plain text", regexInput.body.pagination.total === 0, json(regexInput));

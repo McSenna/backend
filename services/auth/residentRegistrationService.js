@@ -11,6 +11,8 @@ const { ERROR_CODES } = require("../../utils/errorCodes");
 const { resolveRegistrationProfile } = require("./registrationProfile");
 const { prepareGovernmentId } = require("./governmentIdService");
 const { consumeEmailVerification } = require("./emailVerificationConfirm");
+const { createResidentAccount } = require("./registrationDecision");
+const { runMasterListCheck } = require("../masterList/masterListMatcher");
 
 const resolvePhoto = (body) => {
   const incoming = body.profilePhoto ?? body.profileImage ?? body.photo ?? "";
@@ -21,26 +23,43 @@ const resolvePhoto = (body) => {
   return normalized.profilePhoto || "";
 };
 
-const notifyAdminsOfRegistration = async (user) => {
+// Notifications are best effort: a failure is logged and never undoes a sign-up.
+const notify = async (buildNotifications, failureMessage) => {
   try {
-    const admins = await User.find({ role: "admin" }).select("_id").lean();
-    if (admins.length === 0) return;
-
-    await Notification.insertMany(
-      admins.map((admin) => ({
-        recipient: admin._id,
-        type: "resident_verification",
-        title: "New Resident Registration",
-        body: `A new Resident registration for ${user.fullname} is waiting for verification.`,
-        tone: "info",
-      }))
-    );
+    const notifications = await buildNotifications();
+    if (notifications.length > 0) await Notification.insertMany(notifications);
   } catch (notifErr) {
-    logger.warn("Failed to notify admins of new resident registration", {
-      error: notifErr.message,
-    });
+    logger.warn(failureMessage, { error: notifErr.message });
   }
 };
+
+const notifyAdminsOfRegistration = (user, verified) =>
+  notify(async () => {
+    const admins = await User.find({ role: "admin" }).select("_id").lean();
+    return admins.map((admin) => ({
+      recipient: admin._id,
+      type: "resident_verification",
+      title: verified ? "Resident Verified Automatically" : "New Resident Registration",
+      body: verified
+        ? `${user.fullname} registered and was verified against the Barangay Master List.`
+        : `A new Resident registration for ${user.fullname} is waiting for verification.`,
+      tone: "info",
+    }));
+  }, "Failed to notify admins of new resident registration");
+
+const notifyResidentVerified = (user) =>
+  notify(
+    () => [
+      {
+        recipient: user._id,
+        type: "resident_approved",
+        title: "Account Approved",
+        body: "Your MaslogCare registration has been approved. You may now log in to your account.",
+        tone: "success",
+      },
+    ],
+    "Failed to notify resident of automatic verification"
+  );
 
 const submitResidentRegistration = async (body) => {
   const profile = resolveRegistrationProfile(body ?? {});
@@ -57,26 +76,35 @@ const submitResidentRegistration = async (body) => {
   });
 
   const governmentId = await prepareGovernmentId(body);
+  const initialCheck = await runMasterListCheck({
+    profile,
+    dateOfBirthInput: body?.dateOfBirth || body?.birthdate,
+  });
 
   await PendingRegistration.deleteMany({ email: profile.email });
 
-  const user = await User.create({
-    ...profile,
-    role: "resident",
-    verified: false,
-    status: "pending",
-    profilePhoto,
+  const { user, decision, masterListCheck } = await createResidentAccount({
+    accountFields: { ...profile, role: "resident", profilePhoto },
+    masterListCheck: initialCheck,
   });
 
   const verification = await ResidentVerification.create({
     user: user._id,
     ...governmentId,
-    verificationStatus: "pending",
+    ...decision.verificationFields,
+    masterListCheck,
   });
 
-  await notifyAdminsOfRegistration(user);
+  await notifyAdminsOfRegistration(user, decision.verified);
+  if (decision.verified) await notifyResidentVerified(user);
 
-  return { user, verification, idTypeName: governmentId.idTypeName };
+  return {
+    user,
+    verification,
+    idTypeName: governmentId.idTypeName,
+    verified: decision.verified,
+    masterListOutcome: masterListCheck.outcome,
+  };
 };
 
 module.exports = { submitResidentRegistration };

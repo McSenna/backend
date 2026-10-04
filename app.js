@@ -18,6 +18,8 @@ const dashboardRoutes = require("./routes/dashboardRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const supportTicketRoutes = require("./routes/supportTicketRoutes");
 const announcementRoutes = require("./routes/announcementRoutes");
+const masterResidentRoutes = require("./routes/masterResidentRoutes");
+const medicalRecordMasterlistRoutes = require("./routes/medicalRecordMasterlistRoutes");
 
 function createApp() {
   const app = express();
@@ -50,6 +52,8 @@ function createApp() {
   app.use("/api", inventoryRoutes);
   app.use("/api", supportTicketRoutes);
   app.use("/api", announcementRoutes);
+  app.use("/api", masterResidentRoutes);
+  app.use("/api", medicalRecordMasterlistRoutes);
 
   app.use(notFoundHandler);
   app.use(globalErrorHandler);

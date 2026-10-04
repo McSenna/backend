@@ -85,14 +85,16 @@ const bookAppointment = async ({ residentId, payload = {} }) => {
   };
 };
 
-const listResidentAppointments = (residentId) =>
-  Appointment.find({ resident: residentId })
-    .sort({ createdAt: -1 })
+// The resident list's row shape, shared with realtime/publishers/appointments.js.
+const residentAppointmentQuery = (filter) =>
+  Appointment.find(filter)
     .populate("missionSchedule", MISSION_POPULATE)
     .populate("preferredProvider", "fullname role")
     .populate("assignedBy", "fullname role")
     .populate("completedBy", "fullname role")
-    .populate("medicalRecord")
-    .lean();
+    .populate("medicalRecord");
 
-module.exports = { bookAppointment, listBookingOptions, listResidentAppointments };
+const listResidentAppointments = (residentId) =>
+  residentAppointmentQuery({ resident: residentId }).sort({ createdAt: -1 }).lean();
+
+module.exports = { bookAppointment, listBookingOptions, listResidentAppointments, residentAppointmentQuery };

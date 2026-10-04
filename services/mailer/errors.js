@@ -36,10 +36,11 @@ function classifySmtpError(err) {
   const responseCode = Number(err?.responseCode || 0);
   const sysCode = String(err?.code || "").toUpperCase();
 
+  // Gmail reports its daily cap as a 550 too, so quota is matched on the text;
+  // any other 550 means the recipient mailbox was refused.
   if (
-    responseCode === 550 ||
-    rawResponse.includes("daily user sending limit exceeded") ||
-    rawMsg.includes("daily user sending limit exceeded") ||
+    rawResponse.includes("sending limit exceeded") ||
+    rawMsg.includes("sending limit exceeded") ||
     rawResponse.includes("quota exceeded") ||
     rawMsg.includes("quota exceeded")
   ) {
@@ -85,7 +86,26 @@ function classifySmtpError(err) {
     );
   }
 
-  const networkCodes = ["ECONNREFUSED", "ETIMEDOUT", "ECONNRESET", "ESOCKETTIMEDOUT", "ENOTFOUND", "EAI_AGAIN", "EENVELOPE"];
+  if (
+    responseCode === 550 ||
+    responseCode === 551 ||
+    responseCode === 553 ||
+    rawMsg.includes("recipient rejected") ||
+    rawMsg.includes("no such user") ||
+    rawResponse.includes("invalid recipient") ||
+    // EENVELOPE means the recipient list was refused or empty: permanent, so never retried.
+    sysCode === "EENVELOPE"
+  ) {
+    return new EmailServiceError(
+      EmailErrorCode.RECIPIENT_INVALID,
+      `Destination recipient rejected: ${err.message}`,
+      "The specified recipient email address could not be delivered to.",
+      400,
+      err
+    );
+  }
+
+  const networkCodes = ["ECONNREFUSED", "ETIMEDOUT", "ECONNRESET", "ESOCKETTIMEDOUT", "ENOTFOUND", "EAI_AGAIN"];
   if (
     networkCodes.includes(sysCode) ||
     rawMsg.includes("connection closed") ||
@@ -96,22 +116,6 @@ function classifySmtpError(err) {
       `SMTP connection failure (${sysCode}): ${err.message}`,
       "Temporary connection problem with the email service. Please try again in a few moments.",
       503,
-      err
-    );
-  }
-
-  if (
-    responseCode === 551 ||
-    responseCode === 553 ||
-    rawMsg.includes("recipient rejected") ||
-    rawMsg.includes("no such user") ||
-    rawResponse.includes("invalid recipient")
-  ) {
-    return new EmailServiceError(
-      EmailErrorCode.RECIPIENT_INVALID,
-      `Destination recipient rejected: ${err.message}`,
-      "The specified recipient email address could not be delivered to.",
-      400,
       err
     );
   }

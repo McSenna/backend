@@ -2,6 +2,11 @@
 
 const mongoose = require("mongoose");
 const { maskIdNumber } = require("../config/idVerification");
+const {
+  MATCH_OUTCOMES,
+  MATCH_REASONS,
+  VERIFICATION_METHODS,
+} = require("../config/masterList");
 
 const ResidentVerificationSchema = new mongoose.Schema(
   {
@@ -75,6 +80,21 @@ const ResidentVerificationSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    // "master_list" means the server verified the account on its own, so
+    // verifiedBy stays null; "admin_review" means an admin decides.
+    verificationMethod: {
+      type: String,
+      enum: Object.values(VERIFICATION_METHODS),
+      default: VERIFICATION_METHODS.ADMIN_REVIEW,
+    },
+    // Result of the master list check at sign-up. Admin-only: residents never
+    // see it, and it holds record IDs rather than copies of the record.
+    masterListCheck: {
+      outcome: { type: String, enum: Object.values(MATCH_OUTCOMES) },
+      reasons: [{ type: String, enum: Object.values(MATCH_REASONS) }],
+      candidateIds: [{ type: String, trim: true }],
+      checkedAt: { type: Date },
+    },
   },
   {
     timestamps: true,
@@ -99,6 +119,7 @@ ResidentVerificationSchema.methods.toAdminSummary = function () {
     verifiedAt: this.verifiedAt,
     rejectionReason: this.rejectionReason,
     rejectionRemarks: this.rejectionRemarks,
+    verificationMethod: this.verificationMethod,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,
   };

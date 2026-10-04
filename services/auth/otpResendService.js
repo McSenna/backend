@@ -54,13 +54,24 @@ const resendOtp = async (email) => {
   assertCooldownElapsed(pending);
 
   const newOtp = generateOTP();
+  const previousSentAt = pending.lastOtpSentAt;
   pending.otp = newOtp;
   pending.otpExpires = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
   pending.lastOtpSentAt = new Date();
   pending.verificationAttempts = 0;
   await pending.save();
 
-  await deliverOtpEmail(normalizedEmail, newOtp, pending.fullname);
+  try {
+    await deliverOtpEmail(normalizedEmail, newOtp, pending.fullname);
+  } catch (error) {
+    // The code never reached the user, so it must not hold them to the resend cooldown.
+    // Restored rather than unset: the schema defaults a missing value to "now".
+    await PendingRegistration.updateOne(
+      { _id: pending._id },
+      { $set: { lastOtpSentAt: previousSentAt ?? new Date(0) } }
+    );
+    throw error;
+  }
 };
 
 module.exports = { resendOtp };

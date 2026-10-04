@@ -79,10 +79,15 @@ const buildFilters = async ({
   platform,
   severity,
   logType,
+  outcome,
   fromDate,
   toDate,
 }) => {
   const filters = {};
+
+  // "success" or "failed": the stored success flag, as the summary cards count it.
+  if (outcome === "success") filters.success = true;
+  if (outcome === "failed") filters.success = false;
 
   if (role && role !== "all") filters.role = normalizeRole(String(role).trim());
   if (action && action !== "all") filters.action = String(action).trim().toUpperCase();
@@ -112,6 +117,7 @@ const readLogQuery = (query) => ({
   platform: query.platform ?? "all",
   severity: query.severity ?? "all",
   logType: query.logType ?? "all",
+  outcome: query.outcome === "success" || query.outcome === "failed" ? query.outcome : "all",
   fromDate: query.fromDate,
   toDate: query.toDate,
 });

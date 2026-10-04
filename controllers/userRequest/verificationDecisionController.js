@@ -21,9 +21,10 @@ const notifyResident = async (notification) => {
 };
 
 exports.approveUserRequest = asyncHandler(async (req, res) => {
-  const { verification, user, now } = await approve({
+  const { verification, user, now, linkedMasterResidentId } = await approve({
     id: req.params.id,
     adminId: adminIdOf(req),
+    masterResidentId: req.body?.masterResidentId,
   });
 
   await createSystemLog({
@@ -38,6 +39,10 @@ exports.approveUserRequest = asyncHandler(async (req, res) => {
       targetEmail: user.email,
       idType: verification.idType,
       verifiedAt: now,
+      verificationMethod: verification.verificationMethod,
+      masterListOutcome: verification.masterListCheck?.outcome ?? null,
+      linkedMasterResidentId,
+      linkChosenByAdmin: typeof req.body?.masterResidentId === "string",
     },
   });
 
@@ -53,6 +58,7 @@ exports.approveUserRequest = asyncHandler(async (req, res) => {
     success: true,
     message: `Resident registration for ${user.fullname} has been approved.`,
     verification: verification.toAdminSummary(),
+    linkedMasterResidentId,
   });
 });
 

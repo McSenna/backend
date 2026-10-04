@@ -5,7 +5,8 @@ const {
   getCategoryKeysForRole,
   getQueueRole,
 } = require("../../config/consultationCategories");
-const { forbidden } = require("../../utils/AppError");
+const { forbidden, badRequest } = require("../../utils/AppError");
+const { ERROR_CODES } = require("../../utils/errorCodes");
 
 const normalizeRole = (user) => String(user?.role || "").trim().toLowerCase();
 
@@ -19,4 +20,18 @@ const assertMayComplete = (user, serviceType) => {
   );
 };
 
-module.exports = { normalizeRole, assertMayComplete };
+const ownedServiceKeys = (user) => getCategoryKeysForRole(normalizeRole(user));
+
+// Encoding a past record follows the same ownership as completing a visit:
+// admins encode any service, other staff only the services they run.
+const assertMayEncode = (user, serviceType) => {
+  if (!getCategory(serviceType)) {
+    throw badRequest("Choose one of the health center services.", ERROR_CODES.VALIDATION_ERROR);
+  }
+  if (ownedServiceKeys(user).includes(serviceType)) return;
+  throw forbidden(
+    `${getCategory(serviceType).label} records are encoded by the ${getQueueRole(serviceType)} or an admin.`
+  );
+};
+
+module.exports = { normalizeRole, assertMayComplete, assertMayEncode, ownedServiceKeys };

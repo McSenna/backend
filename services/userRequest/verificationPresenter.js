@@ -1,12 +1,15 @@
 "use strict";
 
 const { maskIdNumber } = require("../../config/idVerification");
+const { VERIFICATION_METHODS } = require("../../config/masterList");
 
 const LIST_USER_FIELDS =
   "fullname email phone address addressDetails gender dateOfBirth profilePhoto createdAt status";
 
 const DETAIL_USER_FIELDS =
-  "fullname firstName middleName surname suffix email phone address addressDetails gender civilStatus dateOfBirth profilePhoto createdAt status";
+  "fullname firstName middleName surname suffix email phone address addressDetails gender civilStatus dateOfBirth profilePhoto createdAt status masterResidentId";
+
+const methodOf = (item) => item.verificationMethod || VERIFICATION_METHODS.ADMIN_REVIEW;
 
 const toListRow = (item) => {
   const user = item.user || {};
@@ -33,6 +36,8 @@ const toListRow = (item) => {
     rejectionRemarks: item.rejectionRemarks || "",
     verifiedBy: item.verifiedBy?.fullname || null,
     verifiedAt: item.verifiedAt || null,
+    verificationMethod: methodOf(item),
+    masterListOutcome: item.masterListCheck?.outcome ?? null,
     registeredAt: item.createdAt,
   };
 };
@@ -72,6 +77,7 @@ const toDetail = (verification) => {
       rejectionRemarks: verification.rejectionRemarks || "",
       verifiedBy: verification.verifiedBy?.fullname || null,
       verifiedAt: verification.verifiedAt || null,
+      verificationMethod: methodOf(verification),
       submittedAt: verification.createdAt,
       documentUrl: `/api/admin/user-requests/${verification._id}/document`,
     },

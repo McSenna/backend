@@ -16,6 +16,13 @@ const loadPendingQueue = async (visibleKeys) => {
   return pending.sort(byPriorityThenCreated);
 };
 
+// The staff list's row shape. Realtime publishes appointments through this same
+// query (realtime/publishers/appointments.js), so pushed rows match listed rows.
+const staffAppointmentQuery = (filter) =>
+  Appointment.find(filter)
+    .populate("resident", RESIDENT_QUEUE_FIELDS)
+    .populate("missionSchedule", "date");
+
 const loadAppointments = async ({ visibleKeys, status, missionScheduleId }) => {
   const filter = { ...queueFilter(visibleKeys) };
   if (status) filter.status = status;
@@ -23,11 +30,7 @@ const loadAppointments = async ({ visibleKeys, status, missionScheduleId }) => {
     filter.missionSchedule = missionScheduleId;
   }
 
-  const rows = await Appointment.find(filter)
-    .sort({ createdAt: -1 })
-    .populate("resident", RESIDENT_QUEUE_FIELDS)
-    .populate("missionSchedule", "date")
-    .lean();
+  const rows = await staffAppointmentQuery(filter).sort({ createdAt: -1 }).lean();
 
   // Pending requests are listed in the order staff must schedule them, which is
   // the order assigning a slot enforces (rescheduled first, then age tier).
@@ -36,4 +39,4 @@ const loadAppointments = async ({ visibleKeys, status, missionScheduleId }) => {
   return rows.sort(byPriorityThenCreated);
 };
 
-module.exports = { loadPendingQueue, loadAppointments };
+module.exports = { loadPendingQueue, loadAppointments, staffAppointmentQuery };

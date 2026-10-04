@@ -9,6 +9,7 @@ const {
   DETAIL_USER_FIELDS,
   toDetail,
 } = require("../../services/userRequest/verificationPresenter");
+const { loadMasterListReview } = require("../../services/masterList/masterListReview");
 
 const withRelations = (query) =>
   query.populate("user", DETAIL_USER_FIELDS).populate("verifiedBy", "fullname email").lean();
@@ -28,8 +29,10 @@ exports.getUserRequestById = asyncHandler(async (req, res) => {
     throw notFound("Registration verification request not found.", ERROR_CODES.NOT_FOUND);
   }
 
+  const masterList = await loadMasterListReview(verification, verification.user);
+
   return res.status(HTTP_STATUS.OK).json({
     success: true,
-    request: toDetail(verification),
+    request: { ...toDetail(verification), masterList },
   });
 });

@@ -21,7 +21,7 @@ const LISTED_STATUSES = Object.freeze([
 const TAB_STATUSES = Object.freeze({
   active: [...STATUS_GROUPS.active, ...STATUS_GROUPS.approved],
   deactivated: STATUS_GROUPS.deactivated,
-  masterlist: LISTED_STATUSES,
+  accounts: LISTED_STATUSES,
 });
 
 const ROLES = ["admin", "doctor", "midwife", "bhw", "resident"];
@@ -31,6 +31,7 @@ const SORTS = Object.freeze({
   last_login_desc: { lastLogin: -1, _id: -1 },
   last_login_asc: { lastLogin: 1, _id: 1 },
   name_asc: { fullname: 1, _id: 1 },
+  joined_desc: { createdAt: -1, _id: -1 },
 });
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -63,7 +64,7 @@ const pick = (value, allowed, fallback) => {
 };
 
 const resolveListParams = (query = {}) => {
-  const tab = pick(query.tab, Object.keys(TAB_STATUSES), "masterlist");
+  const tab = pick(query.tab, Object.keys(TAB_STATUSES), "accounts");
   const status = pick(query.status, Object.keys(STATUS_GROUPS), "");
   const role = pick(query.role, ROLES, "");
   const sort = pick(query.sort, Object.keys(SORTS), "last_login_desc");

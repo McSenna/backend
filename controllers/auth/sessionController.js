@@ -5,6 +5,7 @@ const { HTTP_STATUS } = require("../../utils/errorCodes");
 const { createSystemLog } = require("../../services/systemLogService");
 const { authenticate } = require("../../services/auth/loginService");
 const { buildUserResponse, platformOf } = require("../../services/auth/authResponse");
+const { disconnectSession } = require("../../realtime/socketServer");
 
 exports.login = asyncHandler(async (req, res) => {
   const platform = platformOf(req);
@@ -34,6 +35,9 @@ exports.logout = asyncHandler(async (req, res) => {
     success: true,
     metadata: { platform: req.auth?.platform, sessionId: req.auth?.sessionId },
   });
+
+  // The token stays valid until it expires, but this session's live feed ends now.
+  disconnectSession(actor.userId, req.auth?.sessionId).catch(() => undefined);
 
   return res.status(HTTP_STATUS.OK).json({
     success: true,

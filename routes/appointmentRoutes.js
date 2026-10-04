@@ -42,6 +42,7 @@ router.patch("/appointments/:id/processing", auth, roleCheck(STAFF_READ), medica
 router.post("/appointments/:id/complete", auth, roleCheck(STAFF_READ), medicalRecordController.completeAppointment);
 
 router.get("/medical-records/me", auth, roleCheck(RESIDENT), medicalRecordController.getMyMedicalRecords);
+router.post("/medical-records/me/search", auth, roleCheck(RESIDENT), medicalRecordController.searchMyMedicalRecords);
 router.get("/medical-records/:id", auth, medicalRecordController.getMedicalRecord);
 
 router.patch("/appointments/:id/assign", auth, roleCheck(STAFF_ADMIN), appointmentController.assignAppointment);

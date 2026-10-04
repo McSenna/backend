@@ -75,7 +75,7 @@ const makeUser = (role, status, extra = {}) =>
   User.create({
     fullname: `${role} ${status} ${++emailSeq}`,
     email: `${role}.${status}.${emailSeq}@maslogcare.test`,
-    password: "InitialPassword123!",
+    password: "InitialPass123!",
     role,
     verified: status === "approved" || status === "active",
     status,

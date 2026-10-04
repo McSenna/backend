@@ -50,6 +50,7 @@ const FOLLOW_UP_FIELDS = Object.freeze([
     key: "followUpDate",
     label: "Follow-up date",
     type: "date",
+    when: "after_visit",
     required: false,
     dependsOn: "followUpRequired",
   },

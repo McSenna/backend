@@ -36,6 +36,7 @@ const BP_CHECKING_FIELDS = Object.freeze([
     key: "recheckDate",
     label: "Recheck date",
     type: "date",
+    when: "after_visit",
     group: "Plan",
     required: false,
   },

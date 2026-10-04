@@ -120,6 +120,7 @@ const PRENATAL_FIELDS = Object.freeze([
     key: "nextCheckupDate",
     label: "Next prenatal visit",
     type: "date",
+    when: "after_visit",
     group: "Plan",
     required: false,
   },

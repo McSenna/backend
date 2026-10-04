@@ -7,6 +7,7 @@ const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
 const { notFound } = require("../utils/AppError");
 const { HTTP_STATUS } = require("../utils/errorCodes");
+const { residentRecordFilter } = require("../services/medicalRecord/residentRecordQuery");
 
 const UPCOMING_STATUSES = ["pending", "confirmed", "rescheduled"];
 
@@ -43,7 +44,7 @@ const getResidentDashboard = asyncHandler(async (req, res) => {
 
     Appointment.countDocuments({ ...ownedByResident, status: COMPLETED_STATUS }),
 
-    MedicalRecord.countDocuments(ownedByResident),
+    residentRecordFilter(residentId).then((filter) => MedicalRecord.countDocuments(filter)),
 
     Notification.countDocuments({ recipient: residentId, isRead: false }),
 

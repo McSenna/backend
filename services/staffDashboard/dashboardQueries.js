@@ -4,6 +4,7 @@ const Appointment = require("../../models/Appointment");
 const MedicalRecord = require("../../models/MedicalRecord");
 const InventoryItem = require("../../models/InventoryItem");
 const { DAY_MS } = require("../../utils/dateWindow");
+const { APPOINTMENT_FILTER } = require("../medicalRecord/linkageStatus");
 const {
   WAITING_STATUSES,
   ACTIVE_STATUSES,
@@ -71,8 +72,10 @@ const upcomingQueue = (match, { end }) =>
     .select(QUEUE_SELECT)
     .lean();
 
+// Visit records only: records encoded from paper have no visit or account to
+// show here and live in the Medical Records Masterlist instead.
 const recentRecords = (recordMatch) =>
-  MedicalRecord.find(recordMatch)
+  MedicalRecord.find({ $and: [recordMatch, APPOINTMENT_FILTER] })
     .sort({ completedAt: -1 })
     .limit(8)
     .populate("resident", "fullname")

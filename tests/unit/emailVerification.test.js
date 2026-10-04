@@ -93,6 +93,29 @@ async function runTests() {
     assert.strictEqual(classified.httpStatus, 429);
   });
 
+  test("TEST 5b: Gmail 550 5.1.1 unknown mailbox classified as EMAIL_RECIPIENT_INVALID, not quota", () => {
+    const unknownMailbox = {
+      message: "Can't send mail - all recipients were rejected: 550-5.1.1 The email account that you tried to reach does not exist.",
+      code: "EENVELOPE",
+      responseCode: 550,
+      command: "RCPT TO",
+      response: "550-5.1.1 The email account that you tried to reach does not exist.",
+    };
+
+    const classified = classifySmtpError(unknownMailbox);
+    assert.strictEqual(classified.code, EmailErrorCode.RECIPIENT_INVALID);
+    assert.strictEqual(classified.httpStatus, 400);
+    assert.strictEqual(classified.isRetryable, false);
+  });
+
+  test("TEST 5c: EENVELOPE without a response code is a permanent recipient error, not retried", () => {
+    const noRecipients = { message: "No recipients defined", code: "EENVELOPE" };
+
+    const classified = classifySmtpError(noRecipients);
+    assert.strictEqual(classified.code, EmailErrorCode.RECIPIENT_INVALID);
+    assert.strictEqual(classified.isRetryable, false);
+  });
+
   await asyncTest("TEST 6: OTP is properly hashed with bcrypt", async () => {
     const plainOtp = "654321";
     const salt = await bcrypt.genSalt(10);

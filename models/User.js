@@ -21,6 +21,12 @@ const UserSchema = new mongoose.Schema(
 
 UserSchema.index({ role: 1, verified: 1 });
 UserSchema.index({ organizationId: 1 });
+// One account per master list record. Partial, so the many accounts without a
+// link never collide.
+UserSchema.index(
+  { masterResidentId: 1 },
+  { unique: true, partialFilterExpression: { masterResidentId: { $type: "string" } } }
+);
 
 UserSchema.pre("validate", function () {
   if (this.gender) {

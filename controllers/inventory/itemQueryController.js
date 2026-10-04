@@ -11,24 +11,7 @@ const { expireLapsedBatches, recalculateItemStock } = require("../../services/in
 const { serializeItem, serializeBatch } = require("./inventory.serializers");
 const { SORT_FIELDS, buildListFilter } = require("./inventory.filters");
 const { assertCan, resolvePaging, pagingMeta } = require("./inventory.access");
-
-const loadLeadBatches = async (items) => {
-  const batches = await InventoryBatch.find({
-    item: { $in: items.map((item) => item._id) },
-    status: "active",
-    quantityRemaining: { $gt: 0 },
-  })
-    .sort({ expiryDate: 1, receivedDate: 1 })
-    .select("item batchNumber expiryDate quantityRemaining")
-    .lean();
-
-  const leadBatch = new Map();
-  for (const batch of batches) {
-    const key = String(batch.item);
-    if (!leadBatch.has(key)) leadBatch.set(key, batch);
-  }
-  return leadBatch;
-};
+const { loadLeadBatches } = require("../../services/inventory/leadBatches");
 
 const getInventoryItems = asyncHandler(async (req, res) => {
   assertCan(req, "view");

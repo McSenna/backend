@@ -39,6 +39,8 @@ const getAdminDashboard = asyncHandler(async (req, res) => {
     totalPatientsBaseline,
     roleCounts,
     recentUsers,
+    recentResidents,
+    recentStaff,
     recentLogs,
     registrationBuckets,
     activityBuckets,
@@ -65,6 +67,8 @@ const getAdminDashboard = asyncHandler(async (req, res) => {
     registrationTrend: buildDenseSeries(registrationBuckets.map(monthlyKey), monthWindow),
     activityTrend: buildDenseSeries(activityBuckets.map(dailyKey), dayWindow),
     recentUsers: recentUsers.map(toRecentUser),
+    recentResidents: recentResidents.map(toRecentUser),
+    recentStaff: recentStaff.map(toRecentUser),
     recentActivities: recentLogs.map(toRecentActivity),
     generatedAt: now.toISOString(),
   });

@@ -9,6 +9,19 @@ const { getCategoryKeysForRole } = require("../../config/consultationCategories"
  */
 const STAFF_ONLY_FIELDS = Object.freeze(["notes"]);
 
+// Audit and bookkeeping fields on encoded records. Staff read them through the
+// Medical Records Masterlist; no resident payload carries them.
+const INTERNAL_FIELDS = Object.freeze([
+  "revisions",
+  "createdBy",
+  "createdByRole",
+  "updatedBy",
+  "updatedByRole",
+  "requestKey",
+  "duplicateAcknowledged",
+  "masterResidentId",
+]);
+
 const idOf = (value) => String(value?._id ?? value ?? "");
 
 const describeAccess = (record, user) => {
@@ -18,18 +31,24 @@ const describeAccess = (record, user) => {
   return {
     role,
     isOwner: idOf(record.resident) === userId,
-    isAuthor: idOf(record.provider) === userId,
+    isAuthor: idOf(record.provider) === userId || (Boolean(record.createdBy) && idOf(record.createdBy) === userId),
     ownsService: getCategoryKeysForRole(role).includes(record.serviceType),
   };
 };
 
 const forResident = (record) => {
   const safe = { ...record };
-  for (const field of STAFF_ONLY_FIELDS) delete safe[field];
+  for (const field of [...STAFF_ONLY_FIELDS, ...INTERNAL_FIELDS]) delete safe[field];
+  return safe;
+};
+
+const withoutInternals = (record) => {
+  const safe = { ...record };
+  delete safe.requestKey;
   return safe;
 };
 
 const redactForViewer = (record, access) =>
-  access.isAuthor || access.ownsService ? record : forResident(record);
+  access.isAuthor || access.ownsService ? withoutInternals(record) : forResident(record);
 
 module.exports = { STAFF_ONLY_FIELDS, describeAccess, forResident, redactForViewer };

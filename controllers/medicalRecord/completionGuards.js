@@ -5,7 +5,7 @@ const { COMPLETABLE_STATUSES } = require("../../models/Appointment");
 const MedicalRecord = require("../../models/MedicalRecord");
 const { badRequest, conflict } = require("../../utils/AppError");
 const { ERROR_CODES, HTTP_STATUS } = require("../../utils/errorCodes");
-const { validateMedicalRecordInput } = require("../../utils/medicalRecordValidation");
+const { validateMedicalRecordInput, dayKeyOf } = require("../../utils/medicalRecordValidation");
 const { validateDispenseInput } = require("../../utils/dispenseValidation");
 
 const alreadyCompletedResponse = async (res, appointmentId, appointment) => {
@@ -30,7 +30,10 @@ const assertCompletable = (status) => {
 };
 
 const validateSubmission = (serviceType, body) => {
-  const validation = validateMedicalRecordInput(serviceType, body?.medicalRecord ?? body ?? {});
+  // A visit is completed on its day, so follow-up dates start from today.
+  const validation = validateMedicalRecordInput(serviceType, body?.medicalRecord ?? body ?? {}, {
+    visitDay: dayKeyOf(null, new Date()),
+  });
   if (!validation.ok) {
     throw badRequest(validation.errors.join(" "), ERROR_CODES.VALIDATION_ERROR);
   }

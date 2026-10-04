@@ -40,7 +40,13 @@ const issueResetCode = async (email, req) => {
     lastSentAt: new Date(),
   });
 
-  await sendPasswordResetCodeEmail(user.email, otp, user.fullname);
+  try {
+    await sendPasswordResetCodeEmail(user.email, otp, user.fullname);
+  } catch (error) {
+    // No code reached the user, so drop it rather than let it start the resend cooldown.
+    await PasswordReset.deleteOne({ email });
+    throw error;
+  }
 
   void createSystemLog({
     req,

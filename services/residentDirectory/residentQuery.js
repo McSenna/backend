@@ -35,6 +35,9 @@ const STATUS_BUCKETS = Object.freeze({
   inactive: ["inactive", "deactivated"],
   pending: ["pending"],
   suspended: ["suspended"],
+  // Filter only (the "Inactive residents" summary card): inactive or suspended.
+  // Listed last so each stored status still counts toward its own bucket.
+  restricted: ["inactive", "deactivated", "suspended"],
 });
 
 const STATUS_FILTERS = Object.keys(STATUS_BUCKETS);

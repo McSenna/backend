@@ -185,4 +185,5 @@ module.exports = {
   listAnnouncements,
   updateAnnouncement,
   validateAnnouncementInput,
+  toAnnouncement,
 };

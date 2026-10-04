@@ -1,10 +1,15 @@
 "use strict";
 
+const { PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } = require("../../config/passwordPolicy");
+
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
 const validatePassword = (password) => {
   const errors = [];
-  if (!password || password.length < 8) errors.push("Password must be at least 8 characters long");
+  if (!password || password.length < PASSWORD_MIN_LENGTH)
+    errors.push(`Password must be at least ${PASSWORD_MIN_LENGTH} characters long`);
+  if (password && password.length > PASSWORD_MAX_LENGTH)
+    errors.push(`Password must not exceed ${PASSWORD_MAX_LENGTH} characters`);
   if (!/[A-Za-z]/.test(password)) errors.push("Password must contain at least one letter");
   if (!/\d/.test(password)) errors.push("Password must contain at least one number");
   return { isValid: errors.length === 0, errors };
@@ -14,7 +19,10 @@ const validatePasswordStrength = (password) => {
   const errors = [];
   const value = String(password ?? "");
 
-  if (value.length < 8) errors.push("Password must be at least 8 characters");
+  if (value.length < PASSWORD_MIN_LENGTH)
+    errors.push(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
+  if (value.length > PASSWORD_MAX_LENGTH)
+    errors.push(`Password must not exceed ${PASSWORD_MAX_LENGTH} characters`);
   if (!/[a-z]/.test(value) || !/[A-Z]/.test(value))
     errors.push("Password must contain uppercase and lowercase letters");
   if (!/\d/.test(value)) errors.push("Password must contain at least one number");

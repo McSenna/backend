@@ -3,11 +3,8 @@
 const { getCompletionForms } = require("./medicalRecord/completionFormsController");
 const { startProcessing } = require("./medicalRecord/processingController");
 const { completeAppointment } = require("./medicalRecord/completionController");
-const {
-  getMedicalRecord,
-  getMyMedicalRecords,
-  listCompletedAppointments,
-} = require("./medicalRecord/recordReadController");
+const { getMedicalRecord, listCompletedAppointments } = require("./medicalRecord/recordReadController");
+const { getMyMedicalRecords, searchMyMedicalRecords } = require("./medicalRecord/residentRecordController");
 
 module.exports = {
   getCompletionForms,
@@ -15,5 +12,6 @@ module.exports = {
   completeAppointment,
   getMedicalRecord,
   getMyMedicalRecords,
+  searchMyMedicalRecords,
   listCompletedAppointments,
 };

@@ -2,6 +2,7 @@
 
 const mongoose = require("mongoose");
 const { VALID_STATUSES } = require("./userStatus");
+const { VERIFICATION_METHODS } = require("../../config/masterList");
 
 const accountFields = {
   verified: {
@@ -61,6 +62,25 @@ const accountFields = {
     type: String,
     default: "",
     trim: true,
+  },
+
+  // How a resident's registration was decided. `status`, `approved_*` and
+  // `rejected_*` stay the source of truth for the decision itself; an empty
+  // value means the account predates the master list check.
+  verificationMethod: {
+    type: String,
+    enum: {
+      values: ["", ...Object.values(VERIFICATION_METHODS)],
+      message: "Verification method must be master_list or admin_review",
+    },
+    default: "",
+  },
+  // The official master list record this account belongs to, set by the server
+  // only. Linking never copies or changes the master record's details.
+  masterResidentId: {
+    type: String,
+    trim: true,
+    default: undefined,
   },
 };
 

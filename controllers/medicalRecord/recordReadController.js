@@ -10,11 +10,8 @@ const { getCategoryKeysForRole } = require("../../config/consultationCategories"
 const { getCompletionForm } = require("../../config/medicalRecordFields");
 const { createSystemLog } = require("../../services/systemLogService");
 const { normalizeRole } = require("../../services/medicalRecord/serviceOwnership");
-const {
-  describeAccess,
-  forResident,
-  redactForViewer,
-} = require("../../services/medicalRecord/residentRecordView");
+const { describeAccess, redactForViewer } = require("../../services/medicalRecord/residentRecordView");
+const { ownsRecord } = require("../../services/medicalRecord/residentRecordQuery");
 
 const APPOINTMENT_SELECT =
   "consultationType slotStart slotEnd status createdAt approvedAt completedAt missionSchedule childName childDateOfBirth";
@@ -41,6 +38,11 @@ exports.getMedicalRecord = asyncHandler(async (req, res) => {
   }
 
   const access = describeAccess(record, req.user);
+  // A resident also owns records encoded under the master list identity their
+  // account holds.
+  if (access.role === "resident" && !access.isOwner) {
+    access.isOwner = await ownsRecord(req.user.userId, record);
+  }
 
   if (!access.isOwner && !access.isAuthor && !access.ownsService) {
     throw forbidden("You do not have permission to view this medical record.");
@@ -62,23 +64,6 @@ exports.getMedicalRecord = asyncHandler(async (req, res) => {
     message: "Medical record loaded successfully.",
     medicalRecord: redactForViewer(record, access),
     form: getCompletionForm(record.serviceType),
-  });
-});
-
-exports.getMyMedicalRecords = asyncHandler(async (req, res) => {
-  const records = await MedicalRecord.find({ resident: req.user.userId })
-    .sort({ completedAt: -1 })
-    .populate("provider", "fullname role")
-    .populate({
-      path: "appointment",
-      select: "consultationType slotStart slotEnd status createdAt approvedAt completedAt",
-    })
-    .lean();
-
-  return res.json({
-    success: true,
-    message: "Medical records loaded successfully.",
-    medicalRecords: records.map(forResident),
   });
 });
 

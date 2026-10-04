@@ -17,8 +17,11 @@ const MODULE_RULES = [
   { test: /^USER_/, module: "User Management", logType: "User Management" },
   { test: /^APPOINTMENT_/, module: "Appointments", logType: "Appointment Activity" },
   { test: /^RECORD_/, module: "Patients", logType: "Patient Records" },
+  { test: /^MEDICAL_RECORD_/, module: "Patients", logType: "Patient Records" },
+  { test: /^ACCOUNT_MASTER_/, module: "Master List", logType: "Master List Management" },
   { test: /^SCHEDULE_/, module: "Scheduling", logType: "Schedule Management" },
   { test: /^INVENTORY_/, module: "Inventory", logType: "Inventory Management" },
+  { test: /^MASTER_RESIDENT/, module: "Master List", logType: "Master List Management" },
 ];
 
 const ruleFor = (action) => MODULE_RULES.find((rule) => rule.test.test(String(action || "")));
@@ -42,6 +45,9 @@ const WARNING_ACTIONS = new Set([
   "INVENTORY_ITEM_DEACTIVATED",
   "INVENTORY_ADJUSTED",
   "INVENTORY_EXPIRED_RECORDED",
+  "MASTER_RESIDENT_DEACTIVATED",
+  "MEDICAL_RECORD_DUPLICATE_CONFIRMED",
+  "ACCOUNT_MASTER_UNLINKED",
 ]);
 
 const SUCCESS_ACTIONS = new Set([
@@ -59,6 +65,10 @@ const SUCCESS_ACTIONS = new Set([
   "INVENTORY_STOCK_OUT",
   "ANNOUNCEMENT_CREATED",
   "PASSWORD_CHANGED",
+  "MASTER_RESIDENT_CREATED",
+  "MASTER_RESIDENTS_IMPORTED",
+  "MEDICAL_RECORD_CREATED",
+  "ACCOUNT_MASTER_LINKED",
 ]);
 
 const deriveSeverity = (action, success) => {
