@@ -77,13 +77,35 @@ function classifySmtpError(err) {
     rawResponse.includes("too many connections") ||
     rawMsg.includes("rate limit")
   ) {
-    return new EmailServiceError(
+    const serviceErr = new EmailServiceError(
       EmailErrorCode.RATE_LIMITED,
       `SMTP rate limit exceeded: ${err.message}`,
       "Email service is receiving too many requests. Please wait a moment and try again.",
       429,
       err
     );
+
+    // Try to extract a Retry-After value from SMTP response or headers when available.
+    try {
+      const hdr = err?.response?.headers || err?.headers || null;
+      let retryAfter = 0;
+      if (hdr && typeof hdr === "object") {
+        const ra = hdr["retry-after"] || hdr["x-retry-after"];
+        if (ra) retryAfter = Number(String(ra).split(";")[0]) || 0;
+      }
+
+      // Some SMTP error messages include a suggested wait time like "Please try again in 30 seconds".
+      if (!retryAfter && typeof err?.message === "string") {
+        const m = err.message.match(/(\d{1,5})\s*(?:seconds|second|secs|sec)/i);
+        if (m) retryAfter = Number(m[1]) || 0;
+      }
+
+      if (retryAfter > 0) serviceErr.details = { retryAfter };
+    } catch (_) {
+      // ignore extraction errors
+    }
+
+    return serviceErr;
   }
 
   if (

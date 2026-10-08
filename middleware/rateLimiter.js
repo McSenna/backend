@@ -2,6 +2,7 @@
 
 const { tooManyRequests } = require("../utils/AppError");
 const { SlidingWindowStore, clientIpOf } = require("../utils/slidingWindowStore");
+const logger = require("../utils/logger");
 
 // Sending a code and checking a code have separate budgets. When they shared
 // one, a few wrong-code attempts or a password reset on one account used up
@@ -32,6 +33,7 @@ function buildLimiter({ ipStore, emailStore, code, deviceMessage, accountMessage
         const retryAfter = ipStore.getRetryAfterSeconds(ipKey);
         if (retryAfter > 0) err.details = { retryAfter };
       }
+      logger.warn("Rate limiter: ip limit reached", { ip: ipKey, retryAfter: err.details?.retryAfter });
       return next(err);
     }
 
@@ -42,6 +44,7 @@ function buildLimiter({ ipStore, emailStore, code, deviceMessage, accountMessage
         const retryAfter = emailStore.getRetryAfterSeconds(email);
         if (retryAfter > 0) err.details = { retryAfter };
       }
+      logger.warn("Rate limiter: email limit reached", { email, retryAfter: err.details?.retryAfter });
       return next(err);
     }
 

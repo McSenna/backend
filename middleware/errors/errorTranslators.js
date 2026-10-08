@@ -27,6 +27,7 @@ const TRANSLATORS = [
       statusCode: err.httpStatus || HTTP_STATUS.SERVICE_UNAVAILABLE,
       code: err.code === "EMAIL_QUOTA_EXCEEDED" ? ERROR_CODES.EMAIL_SERVICE_LIMIT : err.code,
       message: err.userMessage,
+      details: err.details,
     }),
   },
   {
