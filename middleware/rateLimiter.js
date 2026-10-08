@@ -25,13 +25,24 @@ function targetEmail(req) {
 
 function buildLimiter({ ipStore, emailStore, code, deviceMessage, accountMessage }) {
   return function rateLimit(req, _res, next) {
-    if (ipStore.isLimited(clientIpOf(req))) {
-      return next(tooManyRequests(deviceMessage, code));
+    const ipKey = clientIpOf(req);
+    if (ipStore.isLimited(ipKey)) {
+      const err = tooManyRequests(deviceMessage, code);
+      if (typeof ipStore.getRetryAfterSeconds === "function") {
+        const retryAfter = ipStore.getRetryAfterSeconds(ipKey);
+        if (retryAfter > 0) err.details = { retryAfter };
+      }
+      return next(err);
     }
 
     const email = targetEmail(req);
     if (email && emailStore.isLimited(email)) {
-      return next(tooManyRequests(accountMessage, code));
+      const err = tooManyRequests(accountMessage, code);
+      if (typeof emailStore.getRetryAfterSeconds === "function") {
+        const retryAfter = emailStore.getRetryAfterSeconds(email);
+        if (retryAfter > 0) err.details = { retryAfter };
+      }
+      return next(err);
     }
 
     return next();

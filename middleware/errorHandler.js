@@ -26,6 +26,16 @@ const globalErrorHandler = (err, req, res, next) => {
     Object.assign(body, details);
   }
 
+  // If the translated error included a cooldown hint, expose it via
+  // the standard Retry-After header so browsers and clients can react.
+  if (details && typeof details.retryAfter === "number") {
+    try {
+      res.setHeader("Retry-After", String(details.retryAfter));
+    } catch (_) {
+      /* ignore header failures */
+    }
+  }
+
   if (!isProduction() && unexpected) {
     body.debug = { name: err?.name, stack: err?.stack };
   }
