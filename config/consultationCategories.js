@@ -28,8 +28,8 @@ const CONSULTATION_CATEGORIES = [
     durationMinutes: 10,
     residentBookable: true,
     queueRole: "midwife",
-    // Date#getDay() numbering: the health center's immunization day is Wednesday.
-    serviceWeekdays: [3],
+    // Date#getDay() numbering: the health center's immunization day is Thursday.
+    serviceWeekdays: [4],
     // A resident's reschedule takes the day's first open slot and queues first.
     rescheduleToFirstSlot: true,
     // Runs on its own weekly schedule, never on a doctor's medical mission. Each

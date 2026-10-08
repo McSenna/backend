@@ -78,7 +78,16 @@ const authenticate = async ({ req, email, password, platform }) => {
     throw badRequest("Email and password are required.", ERROR_CODES.MISSING_FIELDS);
   }
 
-  const normalizedEmail = email.toLowerCase().trim();
+  const normalizedEmail = String(email).toLowerCase().trim();
+  // Accounts sign in by email address only. This only asks for an "@", not the full
+  // address rule, so an older account with an unusual address can still sign in.
+  // Checked before any lookup, so it says nothing about which accounts exist.
+  if (!normalizedEmail.includes("@")) {
+    throw badRequest(
+      "Sign in with your email address. Mobile numbers can't be used to sign in.",
+      ERROR_CODES.INVALID_FORMAT
+    );
+  }
   const user = await findLoginCandidate({ req, normalizedEmail, platform });
 
   // The password is checked before any account-state guard so a wrong password

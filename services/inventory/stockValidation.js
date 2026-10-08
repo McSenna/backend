@@ -3,9 +3,11 @@
 const { badRequest } = require("../../utils/AppError");
 const { startOfDay } = require("../../utils/dateWindow");
 
+// Refuses rather than rounds: 2.5 used to be stored as 2, `true` as 1, and
+// numbers past the safe integer range lost precision.
 const readQuantity = (raw) => {
-  const quantity = Math.trunc(Number(raw));
-  if (!Number.isFinite(quantity) || quantity <= 0) {
+  const quantity = typeof raw === "number" || typeof raw === "string" ? Number(raw) : Number.NaN;
+  if (!Number.isSafeInteger(quantity) || quantity <= 0) {
     throw badRequest("Quantity must be a whole number greater than zero.");
   }
   return quantity;

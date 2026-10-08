@@ -78,7 +78,7 @@ const placePendingWeekly = async ({ appointment, payload = {}, staffId, now = ne
     if (named) throw fullDayConflict(categoryKey, dayStart);
   }
   throw conflict(
-    "Every Wednesday in the booking window is full. Decline the request or try again later.",
+    "Every Thursday in the booking window is full. Decline the request or try again later.",
     ERROR_CODES.SLOT_UNAVAILABLE
   );
 };

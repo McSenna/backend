@@ -53,8 +53,8 @@ const run = async ({ request }, check) => {
   const infant = await createUser("resident", new Date(Date.now() - 200 * DAY_MS).toISOString().slice(0, 10));
   const [r1, r2, r3, newcomer] = [await createUser("resident"), await createUser("resident"), await createUser("resident"), await createUser("resident")];
 
-  const w1Key = upcomingDateKey(3);
-  const w2Key = upcomingDateKey(3, 1);
+  const w1Key = upcomingDateKey(4);
+  const w2Key = upcomingDateKey(4, 1);
   const activeOnW1 = () =>
     Appointment.find({ consultationType: "immunization", status: { $in: ACTIVE }, slotStart: { $gte: localAt(w1Key, "00:00"), $lt: localAt(w2Key, "00:00") } })
       .sort({ slotStart: 1 })
@@ -71,14 +71,14 @@ const run = async ({ request }, check) => {
   await book(infant, "Infant Child", "race-test-infant-booking");
   const [s1, s2, s3] = await Promise.all([r1, r2, r3].map((r, i) => placed(r, localAt(w2Key, `09:${i}0`))));
 
-  console.log("\nTwo residents reschedule onto the same Wednesday at once");
+  console.log("\nTwo residents reschedule onto the same Thursday at once");
   const race = await withSlowWrites(() => Promise.all([reschedule(r1, s1._id), reschedule(r2, s2._id)]));
   check("both moves succeed: the server hands out positions, nobody picks one", race.every((r) => r.status === 200), race.map((r) => `${r.status} ${r.body.message}`).join(" | "));
   const times = race.map((r) => r.body.appointment?.slotStart).sort();
   check("they get 08:10 and 08:20 (the infant holds 08:00), never the same", times.join() === [iso(localAt(w1Key, "08:10")), iso(localAt(w1Key, "08:20"))].join(), times.join());
   const [won, lost] = await Appointment.find({ _id: { $in: [s1._id, s2._id] } }).sort({ slotStart: 1 }).lean();
   check("order is deterministic: the earlier reschedule holds the earlier slot", won.reschedulePriorityAt < lost.reschedulePriorityAt);
-  check("no two visits on that Wednesday overlap", !overlaps(await activeOnW1()));
+  check("no two visits on that Thursday overlap", !overlaps(await activeOnW1()));
 
   console.log("\nA new booking races a reschedule");
   const [booked, moved] = await withSlowWrites(() => Promise.all([book(newcomer, "Newcomer Child", "race-test-newcomer-1"), reschedule(r3, s3._id)]));

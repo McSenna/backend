@@ -2,7 +2,7 @@
 
 const { PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } = require("../../config/passwordPolicy");
 
-const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+const { isValidEmail } = require("./emailAddress");
 
 const validatePassword = (password) => {
   const errors = [];

@@ -53,7 +53,7 @@ const positionStarts = (categoryKey, dayStart) => {
 
 /**
  * Service days from today through the booking horizon (8 weeks covers the next
- * 8 Wednesdays). A day whose last position has already started is left out.
+ * 8 Thursdays). A day whose last position has already started is left out.
  */
 const upcomingDays = (categoryKey, now = new Date()) => {
   const { weekdays, horizonWeeks } = scheduleOf(categoryKey);

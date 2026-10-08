@@ -48,13 +48,13 @@ const run = async ({ request }, check) => {
       method: "POST",
       token: doctor.token,
       body: {
-        date: upcomingDateKey(3),
+        date: upcomingDateKey(4),
         categories: [{ categoryKey: "bp_checking", durationMinutes: 5 }],
       },
     })
   ).body.missionSchedule;
-  // Immunization books on its own Wednesday schedule; BP checking on the mission.
-  const shotDay = upcomingDateKey(3);
+  // Immunization books on its own Thursday schedule; BP checking on the mission.
+  const shotDay = upcomingDateKey(4);
   await request("/appointments", {
     method: "POST",
     token: residentA.token,
@@ -99,7 +99,7 @@ const run = async ({ request }, check) => {
   const early = await complete(shot._id, midwife, IMMUNIZATION_RECORD);
   const stillConfirmed = (await Appointment.findById(shot._id).lean()).status === "confirmed";
   check(
-    "before the scheduled Wednesday it is refused and nothing changes",
+    "before the scheduled Thursday it is refused and nothing changes",
     early.status === 409 && early.body.message.includes("its scheduled day") && stillConfirmed,
     `${early.status} ${early.body.message}`
   );

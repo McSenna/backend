@@ -38,7 +38,7 @@ const moveToFirstOpen = async ({ appointmentId, residentId, actorRole, categoryK
     if (!slotStart) throw fullDayConflict(categoryKey, dayStart);
     if (appointment.slotStart && slotStart.getTime() === new Date(appointment.slotStart).getTime()) {
       throw conflict(
-        "You already have the earliest open time on that Wednesday. Please choose another Wednesday.",
+        "You already have the earliest open time on that Thursday. Please choose another Thursday.",
         ERROR_CODES.SLOT_UNAVAILABLE
       );
     }

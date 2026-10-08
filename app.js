@@ -37,6 +37,10 @@ function createApp() {
 
   app.use(attachRequestPlatform);
 
+  app.get("/", (_req, res) => {
+    res.status(200).json({ success: true, message: "MaslogCare API is running" });
+  });
+
   app.get("/api/health", (_req, res) => {
     res.status(200).json({ success: true, message: "Service is running", data: {} });
   });

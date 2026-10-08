@@ -22,11 +22,11 @@ const dayLockKey = (categoryKey, dayStart) => `${categoryKey}:${dayKeyOf(dayStar
 
 const fullDayConflict = (categoryKey, dayStart) =>
   conflict(
-    `No ${(getCategory(categoryKey)?.label ?? "appointment").toLowerCase()} times are left on ${formatDay(dayStart)}. Please choose another Wednesday.`,
+    `No ${(getCategory(categoryKey)?.label ?? "appointment").toLowerCase()} times are left on ${formatDay(dayStart)}. Please choose another Thursday.`,
     ERROR_CODES.SLOT_UNAVAILABLE
   );
 
-// One parent may book several children on one Wednesday, but the same child
+// One parent may book several children on one Thursday, but the same child
 // twice is an accidental repeat. Messages never name the child: errors are logged.
 const assertChildNotBooked = async ({ residentId, request, session }) => {
   const existing = await Appointment.findOne({

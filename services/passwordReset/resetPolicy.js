@@ -1,6 +1,7 @@
 "use strict";
 
 const { PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH } = require("../../config/passwordPolicy");
+const { isValidEmail } = require("../../utils/validation/emailAddress");
 
 const OTP_TTL_MINUTES = 10;
 const RESEND_COOLDOWN_SECONDS = 45;
@@ -13,7 +14,6 @@ const INVALID_CODE_MESSAGE = "The verification code is incorrect or has expired.
 
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 
-const isValidEmail = (value) => /^\S+@\S+\.\S+$/.test(value);
 
 const isSixDigitCode = (value) => /^\d{6}$/.test(value);
 

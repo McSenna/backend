@@ -13,7 +13,7 @@ const assertMissionService = (categoryKey) => {
   if (!isWeeklyService(categoryKey)) return;
   const label = getCategory(categoryKey)?.label ?? "This service";
   throw badRequest(
-    `${label} runs every Wednesday on its own schedule and is not booked on medical missions.`,
+    `${label} runs every Thursday on its own schedule and is not booked on medical missions.`,
     ERROR_CODES.VALIDATION_ERROR
   );
 };

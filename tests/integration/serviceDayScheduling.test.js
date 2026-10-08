@@ -1,15 +1,15 @@
 "use strict";
 
-const { createChecker, startHarness, createUser, upcomingDateKey, localAt, finish, DAY_MS } = require("./helpers/appointmentHarness");
+const { createChecker, startHarness, createUser, upcomingDateKey, localAt, finish } = require("./helpers/appointmentHarness");
 const Appointment = require("../../models/Appointment");
 const MissionSchedule = require("../../models/MissionSchedule");
 
-const WEDNESDAY = 3;
+const THURSDAY = 4;
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const IMMUNIZATION = { categoryKey: "immunization", durationMinutes: 10 };
 const BP = { categoryKey: "bp_checking", durationMinutes: 5 };
 const PRENATAL = { categoryKey: "prenatal", durationMinutes: 20 };
-const DAY_ERROR = "Immunization appointments are only available on Wednesdays.";
+const DAY_ERROR = "Immunization appointments are only available on Thursdays.";
 const OWN_SCHEDULE = /own schedule/;
 
 const run = async ({ request }, check) => {
@@ -21,7 +21,7 @@ const run = async ({ request }, check) => {
     request("/mission-schedule", { method: "POST", token: doctor.token, body: { date, categories } });
 
   console.log("\nMissions never carry immunization");
-  for (const weekday of [3, 0, 1, 2, 4, 5, 6]) {
+  for (const weekday of [4, 0, 1, 2, 3, 5, 6]) {
     const res = await createMission(upcomingDateKey(weekday, 2), [IMMUNIZATION, BP]);
     check(`a ${WEEKDAY_NAMES[weekday]} mission offering immunization is rejected`, res.status === 400 && OWN_SCHEDULE.test(res.body.message), `${res.status} ${res.body.message}`);
   }
@@ -35,8 +35,8 @@ const run = async ({ request }, check) => {
   check("adding immunization to an existing mission is rejected", addShot.status === 400 && OWN_SCHEDULE.test(addShot.body.message));
 
   // A mission saved before this change: a Tuesday that still lists immunization.
-  const firstWednesday = upcomingDateKey(WEDNESDAY);
-  const legacyDay = new Date(localAt(firstWednesday, "00:00").getTime() - DAY_MS);
+  const firstThursday = upcomingDateKey(THURSDAY);
+  const legacyDay = localAt(upcomingDateKey(2), "00:00");
   const legacy = await MissionSchedule.create({ date: legacyDay, categories: [IMMUNIZATION, BP], createdBy: doctor.user._id });
   const legacySlot = new Date(legacyDay.getTime() + 9 * 60 * 60 * 1000).toISOString();
 
@@ -44,16 +44,16 @@ const run = async ({ request }, check) => {
   const book = (who, body) => request("/appointments", { method: "POST", token: who.token, body });
   const shotOptions = (await request("/appointments/booking-options?consultationType=immunization", { token: residentA.token })).body;
   check(
-    "immunization options are Wednesdays only, never the old Tuesday mission",
-    shotOptions.days.length > 0 && shotOptions.days.every((d) => new Date(d.date).getDay() === WEDNESDAY) && !JSON.stringify(shotOptions).includes(String(legacy._id))
+    "immunization options are Thursdays only, never the old Tuesday mission",
+    shotOptions.days.length > 0 && shotOptions.days.every((d) => new Date(d.date).getDay() === THURSDAY) && !JSON.stringify(shotOptions).includes(String(legacy._id))
   );
   const shotBody = { consultationType: "immunization", childName: "Test Child", childDateOfBirth: "2024-05-01" };
   const onTuesday = await book(residentA, { ...shotBody, appointmentDate: upcomingDateKey(2), requestKey: "service-day-a-tue" });
   check("booking immunization on a Tuesday is rejected", onTuesday.status === 400 && onTuesday.body.message === DAY_ERROR, onTuesday.body.message);
-  const forced = await book(residentA, { ...shotBody, appointmentDate: firstWednesday, missionScheduleId: String(legacy._id), slotStart: legacySlot, requestKey: "service-day-a-shot" });
+  const forced = await book(residentA, { ...shotBody, appointmentDate: firstThursday, missionScheduleId: String(legacy._id), slotStart: legacySlot, requestKey: "service-day-a-shot" });
   check(
-    "a booking that names the old mission and time still lands on the Wednesday schedule",
-    forced.status === 201 && forced.body.appointment.missionSchedule === null && new Date(forced.body.appointment.slotStart).getDay() === WEDNESDAY,
+    "a booking that names the old mission and time still lands on the Thursday schedule",
+    forced.status === 201 && forced.body.appointment.missionSchedule === null && new Date(forced.body.appointment.slotStart).getDay() === THURSDAY,
     `${forced.status} ${forced.body.message}`
   );
 
@@ -66,18 +66,18 @@ const run = async ({ request }, check) => {
   console.log("\nResident reschedule");
   const shot = forced.body.appointment;
   const options = await request(`/appointments/${shot._id}/reschedule-options`, { token: residentA.token });
-  check("only Wednesdays are offered", options.status === 200 && options.body.days.every((d) => new Date(d.date).getDay() === WEDNESDAY));
+  check("only Thursdays are offered", options.status === 200 && options.body.days.every((d) => new Date(d.date).getDay() === THURSDAY));
   const reschedule = (who, body) => request(`/appointments/${shot._id}/reschedule`, { method: "PATCH", token: who.token, body });
   const toTuesday = await reschedule(residentA, { appointmentDate: upcomingDateKey(2, 1) });
-  check("Wednesday to Tuesday is rejected", toTuesday.status === 400 && toTuesday.body.message === DAY_ERROR, toTuesday.body.message);
-  const past = await reschedule(residentA, { appointmentDate: upcomingDateKey(WEDNESDAY, -1) });
-  check("a past Wednesday is rejected", past.status === 400, `${past.status}`);
-  const other = await reschedule(residentB, { appointmentDate: upcomingDateKey(WEDNESDAY, 1) });
+  check("Thursday to Tuesday is rejected", toTuesday.status === 400 && toTuesday.body.message === DAY_ERROR, toTuesday.body.message);
+  const past = await reschedule(residentA, { appointmentDate: upcomingDateKey(THURSDAY, -1) });
+  check("a past Thursday is rejected", past.status === 400, `${past.status}`);
+  const other = await reschedule(residentB, { appointmentDate: upcomingDateKey(THURSDAY, 1) });
   check("another resident cannot reschedule it", other.status === 403, `${other.status}`);
   check("another resident cannot read its options", (await request(`/appointments/${shot._id}/reschedule-options`, { token: residentB.token })).status === 403);
-  const toNext = await reschedule(residentA, { appointmentDate: upcomingDateKey(WEDNESDAY, 1) });
+  const toNext = await reschedule(residentA, { appointmentDate: upcomingDateKey(THURSDAY, 1) });
   check(
-    "Wednesday to the next Wednesday is accepted on the same record",
+    "Thursday to the next Thursday is accepted on the same record",
     toNext.status === 200 && toNext.body.appointment.status === "rescheduled" && String(toNext.body.appointment._id) === String(shot._id) &&
       (await Appointment.countDocuments({ resident: residentA.user._id })) === 2,
     `${toNext.status} ${toNext.body.message}`

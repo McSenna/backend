@@ -28,25 +28,42 @@ const recalculateItemStock = async (itemId, session = null) => {
     }
   }
 
-  const update = InventoryItem.findByIdAndUpdate(
-    itemId,
+  // Writes only a real change. The item detail read recalculates too, and an
+  // unconditional write bumped updatedAt on every view: the realtime update
+  // made each open details panel reload, which wrote again, without end.
+  const update = InventoryItem.findOneAndUpdate(
+    { _id: itemId, $or: [{ currentStock: { $ne: currentStock } }, { nearestExpiry: { $ne: nearestExpiry } }] },
     { currentStock, nearestExpiry },
     { returnDocument: "after" }
   );
   if (session) update.session(session);
-  return update;
+  const changed = await update;
+  if (changed) return changed;
+
+  const unchanged = InventoryItem.findById(itemId);
+  if (session) unchanged.session(session);
+  return unchanged;
 };
 
-const expireLapsedBatches = (itemId = null, session = null) => {
+const expireLapsedBatches = async (itemId = null, session = null) => {
   const filter = {
     status: "active",
     expiryDate: { $ne: null, $lt: startOfDay(new Date()) },
   };
   if (itemId) filter.item = itemId;
 
-  const query = InventoryBatch.updateMany(filter, { status: "expired" });
-  if (session) query.session(session);
-  return query;
+  const lapsedItems = InventoryBatch.distinct("item", filter);
+  if (session) lapsedItems.session(session);
+  const items = await lapsedItems;
+  if (items.length === 0) return;
+
+  const expire = InventoryBatch.updateMany({ ...filter, item: { $in: items } }, { status: "expired" });
+  if (session) expire.session(session);
+  await expire;
+
+  // An expired lot no longer counts, so its item is recounted here. Marking the
+  // lot alone left the list, summary and low-stock alerts counting it.
+  for (const id of items) await recalculateItemStock(id, session);
 };
 
 const getItemOrThrow = async (itemId, { includeInactive = false } = {}) => {

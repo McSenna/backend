@@ -34,8 +34,8 @@ const run = async ({ request }, check) => {
   const doctor = await createUser("doctor");
   const midwife = await createUser("midwife");
   const [residentA, residentB, residentC] = [await createUser("resident"), await createUser("resident"), await createUser("resident")];
-  const w1Key = upcomingDateKey(3);
-  const w2Key = upcomingDateKey(3, 1);
+  const w1Key = upcomingDateKey(4);
+  const w2Key = upcomingDateKey(4, 1);
 
   console.log("\nA new immunization booking stays a normal appointment");
   const aBooked = await request("/appointments", {
@@ -45,7 +45,7 @@ const run = async ({ request }, check) => {
   });
   const aShot = await Appointment.findById(aBooked.body.appointment?._id).lean();
   check(
-    "it is confirmed on the first Wednesday at 08:00 with no reschedule priority",
+    "it is confirmed on the first Thursday at 08:00 with no reschedule priority",
     aShot?.status === "confirmed" && iso(aShot.slotStart) === iso(localAt(w1Key, "08:00")) && aShot.reschedulePriorityAt === null,
     JSON.stringify({ status: aShot?.status, slotStart: aShot?.slotStart })
   );
@@ -66,11 +66,11 @@ const run = async ({ request }, check) => {
     `${moved.status} ${moved.body.message}`
   );
   const onTuesday = await reschedule(residentB, bShot._id, { appointmentDate: upcomingDateKey(2, 1) });
-  check("a Tuesday is still refused", onTuesday.status === 400 && onTuesday.body.message.includes("Wednesdays"));
+  check("a Tuesday is still refused", onTuesday.status === 400 && onTuesday.body.message.includes("Thursdays"));
   check("no second appointment was created", (await Appointment.countDocuments({ resident: residentB.user._id })) === 1);
   check("the patient already at 08:00 keeps that slot", iso((await Appointment.findById(aShot._id).lean()).slotStart) === iso(localAt(w1Key, "08:00")));
   const onW1 = await Appointment.find({ consultationType: "immunization", status: { $in: ["confirmed", "rescheduled"] }, slotStart: { $gte: localAt(w1Key, "00:00"), $lt: localAt(w2Key, "00:00") } }).lean();
-  check("nothing on that Wednesday overlaps", !overlaps(onW1));
+  check("nothing on that Thursday overlaps", !overlaps(onW1));
   check("the existing reschedule notification names the new time", Boolean(await Notification.findOne({ recipient: residentB.user._id, type: "appointment_rescheduled", body: /8:10/ })));
 
   console.log("\nOther services keep the resident's choice of time");
@@ -90,17 +90,17 @@ const run = async ({ request }, check) => {
     prenatalMove.status === 200 && iso(prenatalStored.slotStart) === iso(localAt(w1Key, "14:00")) && prenatalStored.reschedulePriorityAt === null
   );
 
-  console.log("\nA full Wednesday and the Complete gate");
-  const fullKey = upcomingDateKey(3, 2);
+  console.log("\nA full Thursday and the Complete gate");
+  const fullKey = upcomingDateKey(4, 2);
   for (let i = 0; i < 24; i += 1) await placedShot(residentC, new Date(localAt(fullKey, "08:00").getTime() + i * 600000), { childName: `Full Child ${i}` });
   const full = await reschedule(residentB, bShot._id, { appointmentDate: fullKey });
-  check("a Wednesday with no open position is refused", full.status === 409 && full.body.message.includes("choose another Wednesday"), full.body.message);
+  check("a Thursday with no open position is refused", full.status === 409 && full.body.message.includes("choose another Thursday"), full.body.message);
   const early = await request(`/appointments/${bShot._id}/complete`, {
     method: "POST",
     token: midwife.token,
     body: { medicalRecord: { assessment: "Dose given.", serviceDetails: { vaccineName: "Test vaccine", doseNumber: 1 } } },
   });
-  check("priority does not open Complete before the scheduled Wednesday", early.status === 409, `${early.status}`);
+  check("priority does not open Complete before the scheduled Thursday", early.status === 409, `${early.status}`);
 
   console.log("\nStaff see and must follow the same pending order");
   const infant = await createUser("resident", new Date(Date.now() - 200 * DAY_MS).toISOString().slice(0, 10));

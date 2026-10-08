@@ -34,7 +34,7 @@ function thrown(fn) {
   }
 }
 
-// Oct 5–11 2026 runs Monday to Sunday; Oct 7 is the Wednesday.
+// Oct 5–11 2026 runs Monday to Sunday; Oct 8 is the Thursday.
 const WEEK = [
   ["Monday", "2026-10-05"],
   ["Tuesday", "2026-10-06"],
@@ -46,9 +46,9 @@ const WEEK = [
 ];
 const at = (dateKey, time = "09:00") => new Date(`${dateKey}T${time}:00+08:00`);
 
-console.log("\nImmunization runs on Wednesdays only");
+console.log("\nImmunization runs on Thursdays only");
 for (const [name, key] of WEEK) {
-  const expected = name === "Wednesday";
+  const expected = name === "Thursday";
   check(`${name} is ${expected ? "allowed" : "rejected"}`, isServiceDay("immunization", at(key)) === expected);
 }
 
@@ -58,21 +58,21 @@ for (const key of ["bp_checking", "prenatal", "general_checkup", "consultation"]
 }
 
 console.log("\nDay boundaries do not drift through UTC");
-check("a mission saved as Manila midnight (Tue 16:00 UTC) reads as Wednesday", isServiceDay("immunization", "2026-10-06T16:00:00.000Z"));
-check("Wednesday 23:59 Manila is still Wednesday", isServiceDay("immunization", "2026-10-07T15:59:00.000Z"));
-check("Thursday 00:00 Manila is no longer Wednesday", !isServiceDay("immunization", "2026-10-07T16:00:00.000Z"));
-check("a date-only mission input normalizes to that Wednesday", isServiceDay("immunization", normalizeDateInput("2026-10-07")));
+check("a mission saved as Manila midnight (Wed 16:00 UTC) reads as Thursday", isServiceDay("immunization", "2026-10-07T16:00:00.000Z"));
+check("Thursday 23:59 Manila is still Thursday", isServiceDay("immunization", "2026-10-08T15:59:00.000Z"));
+check("Friday 00:00 Manila is no longer Thursday", !isServiceDay("immunization", "2026-10-08T16:00:00.000Z"));
+check("a date-only mission input normalizes to that Thursday", isServiceDay("immunization", normalizeDateInput("2026-10-08")));
 check("an invalid date is never a service day", !isServiceDay("immunization", "not-a-date"));
 
 console.log("\nRejection messages");
-const dayError = thrown(() => assertServiceDay("immunization", at("2026-10-06")));
+const dayError = thrown(() => assertServiceDay("immunization", at("2026-10-07")));
 check(
-  "a Tuesday immunization is a 400 with the resident-facing message",
+  "a Wednesday immunization, the old day, is a 400 with the resident-facing message",
   dayError?.statusCode === 400 &&
-    dayError.message === "Immunization appointments are only available on Wednesdays.",
+    dayError.message === "Immunization appointments are only available on Thursdays.",
   dayError?.message
 );
-check("a Wednesday immunization passes", thrown(() => assertServiceDay("immunization", at("2026-10-07"))) === null);
+check("a Thursday immunization passes", thrown(() => assertServiceDay("immunization", at("2026-10-08"))) === null);
 
 const missionError = thrown(() =>
   assertCategoriesFitDay([{ categoryKey: "prenatal" }, { categoryKey: "immunization" }], at("2026-10-06", "00:00"))
@@ -88,19 +88,19 @@ check(
 );
 
 console.log("\nComplete opens on the scheduled calendar day");
-const immunization = { consultationType: "immunization", slotStart: at("2026-10-07", "09:00") };
-const before = thrown(() => assertCompletionDayReached(immunization, at("2026-10-06", "23:59")));
+const immunization = { consultationType: "immunization", slotStart: at("2026-10-08", "09:00") };
+const before = thrown(() => assertCompletionDayReached(immunization, at("2026-10-07", "23:59")));
 check("the day before is rejected with 409", before?.statusCode === 409, before?.message);
-check("the rejection names the scheduled day", Boolean(before?.message.includes("Wed, Oct 7")), before?.message);
+check("the rejection names the scheduled day", Boolean(before?.message.includes("Thu, Oct 8")), before?.message);
 check(
-  "the scheduled Wednesday opens at midnight, before the slot time",
-  thrown(() => assertCompletionDayReached(immunization, at("2026-10-07", "00:00"))) === null
+  "the scheduled Thursday opens at midnight, before the slot time",
+  thrown(() => assertCompletionDayReached(immunization, at("2026-10-08", "00:00"))) === null
 );
-check("later the same day is allowed", thrown(() => assertCompletionDayReached(immunization, at("2026-10-07", "16:30"))) === null);
-check("a later day keeps the existing behaviour (allowed)", thrown(() => assertCompletionDayReached(immunization, at("2026-10-08"))) === null);
+check("later the same day is allowed", thrown(() => assertCompletionDayReached(immunization, at("2026-10-08", "16:30"))) === null);
+check("a later day keeps the existing behaviour (allowed)", thrown(() => assertCompletionDayReached(immunization, at("2026-10-09"))) === null);
 check(
   "an immunization without a slot cannot be completed",
-  thrown(() => assertCompletionDayReached({ consultationType: "immunization", slotStart: null }, at("2026-10-07")))?.statusCode === 409
+  thrown(() => assertCompletionDayReached({ consultationType: "immunization", slotStart: null }, at("2026-10-08")))?.statusCode === 409
 );
 for (const key of ["bp_checking", "prenatal", "general_checkup", "consultation"]) {
   check(
@@ -131,9 +131,9 @@ const upcoming = (weekday) => {
 
 check("a Tuesday mission that still lists immunization gets no plan", plan("immunization", upcoming(2)) === null);
 // Immunization has its own weekly schedule now, so no mission ever places it.
-check("even a Wednesday mission that lists immunization gets no plan", plan("immunization", upcoming(3)) === null);
+check("even a Thursday mission that lists immunization gets no plan", plan("immunization", upcoming(4)) === null);
 check("prenatal still plans on a Tuesday", plan("prenatal", upcoming(2))?.durationMinutes === 20);
-check("prenatal still plans on a Wednesday mission", plan("prenatal", upcoming(3))?.durationMinutes === 20);
+check("prenatal still plans on a Thursday mission", plan("prenatal", upcoming(4))?.durationMinutes === 20);
 const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
 check(
   "a mission day that has passed gets no plan",

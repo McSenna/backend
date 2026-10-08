@@ -99,8 +99,8 @@ const run = async ({ request }, check) => {
   );
   const shotOptions = (await options(alice, "immunization")).body;
   check(
-    "immunization lists its own Wednesdays, not missions",
-    shotOptions.scheduling === "weekly" && shotOptions.days.length > 0 && shotOptions.days.every((d) => new Date(d.date).getDay() === 3),
+    "immunization lists its own Thursdays, not missions",
+    shotOptions.scheduling === "weekly" && shotOptions.days.length > 0 && shotOptions.days.every((d) => new Date(d.date).getDay() === 4),
     JSON.stringify(shotOptions.days?.map((d) => d.dateKey))
   );
   const unknownOptions = await options(alice, "surgery");
