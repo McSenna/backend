@@ -6,7 +6,6 @@ const { HTTP_STATUS, ERROR_CODES, SAFE_MESSAGES } = require("../utils/errorCodes
 const asyncHandler = require("../utils/asyncHandler");
 const { normalizeError, isProduction } = require("./errors/errorTranslators");
 
-// eslint-disable-next-line no-unused-vars -- Express identifies error middleware by arity.
 const globalErrorHandler = (err, req, res, next) => {
   const { statusCode, code, message, details, unexpected } = normalizeError(err);
 
@@ -26,8 +25,6 @@ const globalErrorHandler = (err, req, res, next) => {
     Object.assign(body, details);
   }
 
-  // If the translated error included a cooldown hint, expose it via
-  // the standard Retry-After header so browsers and clients can react.
   if (details && typeof details.retryAfter === "number") {
     try {
       res.setHeader("Retry-After", String(details.retryAfter));
