@@ -55,13 +55,25 @@ async function masterWritesLeaveAccountsAlone(admin, linked) {
   const created = await request(BASE, {
     method: "POST",
     headers: asAdmin(admin),
-    body: { ...officialRow(), role: "admin", isActive: false, createdBy: String(linked._id), email: "smuggle@test" },
+    body: { ...officialRow(), role: "resident", isActive: false, createdBy: String(linked._id), email: "smuggle@test" },
   });
   check("an admin can add a record", created.status === 201, json(created));
-  check("the role is always resident", created.body.record?.role === "resident");
+  check("an explicit Resident classification is saved", created.body.record?.role === "resident");
   check("status cannot be set on create", created.body.record?.isActive === true);
   check("an ID is generated when none is given", /^MSL-[0-9A-F]{8}$/.test(created.body.record?.masterResidentId ?? ""));
   check("a new record has no account", created.body.record?.linkedAccount === false);
+
+  const duplicate = await request(BASE, {
+    method: "POST", headers: asAdmin(admin),
+    body: officialRow({ firstName: " SEPA ", middleName: null }),
+  });
+  // A missing middle name is meaningfully different from Sample.
+  check("a different optional name remains allowed", duplicate.status === 201, json(duplicate));
+  const repeated = await request(BASE, { method: "POST", headers: asAdmin(admin), body: officialRow() });
+  check("duplicate Add returns safe field errors", repeated.status === 409 && repeated.body.code === "DUPLICATE_RESOURCE" && Boolean(repeated.body.fieldErrors?.address), json(repeated));
+  check("duplicate response contains no resident details or comparison key", !json(repeated).includes("Sepa") && !json(repeated).includes("identityKey"));
+  const corrected = await request(BASE, { method: "POST", headers: asAdmin(admin), body: officialRow({ address: "002 Test Street" }) });
+  check("correcting an address permits resubmission", corrected.status === 201, json(corrected));
 
   const invalid = await request(BASE, {
     method: "POST",
@@ -90,7 +102,7 @@ async function masterWritesLeaveAccountsAlone(admin, linked) {
   const imported = await request(`${BASE}/import`, {
     method: "POST",
     headers: asAdmin(admin),
-    body: { records: [officialRow({ masterResidentId: "IMP-1" }), officialRow({ masterResidentId: "IMP-2", firstName: "Second" })] },
+    body: { records: [officialRow({ masterResidentId: "IMP-1", firstName: "Imported" }), officialRow({ masterResidentId: "IMP-2", firstName: "Second" })] },
   });
   check("an admin can import records", imported.status === 201 && imported.body.imported === 2, json(imported));
 
@@ -98,7 +110,7 @@ async function masterWritesLeaveAccountsAlone(admin, linked) {
   const partial = await request(`${BASE}/import`, {
     method: "POST",
     headers: asAdmin(admin),
-    body: { records: [officialRow({ masterResidentId: "IMP-3" }), officialRow({ masterResidentId: "IMP-1" }), officialRow({ masterResidentId: "IMP-4", sex: "" })] },
+    body: { records: [officialRow({ masterResidentId: "IMP-3", firstName: "Third" }), officialRow({ masterResidentId: "IMP-1", firstName: "Imported" }), officialRow({ masterResidentId: "IMP-4", sex: "" })] },
   });
   check("one bad row stops the whole import", partial.status === 400 && (await MasterResident.countDocuments()) === countBefore, json(partial));
   check("the import names the rows to fix", JSON.stringify(partial.body.rowErrors?.map((row) => row.row)) === "[2,3]");

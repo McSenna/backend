@@ -8,7 +8,8 @@
 // sign-ups.
 
 const mongoose = require("mongoose");
-const { SEX_OPTIONS, CIVIL_STATUS_OPTIONS } = require("../config/residency");
+const { residentIdentityKey, IDENTITY_INDEX } = require("../services/masterList/residentIdentity");
+const { SEX_OPTIONS, CIVIL_STATUS_OPTIONS, MASTER_RESIDENT_ROLES } = require("../config/residency");
 const { looseName, barangayKey } = require("../services/masterList/normalize");
 
 const nameField = (label, { required = false, max = 50 } = {}) => ({
@@ -34,6 +35,7 @@ const MasterResidentSchema = new mongoose.Schema(
       immutable: true,
       match: [/^[A-Za-z0-9-]{3,40}$/, "Master resident ID must be 3 to 40 letters, digits or dashes"],
     },
+    identityKey: { type: String, required: true, select: false },
     firstName: nameField("First name", { required: true }),
     middleName: nameField("Middle name"),
     lastName: nameField("Last name", { required: true }),
@@ -65,13 +67,12 @@ const MasterResidentSchema = new mongoose.Schema(
     },
     barangay: nameField("Barangay", { required: true, max: 100 }),
     address: nameField("Address", { required: true, max: 255 }),
-    // Always "resident": a master record is never a staff account, and it
-    // never sets the role of any user account.
+    // Classification only. This never sets the role of a linked user account.
     role: {
       type: String,
-      enum: { values: ["resident"], message: "Master list records are always residents" },
+      required: [true, "Choose Resident, BHW, or Midwife"],
+      enum: { values: MASTER_RESIDENT_ROLES, message: "Choose Resident, BHW, or Midwife" },
       default: "resident",
-      immutable: true,
     },
     // Residents who moved away or died stay on file but are never matched.
     isActive: { type: Boolean, default: true },
@@ -94,6 +95,8 @@ const MasterResidentSchema = new mongoose.Schema(
   }
 );
 
+MasterResidentSchema.index({ identityKey: 1 }, { unique: true, name: IDENTITY_INDEX });
+
 // Lookups by barangay plus birth date, or barangay plus name. Neither index is
 // unique, so two residents with the same name or birthday are both allowed.
 MasterResidentSchema.index({ "matchKeys.barangay": 1, isActive: 1, dateOfBirth: 1 });
@@ -105,6 +108,9 @@ MasterResidentSchema.index({
 });
 
 MasterResidentSchema.pre("validate", function () {
+  if (this.dateOfBirth instanceof Date && !Number.isNaN(this.dateOfBirth.getTime())) {
+    this.identityKey = residentIdentityKey(this);
+  }
   this.matchKeys = {
     firstName: looseName(this.firstName),
     lastName: looseName(this.lastName),

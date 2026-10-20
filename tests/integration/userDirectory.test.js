@@ -8,6 +8,7 @@ const { MongoMemoryServer } = require("mongodb-memory-server");
 const { createApp } = require("../../app");
 const User = require("../../models/User");
 const ResidentVerification = require("../../models/ResidentVerification");
+const MasterResident = require("../../models/MasterResident");
 
 let mongod;
 let server;
@@ -136,6 +137,14 @@ async function runTests() {
   check("bulk status rejects non-admins", bulkAsDoctor.status === 403, `got ${bulkAsDoctor.status}`);
 
   console.log("\nSummary");
+  const emptyRegistry = await request("/users/summary", { headers: headersFor(admin) });
+  check("empty master list counts as zero", emptyRegistry.body.summary?.masterlist === 0, json(emptyRegistry));
+  await MasterResident.create([true, true, false].map((isActive, index) => ({
+    masterResidentId: `TEST-CARD-${index}`,
+    firstName: `Fixture${index}`, lastName: "Registry",
+    dateOfBirth: new Date("1990-01-01"), sex: "female", civilStatus: "single",
+    barangay: "Maslog", address: "Purok 1, Centro", isActive,
+  })));
   const summary = await request("/users/summary", { headers: headersFor(admin) });
   check("summary loads", summary.status === 200, `got ${summary.status}`);
   const expected = {
@@ -146,10 +155,16 @@ async function runTests() {
     approved: 1,
     deactivated: 2,
     addedThisMonth: 5,
+    masterlist: 3,
     pendingRequests: 1,
     rejectedRequests: 1,
   };
   check("summary counts listed accounts only", JSON.stringify(summary.body.summary) === JSON.stringify(expected), json(summary));
+
+  check("masterlist counts active and inactive records independently of accounts", summary.body.summary?.masterlist === 3, json(summary));
+  await MasterResident.updateMany({}, { $set: { isActive: false } });
+  const afterDeactivation = await request("/users/summary", { headers: headersFor(admin) });
+  check("deactivating records preserves the masterlist total", afterDeactivation.body.summary?.masterlist === 3, json(afterDeactivation));
 
   console.log("\nList");
   const page = await request("/users?page=1&pageSize=2&tab=accounts", { headers: headersFor(admin) });

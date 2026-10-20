@@ -5,14 +5,14 @@
 // only ever become master list records; no account is created or touched.
 
 const MasterResident = require("../../models/MasterResident");
-const { badRequest, conflict } = require("../../utils/AppError");
+const { badRequest, serviceUnavailable } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
 const { buildNewRecord } = require("./masterResidentPayload");
 
-const MAX_IMPORT_ROWS = 500;
+const { duplicateIdError, translateDuplicateError, DUPLICATE_MESSAGE } = require("./residentIdentity");
+const { assertIdentityEnforcement } = require("./residentIdentityReadiness");
 
-const duplicateIdError = () =>
-  conflict("A master list record with this ID already exists.", ERROR_CODES.DUPLICATE_RESOURCE);
+const MAX_IMPORT_ROWS = 500;
 
 const rowErrorsOf = async (docs, built) => {
   const ids = docs.map((doc) => doc.masterResidentId);
@@ -21,6 +21,9 @@ const rowErrorsOf = async (docs, built) => {
       (record) => record.masterResidentId
     )
   );
+  const keys = docs.map((doc) => doc.identityKey);
+  const existingKeys = new Set((await MasterResident.find({ identityKey: { $in: keys } }).select("+identityKey").lean()).map((record) => record.identityKey));
+  const seenKeys = new Set();
   const seen = new Set();
 
   return built.flatMap(({ doc, fieldErrors }, index) => {
@@ -28,6 +31,8 @@ const rowErrorsOf = async (docs, built) => {
     if (existing.has(doc.masterResidentId) || seen.has(doc.masterResidentId)) {
       errors.masterResidentId = "This master resident ID is already on the list";
     }
+    if (existingKeys.has(doc.identityKey) || seenKeys.has(doc.identityKey)) errors.address = DUPLICATE_MESSAGE;
+    seenKeys.add(doc.identityKey);
     seen.add(doc.masterResidentId);
     return Object.keys(errors).length > 0 ? [{ row: index + 1, fieldErrors: errors }] : [];
   });
@@ -57,11 +62,19 @@ const importMasterResidents = async (rows, adminId) => {
     throw error;
   }
 
+  await assertIdentityEnforcement();
+  const session = await MasterResident.startSession();
   try {
-    await MasterResident.insertMany(docs, { ordered: true });
+    await session.withTransaction(async () => {
+      await MasterResident.insertMany(docs, { ordered: true, session });
+    });
   } catch (error) {
-    if (error?.code === 11000) throw duplicateIdError();
-    throw error;
+    if (error?.code === 20 && error?.codeName === "IllegalOperation") {
+      throw serviceUnavailable("Master list import requires database maintenance. Contact the administrator before trying again.");
+    }
+    throw translateDuplicateError(error);
+  } finally {
+    await session.endSession();
   }
   return { imported: docs.length };
 };

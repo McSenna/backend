@@ -19,35 +19,19 @@ const {
   assertNoFieldErrors,
 } = require("./masterResidentPayload");
 
-const STATUS_FILTERS = { active: { isActive: true }, inactive: { isActive: false }, all: {} };
+const { translateDuplicateError } = require("./residentIdentity");
+const { assertIdentityEnforcement } = require("./residentIdentityReadiness");
+const { buildMasterResidentFilter, readMasterResidentSort } = require("./masterResidentQuery");
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-const { duplicateIdError } = require("./masterResidentImport");
-
-const searchFilter = (search) => {
-  const tokens = String(search ?? "").trim().slice(0, 60).split(/\s+/).filter(Boolean).slice(0, 5);
-  if (tokens.length === 0) return {};
-  return {
-    $and: tokens.map((token) => {
-      const pattern = new RegExp(escapeRegex(token), "i");
-      return {
-        $or: ["firstName", "middleName", "lastName", "masterResidentId"].map((field) => ({
-          [field]: pattern,
-        })),
-      };
-    }),
-  };
-};
-
-const listMasterResidents = async ({ search = "", status = "active", page, limit } = {}) => {
+const listMasterResidents = async ({ search = "", status = "active", role = "all", civilStatus = "all", purok = "all", sort = "name_asc", page, limit } = {}) => {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
-  const filter = { ...(STATUS_FILTERS[status] ?? STATUS_FILTERS.active), ...searchFilter(search) };
+  const filter = buildMasterResidentFilter({ search, status, role, civilStatus, purok });
+  const ordering = readMasterResidentSort(sort);
 
   const [records, total, active, inactive] = await Promise.all([
     MasterResident.find(filter)
-      .sort({ lastName: 1, firstName: 1, _id: 1 })
+      .sort(ordering)
       .skip((pageNum - 1) * limitNum)
       .limit(limitNum)
       .lean(),
@@ -70,6 +54,8 @@ const loadRecord = async (id) => {
   }
   const record = await MasterResident.findById(id);
   if (!record) throw notFound("Master list record not found.", ERROR_CODES.NOT_FOUND);
+  // Blank legacy classifications have always meant Resident.
+  if (!record.role) record.role = "resident";
   return record;
 };
 
@@ -78,11 +64,11 @@ const presentOne = async (record) => toRow(record.toObject(), await linkedIdsAmo
 const getMasterResident = async (id) => presentOne(await loadRecord(id));
 
 const saveRecord = async (record) => {
+  await assertIdentityEnforcement();
   try {
     await record.save();
   } catch (error) {
-    if (error?.code === 11000) throw duplicateIdError();
-    throw error;
+    throw translateDuplicateError(error);
   }
 };
 
@@ -93,7 +79,7 @@ const createMasterResident = async (body, adminId) => {
   return presentOne(doc);
 };
 
-// The record ID, role and status are never edited here.
+// The record ID and status are never edited here.
 const updateMasterResident = async (id, body, adminId) => {
   const record = await loadRecord(id);
   const { fields, fieldErrors } = readOfficialFields(body);

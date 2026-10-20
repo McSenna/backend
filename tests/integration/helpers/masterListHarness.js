@@ -8,7 +8,7 @@ const http = require("http");
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
-const { MongoMemoryServer } = require("mongodb-memory-server");
+const { MongoMemoryReplSet } = require("mongodb-memory-server");
 const { createApp } = require("../../../app");
 const User = require("../../../models/User");
 const MasterResident = require("../../../models/MasterResident");
@@ -154,7 +154,7 @@ const MASTER_FIXTURES = [
     sex: "male",
     civilStatus: "married",
     barangay: `Brgy. ${RESIDENCY.barangay}`,
-    address: "Purok 1, Acacia Street",
+    address: `Purok ${masterResidentId === "TEST-B1" ? "1" : "2"}, Acacia Street`,
   })),
   {
     masterResidentId: "TEST-D",
@@ -192,7 +192,7 @@ const MASTER_FIXTURES = [
 
 async function setup() {
   process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret-key-1234567890";
-  mongod = await MongoMemoryServer.create();
+  mongod = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   await mongoose.connect(mongod.getUri());
   await Promise.all([User.init(), MasterResident.init(), ResidentVerification.init()]);
   server = http.createServer(createApp());

@@ -15,4 +15,20 @@ const CIVIL_STATUS_OPTIONS = Object.freeze([
   "separated",
 ]);
 
-module.exports = { RESIDENCY, SEX_OPTIONS, CIVIL_STATUS_OPTIONS };
+const MASTER_RESIDENT_ROLES = Object.freeze(["resident", "bhw", "midwife"]);
+
+const PUROK_OPTIONS = Object.freeze([
+  "Purok 1, Centro",
+  "Purok 2, Pangulo",
+  "Purok 2, Pangulo 2",
+  "Purok 3, Polique",
+  "Purok 4, Gumihan",
+  "Purok 5, East San Jose",
+  "Purok 6, West San Jose",
+  "Purok 7, West Pagbidayan",
+  "Purok 8, East Pagbidayan",
+  "Purok 9, Oraroy",
+  "Purok 10, Macaradat",
+]);
+
+module.exports = { RESIDENCY, SEX_OPTIONS, CIVIL_STATUS_OPTIONS, MASTER_RESIDENT_ROLES, PUROK_OPTIONS };

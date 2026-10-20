@@ -1,12 +1,12 @@
 "use strict";
 
 // Reads the official fields an admin may set on a master list record. Anything
-// else in the request (role, isActive, matchKeys, audit fields, account data)
+// else in the request (isActive, matchKeys, audit fields, account data)
 // is ignored, so a request can never smuggle account or status data in.
 
 const crypto = require("crypto");
 const MasterResident = require("../../models/MasterResident");
-const { RESIDENCY } = require("../../config/residency");
+const { RESIDENCY, MASTER_RESIDENT_ROLES } = require("../../config/residency");
 const { validationFailed } = require("../../utils/AppError");
 const { parseCalendarDate } = require("../../utils/calendarDate");
 
@@ -20,6 +20,7 @@ const OFFICIAL_FIELDS = Object.freeze([
   "civilStatus",
   "barangay",
   "address",
+  "role",
 ]);
 
 const readOfficialFields = (body = {}) => {
@@ -29,6 +30,13 @@ const readOfficialFields = (body = {}) => {
   for (const field of OFFICIAL_FIELDS) {
     if (!(field in body)) continue;
     const value = body[field];
+
+    if (field === "role") {
+      if (typeof value === "string" && MASTER_RESIDENT_ROLES.includes(value.trim())) {
+        fields.role = value.trim();
+      } else fieldErrors.role = "Choose Resident, BHW, or Midwife";
+      continue;
+    }
 
     if (field === "dateOfBirth") {
       const date = parseCalendarDate(value);

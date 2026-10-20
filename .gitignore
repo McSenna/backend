@@ -16,3 +16,6 @@ npm-debug.*
 
 # OS
 .DS_Store
+
+#test 
+test/

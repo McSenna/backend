@@ -16,6 +16,7 @@ const logger = require("./utils/logger");
 const { seedAdmin } = require("./services/seedAdmin");
 const { verifyTransport } = require("./services/mailer");
 const { migrateMedicalRecordSources } = require("./services/medicalRecord/sourceMigration");
+const { initializeResidentIdentity } = require("./services/masterList/residentIdentityStartup");
 const { startRealtime, stopRealtime } = require("./realtime");
 
 const PORT = process.env.PORT || 5000;
@@ -23,6 +24,7 @@ const PORT = process.env.PORT || 5000;
 async function bootstrap() {
   validateEnv();
   await connectDB();
+  await initializeResidentIdentity();
   await migrateMedicalRecordSources();
   await seedAdmin();
   verifyTransport();

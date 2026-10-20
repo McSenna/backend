@@ -40,6 +40,7 @@ const MASTER_WRITERS = new Set([
   "services/masterList/masterResidentAdmin.js",
   "services/masterList/masterResidentImport.js",
   "services/masterList/masterResidentPayload.js",
+  "services/masterList/residentIdentityStartup.js",
 ]);
 const MASTER_READERS = new Set([
   "services/masterList/masterListMatcher.js",
@@ -47,6 +48,7 @@ const MASTER_READERS = new Set([
   "services/masterList/masterListReview.js",
   "services/masterList/medicalIdentityLookup.js",
   "services/masterList/masterResidentRows.js",
+  "services/masterList/residentIdentityReadiness.js",
 ]);
 
 const WRITE_CALL = /\.(create|insertMany|save|updateOne|updateMany|findOneAndUpdate|findByIdAndUpdate|replaceOne|deleteOne|deleteMany|findOneAndDelete|findByIdAndDelete|bulkWrite)\s*\(/;

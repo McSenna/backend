@@ -3,6 +3,7 @@ const { RESIDENCY } = require("../config/residency");
 const { PASSWORD_MAX_LENGTH } = require("../config/passwordPolicy");
 
 const ADMIN_EMAIL = "maslog@admin.gov.ph";
+const ADMIN2_EMAIL = "maslog2@admin.gov.ph";
 const MIDWIFE_EMAIL = "midwife@maslog.gov.ph";
 const DOCTOR_EMAIL = "doctor@maslog.gov.ph";
 const BHW_EMAIL = "bhw@maslog.gov.ph";
@@ -18,6 +19,18 @@ const ADMIN_SEED = {
   role: "admin",
   address: HEALTH_CENTER_ADDRESS,
   gender: "male",
+};
+
+const ADMIN2_SEED = {
+  fullname: "System Administrator II",
+  dateOfBirth: new Date("2006-05-20"),
+  email: ADMIN2_EMAIL,
+  profilePhoto: "",
+  password: process.env.ADMIN2_DEFAULT_PASSWORD || "maslogadmin2@com",
+  verified: true,
+  role: "admin",
+  address: HEALTH_CENTER_ADDRESS,
+  gender: "female",
 };
 
 const MIDWIFE_SEED = {
@@ -56,7 +69,7 @@ const BHW_SEED = {
   gender: "female",
 };
 
-const DEFAULT_ACCOUNTS = [ADMIN_SEED, MIDWIFE_SEED, DOCTOR_SEED, BHW_SEED];
+const DEFAULT_ACCOUNTS = [ADMIN_SEED, ADMIN2_SEED, MIDWIFE_SEED, DOCTOR_SEED, BHW_SEED];
 
 // Former defaults longer than PASSWORD_MAX_LENGTH. The app's password inputs stop at
 // that length, so accounts still on one of these could never sign in again.

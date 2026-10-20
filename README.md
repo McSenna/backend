@@ -48,3 +48,94 @@ Scripts in `tests/live/` **write to the database in `MONGO_URI`**, and the `*.e2
 
 - `.env` and everything in `storage/` are git-ignored. Never commit them. Uploaded IDs are personal data.
 - If a real `.env` was ever committed, rotate `JWT_SECRET`, the MongoDB password, the SMTP password and the admin password.
+
+## Master resident duplicate protection
+
+The official admin resident list compares **all** of first name, middle name,
+last name, suffix, birth date, sex, civil status, barangay, and address. Text is
+trimmed and lowercased for comparison only. Optional absent middle names and
+suffixes equal empty strings. Punctuation, internal whitespace, and leading
+zeros remain significant. Official display values are preserved. This is an
+exact record comparison, not a claim that names identify a person. A changed
+address or civil status is a different combination. Prefer editing an existing
+resident when updating their details.
+
+Uniqueness spans the single registry, including inactive records. Account and
+resident active status do not participate. Existing master resident ID
+uniqueness also remains. Add, edits and imports use the same derived SHA-256
+comparison key and MongoDB unique index. Concurrent conflicts return HTTP 409
+`DUPLICATE_RESOURCE` with safe field errors consumed by the existing web/mobile
+wizard, which preserves input and releases its submission lock on failure.
+
+The backend now runs this repeatable backfill and unique-index preparation
+before accepting HTTP requests. A clean legacy database is upgraded automatically;
+conflicting or incomplete records block startup without changing them. Only
+derived comparison keys are backfilled, never resident details or accounts.
+
+**Before deploying against an existing database:** stop all master-list writers
+(including old application instances), take a backup, then run from `backend/`:
+
+```bash
+node scripts/migrations/masterResidentIdentity.js          # read-only audit
+node scripts/migrations/masterResidentIdentity.js --apply  # backfill and index
+```
+
+The audit prints counts only. Conflicting or incomplete legacy records block
+apply without writing anything. Review those records privately and obtain
+explicit authorization for any correction; this migration never removes or
+merges records. Re-run the audit and apply after resolving blockers. Keep writes
+stopped through successful index creation, then deploy/restart. Apply is
+rerunnable after an interrupted backfill. Runtime saves fail closed when the
+index or legacy backfill is missing. Do not drop the unique index while serving
+writes or bypass the services with raw database updates.
+
+Imports use a MongoDB transaction to retain all-or-nothing behavior even when
+another writer wins a uniqueness race. **A replica set or sharded cluster is
+required for imports** (Atlas supports this); standalone MongoDB cannot execute
+these transactions. Single-record Add does not require a transaction. No live
+database audit or migration is performed by the test suite.
+
+
+## Master List resident roles
+
+`master_residents.role` classifies an official record as `resident`, `bhw`, or
+`midwife` (shown as Resident, BHW, Midwife). Admin create, edit and import routes
+validate the same values; invalid explicit values return a role field error.
+Omitting the field on create defaults to Resident; omitting it on PATCH keeps
+the current role. Reads treat missing, null or empty legacy roles as Resident.
+The field never changes `users.role`, account approval, or login permissions.
+Search accepts the displayed role labels alongside names and record IDs.
+The app offers Role, Civil Status (Single, Married, Widowed, Separated), and
+Purok filters. They combine with search before pagination, reset to page one
+when changed, and are saved separately from account-list filters. Defaults
+include all roles, civil statuses, puroks, and active/inactive records.
+
+The list API accepts `role=all|resident|bhw|midwife`,
+`civilStatus=all|single|married|widowed|separated`, and `purok=all` or an exact
+Purok choice from the resident form. Invalid/repeated values return HTTP 400.
+Purok filtering reads the existing address field; no new database field or
+migration is needed. Unique purok numbers also match legacy addresses beginning
+with that purok, without confusing Purok 1 with Purok 10. The two Purok 2 areas
+require their named area (Pangulo or Pangulo 2); ambiguous legacy addresses stay
+visible under All puroks and are never automatically reassigned.
+
+Existing API clients may still send `status=all|active|inactive` and
+`sort=name_asc|name_desc|newest|oldest`. Omitting status retains the API's active
+record default; the app explicitly requests all. Default ordering is by name;
+newest/oldest use creation date. Every order uses a stable ID tie-breaker.
+Legacy unassigned roles belong to the Resident filter.
+
+Deploy the API before the client so the editor can save the new classifications.
+MongoDB needs no new collection or index. Existing records work immediately via
+the read fallback. An optional, repeatable backfill persists the legacy default:
+
+```bash
+# From backend/, using the intended database's MONGO_URI
+node scripts/migrations/masterResidentRoles.js          # read-only counts
+node scripts/migrations/masterResidentRoles.js --apply  # set unassigned roles to resident
+```
+
+Take the usual database backup before applying. The update matches only missing,
+null or empty roles, preserves assigned BHW/Midwife roles, does not touch account
+records or resident timestamps, and is safe to rerun. No live database was
+migrated by development or the test suite.

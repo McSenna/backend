@@ -1,8 +1,5 @@
 "use strict";
 
-// Date limits on medical record fields: a dose given cannot be in the future,
-// and follow-up style dates cannot fall before the visit they follow.
-
 const { validateMedicalRecordInput } = require("../../utils/medicalRecordValidation");
 
 let passed = 0;

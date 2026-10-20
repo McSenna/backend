@@ -29,7 +29,7 @@ function createApp() {
     app.set("trust proxy", /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
   }
 
-  app.use(cors(buildCorsOptions()));
+  app.use(cors(buildCorsOptions()));  
 
   const bodyLimit = process.env.REQUEST_BODY_LIMIT || "10mb";
   app.use(express.json({ limit: bodyLimit }));

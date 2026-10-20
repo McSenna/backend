@@ -2,6 +2,7 @@
 
 const User = require("../../models/User");
 const ResidentVerification = require("../../models/ResidentVerification");
+const { countMasterResidents } = require("../../services/masterList/masterResidentRows");
 const asyncHandler = require("../../utils/asyncHandler");
 const { HTTP_STATUS } = require("../../utils/errorCodes");
 const { serializeUser } = require("../../services/userDirectory/userPresenter");
@@ -72,7 +73,7 @@ const startOfMonth = (now = new Date()) => new Date(now.getFullYear(), now.getMo
 
 /** GET /users/summary: the numbers on the overview cards and tab badges. */
 exports.getUserSummary = asyncHandler(async (_req, res) => {
-  const [groups, requestCounts] = await Promise.all([
+  const [groups, masterlist, requestCounts] = await Promise.all([
     User.aggregate([
       effectiveStatusStage,
       { $match: { effectiveStatus: { $in: LISTED_STATUSES } } },
@@ -84,6 +85,7 @@ exports.getUserSummary = asyncHandler(async (_req, res) => {
         },
       },
     ]),
+    countMasterResidents(),
     ResidentVerification.aggregate([
       { $match: { verificationStatus: { $in: ["pending", "rejected"] } } },
       { $group: { _id: "$verificationStatus", count: { $sum: 1 } } },
@@ -104,6 +106,7 @@ exports.getUserSummary = asyncHandler(async (_req, res) => {
       approved: sumWhere((id) => STATUS_GROUPS.approved.includes(id.status)),
       deactivated: sumWhere((id) => STATUS_GROUPS.deactivated.includes(id.status)),
       addedThisMonth: sumWhere(() => true, "addedThisMonth"),
+      masterlist,
       pendingRequests: requestCount("pending"),
       rejectedRequests: requestCount("rejected"),
     },
