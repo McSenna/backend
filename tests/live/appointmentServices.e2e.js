@@ -10,7 +10,7 @@ const Appointment = require("../../models/Appointment");
 const SystemLog = require("../../models/SystemLog");
 const MissionSchedule = require("../../models/MissionSchedule");
 
-const BASE = process.env.TEST_BASE_URL || `http://127.0.0.1:${process.env.TEST_PORT || 5000}/api`;
+const BASE = process.env.TEST_BASE_URL || `http://127.0.0.1:${process.env.TEST_PORT || 3000}/api`;
 const TAG = "svc-e2e";
 const PASSWORD = "TestPass123!";
 const emailFor = (key) => `${TAG}.${key}@maslogcare.test`;

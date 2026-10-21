@@ -39,7 +39,8 @@ function buildLimiter({ ipStore, emailStore, code, deviceMessage, accountMessage
         const retryAfter = emailStore.getRetryAfterSeconds(email);
         if (retryAfter > 0) err.details = { retryAfter };
       }
-      logger.warn("Rate limiter: email limit reached", { email, retryAfter: err.details?.retryAfter });
+      // The address stays out of the log: it is personal data, and the code says which limit hit.
+      logger.warn("Rate limiter: email limit reached", { code, retryAfter: err.details?.retryAfter });
       return next(err);
     }
 

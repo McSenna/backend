@@ -1,6 +1,6 @@
 "use strict";
 
-const { CIVIL_STATUS_OPTIONS } = require("../../config/residency");
+const { CIVIL_STATUS_OPTIONS, CIVIL_STATUS_MESSAGE } = require("../../config/residency");
 
 const identityFields = {
   firstName: {
@@ -34,7 +34,7 @@ const identityFields = {
     default: "",
     enum: {
       values: ["", ...CIVIL_STATUS_OPTIONS],
-      message: "Civil status must be single, married, widowed, or separated",
+      message: CIVIL_STATUS_MESSAGE,
     },
   },
   fullname: {

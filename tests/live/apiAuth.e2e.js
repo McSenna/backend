@@ -8,7 +8,7 @@ function request(options, data) {
     const req = http.request(
       {
         hostname: "localhost",
-        port: 5000,
+        port: Number(process.env.TEST_PORT) || 3000,
         headers: { "Content-Type": "application/json" },
         ...options,
       },

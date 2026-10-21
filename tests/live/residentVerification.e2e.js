@@ -5,7 +5,7 @@ require("dotenv").config({ path: require("path").join(__dirname, "..", "..", ".e
 const http = require("http");
 const { URL } = require("url");
 
-const BASE = process.env.TEST_BASE_URL || `http://127.0.0.1:${process.env.PORT || 5000}/api`;
+const BASE = process.env.TEST_BASE_URL || `http://127.0.0.1:${process.env.PORT || 3000}/api`;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "maslog@admin.gov.ph";
 const ADMIN_PASSWORD = process.env.ADMIN_DEFAULT_PASSWORD || "MaslogAdmin@2025";
 

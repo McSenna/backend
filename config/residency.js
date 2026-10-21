@@ -8,12 +8,16 @@ const RESIDENCY = Object.freeze({
 
 const SEX_OPTIONS = Object.freeze(["male", "female"]);
 
+// Stored as lowercase slugs; the app owns the display labels.
 const CIVIL_STATUS_OPTIONS = Object.freeze([
   "single",
+  "single_live_in",
+  "single_solo_parent",
   "married",
   "widowed",
   "separated",
 ]);
+const CIVIL_STATUS_MESSAGE = "Choose a civil status from the list";
 
 const MASTER_RESIDENT_ROLES = Object.freeze(["resident", "bhw", "midwife"]);
 
@@ -31,4 +35,4 @@ const PUROK_OPTIONS = Object.freeze([
   "Purok 10, Macaradat",
 ]);
 
-module.exports = { RESIDENCY, SEX_OPTIONS, CIVIL_STATUS_OPTIONS, MASTER_RESIDENT_ROLES, PUROK_OPTIONS };
+module.exports = { RESIDENCY, SEX_OPTIONS, CIVIL_STATUS_OPTIONS, CIVIL_STATUS_MESSAGE, MASTER_RESIDENT_ROLES, PUROK_OPTIONS };

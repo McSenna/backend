@@ -15,6 +15,7 @@ const {
   isValidSex,
 } = require("./identityValidators");
 const { buildFullName, buildAddressLine, normalizeAddress } = require("./nameAndAddress");
+const { CIVIL_STATUS_MESSAGE } = require("../../config/residency");
 
 const isStructuredRegistration = (data = {}) =>
   Boolean(data.firstName || data.surname || data.address?.barangay);
@@ -57,7 +58,7 @@ const checkPersonalDetails = (data, fail) => {
   else if (!isValidSex(sex)) fail("sex", "Sex must be male or female");
 
   if (!isValidCivilStatus(data.civilStatus)) {
-    fail("civilStatus", "Civil status must be single, married, widowed, or separated");
+    fail("civilStatus", CIVIL_STATUS_MESSAGE);
   }
 };
 

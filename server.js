@@ -16,7 +16,7 @@ const { migrateMedicalRecordSources } = require("./services/medicalRecord/source
 const { initializeResidentIdentity } = require("./services/masterList/residentIdentityStartup");
 const { startRealtime, stopRealtime } = require("./realtime");
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 async function bootstrap() {
   validateEnv();

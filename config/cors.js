@@ -1,29 +1,34 @@
 "use strict";
 
 const { isProduction } = require("./env");
+const { isLocalHostname, normalizeOrigin, parseOrigins } = require("../utils/origins");
 const logger = require("../utils/logger");
 
 function configuredOrigins() {
-  return String(process.env.CLIENT_ORIGINS || "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
+  return parseOrigins(process.env.CLIENT_ORIGINS).valid;
+}
+
+/**
+ * The one origin rule for REST and Socket.IO. Development also accepts local
+ * dev servers, since Expo's web port and the computer's LAN address both move.
+ */
+function isAllowedBrowserOrigin(origin) {
+  const normalized = normalizeOrigin(origin);
+  if (!normalized) return false;
+  if (configuredOrigins().includes(normalized)) return true;
+  return !isProduction() && isLocalHostname(new URL(normalized).hostname);
 }
 
 function buildCorsOptions() {
-  const allowed = configuredOrigins();
-
-  if (!isProduction()) {
-    logger.info("CORS: development mode — all origins allowed");
-    return { origin: true, credentials: true };
-  }
-
-  logger.info("CORS: production mode", { allowedOrigins: allowed.length });
+  logger.info("CORS: allowed browser origins", {
+    listed: configuredOrigins().length,
+    localDevServers: !isProduction(),
+  });
 
   return {
     origin(origin, callback) {
-      if (!origin) return callback(null, true);
-      if (allowed.includes(origin)) return callback(null, true);
+      // Native apps and server-to-server calls send no Origin; CORS does not apply to them.
+      if (!origin || isAllowedBrowserOrigin(origin)) return callback(null, true);
 
       logger.warn("CORS: blocked a cross-origin request", { origin });
       return callback(null, false);
@@ -32,4 +37,4 @@ function buildCorsOptions() {
   };
 }
 
-module.exports = { buildCorsOptions, configuredOrigins };
+module.exports = { buildCorsOptions, isAllowedBrowserOrigin };

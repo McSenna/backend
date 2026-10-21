@@ -9,7 +9,7 @@
 
 const mongoose = require("mongoose");
 const { residentIdentityKey, IDENTITY_INDEX } = require("../services/masterList/residentIdentity");
-const { SEX_OPTIONS, CIVIL_STATUS_OPTIONS, MASTER_RESIDENT_ROLES } = require("../config/residency");
+const { SEX_OPTIONS, CIVIL_STATUS_OPTIONS, CIVIL_STATUS_MESSAGE, MASTER_RESIDENT_ROLES } = require("../config/residency");
 const { looseName, barangayKey } = require("../services/masterList/normalize");
 
 const nameField = (label, { required = false, max = 50 } = {}) => ({
@@ -62,7 +62,7 @@ const MasterResidentSchema = new mongoose.Schema(
       lowercase: true,
       enum: {
         values: CIVIL_STATUS_OPTIONS,
-        message: "Civil status must be single, married, widowed, or separated",
+        message: CIVIL_STATUS_MESSAGE,
       },
     },
     barangay: nameField("Barangay", { required: true, max: 100 }),

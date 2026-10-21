@@ -1,6 +1,7 @@
 "use strict";
 
 const logger = require("../utils/logger");
+const { parseOrigins } = require("../utils/origins");
 
 const REQUIRED = [
   { key: "MONGO_URI", why: "the database connection string" },
@@ -29,10 +30,23 @@ function validateEnv() {
     else logger.warn(message);
   }
 
-  if (isProduction() && !String(process.env.CLIENT_ORIGINS || "").trim()) {
+  const origins = parseOrigins(process.env.CLIENT_ORIGINS);
+  if (origins.invalid.length > 0) {
+    const message = `CLIENT_ORIGINS has entries a browser can never send: ${origins.invalid.join(", ")}. Use full origins like https://maslogcare.com.`;
+    if (isProduction()) problems.push(message);
+    else logger.warn(message);
+  }
+
+  if (isProduction() && origins.valid.length === 0) {
     logger.warn(
       "CLIENT_ORIGINS is not set; browser clients on other origins will be refused by CORS."
     );
+  }
+
+  // Render sets RENDER=true. Behind its proxy every request arrives from the
+  // proxy's address, so without TRUST_PROXY all visitors share one sign-in and OTP limit.
+  if (process.env.RENDER === "true" && !String(process.env.TRUST_PROXY || "").trim()) {
+    logger.warn("TRUST_PROXY is not set; rate limits will count every visitor as the same device.");
   }
 
   if (problems.length > 0) {

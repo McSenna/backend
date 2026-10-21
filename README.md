@@ -7,7 +7,7 @@ The Express 5 + MongoDB (Mongoose) REST API behind the MaslogCare app. It handle
 ```bash
 npm install
 cp .env.example .env   # then fill in MONGO_URI, JWT_SECRET (32+ chars) and email settings
-npm run dev            # nodemon on PORT (default 5000)
+npm run dev            # nodemon on PORT (default 3000)
 ```
 
 On first boot the server validates its configuration, connects to MongoDB and seeds the default admin account (`ADMIN_DEFAULT_PASSWORD`).
@@ -42,7 +42,22 @@ storage/              Uploaded ID documents and attachments (git-ignored, create
 
 ### Live tests
 
-Scripts in `tests/live/` **write to the database in `MONGO_URI`**, and the `*.e2e.js` ones also call a running server (`TEST_BASE_URL`, default `http://127.0.0.1:5000/api`). Run them one at a time with `node tests/live/<file>`, and only against a development database.
+Scripts in `tests/live/` **write to the database in `MONGO_URI`**, and the `*.e2e.js` ones also call a running server (`TEST_BASE_URL`, default `http://127.0.0.1:3000/api`). Run them one at a time with `node tests/live/<file>`, and only against a development database.
+
+## Deploying on Render
+
+Start command `npm start`, health check path `/api/health`. Render sets
+`NODE_ENV=production` itself. Set these in the service's Environment tab:
+
+| Variable | Value |
+| --- | --- |
+| `MONGO_URI`, `JWT_SECRET`, email settings | As in `.env.example`. Secrets live only here |
+| `CLIENT_ORIGINS` | Every address the web app is served from, comma separated, e.g. `https://maslogcare.com`. Full origins only: the server refuses to start on an entry without `https://` |
+| `TRUST_PROXY` | The number of proxies in front of the app, so sign-in and OTP limits see each visitor's address. Until it is set, the server logs a warning and every visitor shares one limit |
+
+REST and Socket.IO accept the same origins. Without `NODE_ENV=production`
+(local development), any localhost or private-network origin is also accepted,
+so Expo's changing web port and Wi-Fi address keep working.
 
 ## Security notes
 
