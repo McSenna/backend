@@ -7,6 +7,7 @@ const { ERROR_CODES, HTTP_STATUS } = require("../../utils/errorCodes");
 const { createSystemLog } = require("../../services/systemLogService");
 const { sendPasswordChangedEmail } = require("../../services/mailer");
 const { validatePasswordStrength } = require("../../services/passwordReset/resetPolicy");
+const logger = require("../../utils/logger");
 
 exports.changePassword = asyncHandler(async (req, res) => {
   const currentPassword = String(req.body?.currentPassword || "");
@@ -63,15 +64,16 @@ exports.changePassword = asyncHandler(async (req, res) => {
     metadata: { email: user.email, changedAt: changedAt.toISOString() },
   });
 
-  try {
-    await sendPasswordChangedEmail({
-      email: user.email,
-      fullname: user.fullname,
-      changedAt,
-    });
-  } catch {
-    // Non-fatal email notification failure
-  }
+  // The password is already saved, so the answer must not wait on SMTP: a
+  // stalled mail server used to hold it past the app's timeout, and the app
+  // then reported a change that had gone through as failed.
+  void sendPasswordChangedEmail({
+    email: user.email,
+    fullname: user.fullname,
+    changedAt,
+  }).catch((error) => {
+    logger.warn("Password-changed notice not sent", { code: error?.code });
+  });
 
   return res.status(HTTP_STATUS.OK).json({
     success: true,

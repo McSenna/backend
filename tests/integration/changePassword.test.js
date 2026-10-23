@@ -1,6 +1,8 @@
 "use strict";
 
 require("dotenv").config({ path: require("path").join(__dirname, "..", "..", ".env") });
+// The password-changed notice goes to a stub, never to the real SMTP account in .env.
+process.env.EMAIL_PROVIDER = "mock";
 const http = require("http");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");

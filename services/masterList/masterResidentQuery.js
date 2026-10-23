@@ -3,6 +3,7 @@
 const { MASTER_RESIDENT_ROLES, CIVIL_STATUS_OPTIONS, PUROK_OPTIONS } = require("../../config/residency");
 const { badRequest } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
+const { birthDateClauses } = require("./birthDateSearch");
 
 const STATUS_FILTERS = { active: { isActive: true }, inactive: { isActive: false }, all: {} };
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -17,6 +18,7 @@ const searchFilter = (search) => {
         $or: [
           ...["firstName", "middleName", "lastName", "masterResidentId", "role"].map((field) => ({ [field]: pattern })),
           ...(pattern.test("resident") ? [{ role: { $in: [null, ""] } }] : []),
+          ...birthDateClauses(token),
         ],
       };
     }),
