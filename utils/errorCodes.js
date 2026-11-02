@@ -46,6 +46,7 @@ const ERROR_CODES = Object.freeze({
   DEVICE_CREDENTIAL_REQUIRED: "DEVICE_CREDENTIAL_REQUIRED",
   PLATFORM_ACCESS_DENIED: "PLATFORM_ACCESS_DENIED",
   RESIDENT_WEB_ACCESS_DENIED: "RESIDENT_WEB_ACCESS_DENIED",
+  RESIDENT_WEB_ACCESS_ADMIN_REQUIRED: "RESIDENT_WEB_ACCESS_ADMIN_REQUIRED",
   PLATFORM_CONTEXT_MISMATCH: "PLATFORM_CONTEXT_MISMATCH",
 
   ROUTE_NOT_FOUND: "ROUTE_NOT_FOUND",
@@ -103,7 +104,9 @@ const SAFE_MESSAGES = Object.freeze({
   [ERROR_CODES.PLATFORM_ACCESS_DENIED]:
     "This account is not authorized to access this platform.",
   [ERROR_CODES.RESIDENT_WEB_ACCESS_DENIED]:
-    "Your resident web access is disabled. Contact the barangay health center to request access.",
+    "Your web access has been disabled. Please contact the administrator.",
+  [ERROR_CODES.RESIDENT_WEB_ACCESS_ADMIN_REQUIRED]:
+    "Only the designated administrator can manage resident web access.",
   [ERROR_CODES.PLATFORM_CONTEXT_MISMATCH]:
     "This session is not valid on this platform. Please log in again.",
   [ERROR_CODES.INVALID_ID]:

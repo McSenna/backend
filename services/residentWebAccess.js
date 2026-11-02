@@ -5,7 +5,9 @@ const {
   resolveUserStatus,
   SIGN_IN_READY_STATUSES,
 } = require("../models/user/userStatus");
+const { ENV_KEY, designatedAdminId, canManageResidentWebAccess } = require("../config/residentWebAccessAdmin");
 const { forbidden, serviceUnavailable } = require("../utils/AppError");
+const logger = require("../utils/logger");
 
 const initializeResidentWebAccess = async () => {
   await Policy.updateOne(
@@ -42,11 +44,13 @@ const accessView = (user, policy) => {
   const override = user.residentWebAccessOverride ?? null;
   const globalEnabled = policy?.enabled === true;
   const state = stateOf({ policy, eligible, override, globalEnabled });
+  const effective = ALLOWED_STATES.includes(state);
   return {
     override,
     globalEnabled,
     eligible,
-    effective: ALLOWED_STATES.includes(state),
+    effective,
+    status: effective ? "on" : "off",
     state,
     reason: STATE_REASONS[state],
     revision: user.webAccessRevision ?? 0,
@@ -60,9 +64,16 @@ const assertResidentWebAccess = async (user) => {
     );
   if (!accessView(user, policy).effective)
     throw forbidden(
-      "Your resident web access is disabled. Contact the barangay health center for help. Managed mobile access is unchanged.",
+      "Your web access has been disabled. Please contact the administrator.",
       "RESIDENT_WEB_ACCESS_DENIED",
     );
+};
+/** Startup check only. A bad config never stops the server: the permission simply stays denied. */
+const reportDesignatedAdmin = async () => {
+  const id = designatedAdminId();
+  const account = id ? await User.findById(id).select("role status verified").lean() : null;
+  if (!id) logger.error(`${ENV_KEY} is missing or invalid; nobody can change resident web access.`);
+  else if (!canManageResidentWebAccess(account)) logger.error(`${ENV_KEY} does not match an active admin account; nobody can change resident web access.`);
 };
 const describeAccountAccess = (user, policy) => {
   const base = require("../config/platformAccess").describePlatformAccess(
@@ -79,6 +90,7 @@ const describeAccountAccess = (user, policy) => {
 };
 module.exports = {
   describeAccountAccess,
+  reportDesignatedAdmin,
   initializeResidentWebAccess,
   readPolicy,
   policyView,

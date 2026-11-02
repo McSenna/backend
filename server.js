@@ -28,6 +28,7 @@ async function bootstrap() {
   await migrateMedicalRecordSources();
   await require("./services/immunization/initialize").initializeImmunization();
   await require("./services/residentWebAccess").initializeResidentWebAccess();
+  await require("./services/residentWebAccess").reportDesignatedAdmin();
   await seedAdmin();
   verifyTransport();
 }

@@ -23,6 +23,7 @@ const run = async () => {
   await h.setup();
   await initializeResidentWebAccess();
   const admin = await account("admin", "admin");
+  process.env.RESIDENT_WEB_ACCESS_ADMIN_ID = String(admin._id);
   const headers = h.asAdmin(admin);
 
   for (const [index, { global, override, status, state }] of CASES.entries()) {

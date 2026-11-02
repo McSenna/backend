@@ -1,5 +1,6 @@
 "use strict";
 
+const { canManageResidentWebAccess } = require("../../config/residentWebAccessAdmin");
 const { describeAccountAccess } = require("../residentWebAccess");
 const { resolveRequestPlatform } = require("../platformService");
 
@@ -21,6 +22,8 @@ const buildUserResponse = (user, policy = null) => ({
   phone: user.phone || "",
   avatarUrl: user.profilePhoto || null,
   platformAccess: describeAccountAccess(user, policy),
+  // Only decides which controls the app shows. The API checks the permission itself on every request.
+  permissions: { manageResidentWebAccess: canManageResidentWebAccess(user) },
 });
 
 const platformOf = (req) => (req.clientPlatform || resolveRequestPlatform(req)).platform;

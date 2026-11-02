@@ -17,6 +17,7 @@ const once = (socket, event) => new Promise((resolve, reject) => { const timer =
 async function run() {
   await h.setup();
   const admin = await account("admin", "admin");
+  process.env.RESIDENT_WEB_ACCESS_ADMIN_ID = String(admin._id);
   const resident = await account("resident", "allowed");
   const other = await account("resident", "denied");
   await User.collection.updateOne({ _id: other._id }, { $unset: { residentWebAccessOverride: "", residentWebAccessEnabled: "", webAccessRevision: "" } });
@@ -63,12 +64,12 @@ async function run() {
   assert.equal((await h.request("/admin/resident-web-access", { method: "PATCH", headers: webHeaders, body: { enabled: false, revision: 1 } })).status, 403);
   const bhw = await account("bhw", "bhw");
   assert.equal((await h.request("/admin/resident-web-access", { headers: h.asAdmin(bhw) })).status, 403);
-  const { token: plainMobile } = require("../../services/sessionService").issueSession(resident, "mobile");
-  assert.equal((await h.request("/profile", { headers: authorization(plainMobile) })).status, 200, "a mobile session needs no device credential");
+  const plainMobile = require("jsonwebtoken").sign({ userId: String(resident._id), role: "resident", platform: "mobile" }, process.env.JWT_SECRET);
+  assert.equal((await h.request("/profile", { headers: authorization(plainMobile) })).status, 403, "unbound mobile sessions require device setup");
   const mobileNoCredential = await login(resident, { clientPlatform: "mobile" });
-  assert.equal(mobileNoCredential.status, 200, JSON.stringify(mobileNoCredential.body));
+  assert.equal(mobileNoCredential.status, 403, JSON.stringify(mobileNoCredential.body));
   const nativeNoCredential = await login(resident, { clientPlatform: "mobile", deviceCredential: null });
-  assert.equal(nativeNoCredential.status, 200, "the app sends null when nothing is saved: " + JSON.stringify(nativeNoCredential.body));
+  assert.equal(nativeNoCredential.status, 403, "a null credential does not establish mobile access");
   assert.equal((await login(resident, { clientPlatform: "mobile", deviceCredential: "not-a-credential" })).body.code, "DEVICE_CREDENTIAL_REQUIRED", "a credential that is sent must be valid");
   const blockedOnWeb = await account("resident", "blockedweb");
   await individual(blockedOnWeb, "block");
@@ -132,7 +133,7 @@ async function run() {
     assert.equal((await h.request(`${devicePath}/${device.id}`, { method: "DELETE", headers })).status, 200);
     assert.equal((await h.request("/profile", { headers: mobileHeaders })).status, 403, "revoking a device ends its sessions");
     assert.equal((await login(resident, { clientPlatform: "mobile", deviceCredential: credential })).status, 403);
-    assert.equal((await login(resident, { clientPlatform: "mobile" })).status, 200, "the resident can still sign in without the credential");
+    assert.equal((await login(resident, { clientPlatform: "mobile" })).status, 403, "revocation cannot be bypassed by omitting the credential");
     assert.equal((await h.request("/profile", { headers: webHeaders })).status, 200);
     for (const status of ["pending", "rejected", "deactivated", "inactive"]) {
       await User.updateOne({ _id: resident._id }, { $set: { status, verified: false } });
@@ -146,8 +147,10 @@ async function run() {
     const recoveries = await Promise.all([global(false, 0), global(true, 0)]);
     assert.deepEqual(recoveries.map((result) => result.status).sort(), [200, 409], "concurrent recovery has one winner");
     state = (await get()).body.policy;
-    const concurrent = await Promise.all([global(false, state.revision), global(true, state.revision)]);
-    assert.deepEqual(concurrent.map((result) => result.status).sort(), [200, 409], "concurrent saves cannot silently overwrite");
+    // Sending the current value writes nothing, so only the real change can land.
+    const concurrent = await Promise.all([global(state.enabled, state.revision), global(!state.enabled, state.revision)]);
+    assert.equal(concurrent.filter((result) => result.body.changed === true).length, 1, "concurrent saves cannot silently overwrite");
+    assert.equal((await get()).body.policy.enabled, !state.enabled);
   } finally { socket.close(); followsGlobal.close(); native.close(); closeRealtime(); await new Promise((resolve) => socketServer.close(resolve)); }
   console.log("Resident web policy, devices, REST and realtime assertions passed");
 }

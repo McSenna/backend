@@ -15,13 +15,13 @@ const deviceView = (device) => ({
   createdAt: device.createdAt,
   revokedAt: device.revokedAt,
 });
-const provisionDevice = async (residentId, adminId) => {
+const provisionDevice = async (residentId, adminId, { session = null } = {}) => {
   const secret = crypto.randomBytes(32).toString("hex");
-  const device = await ManagedDevice.create({
+  const [device] = await ManagedDevice.create([{
     residentId,
     createdBy: adminId,
     credentialHash: hash(secret),
-  });
+  }], { session });
   return { device: deviceView(device), credential: `${device._id}.${secret}` };
 };
 const verifyDeviceCredential = async (residentId, credential) => {

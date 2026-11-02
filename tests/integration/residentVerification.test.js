@@ -4,14 +4,14 @@ const path = require("path");
 const { spawn } = require("child_process");
 
 const BACKEND = path.resolve(__dirname, "..", "..");
-const { MongoMemoryServer } = require("mongodb-memory-server");
+const { MongoMemoryReplSet } = require("mongodb-memory-server");
 const PORT = process.env.TEST_PORT || "5099";
 
 const backendRequire = require("module").createRequire(path.join(BACKEND, "package.json"));
 
 async function main() {
   console.log("Starting in-memory MongoDB…");
-  const mongo = await MongoMemoryServer.create();
+  const mongo = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   const uri = mongo.getUri("maslogcare_test");
   console.log(`  mongod at ${uri}\n`);
 

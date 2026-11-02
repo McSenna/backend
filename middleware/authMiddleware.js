@@ -88,6 +88,7 @@ const authenticateSession = async (req, { skipResidentAccess = false } = {}) => 
 
   req.user = {
     ...payload,
+    _id: String(account._id),
     userId: String(account._id),
     role: account.role,
     status: accountStatus,
@@ -102,8 +103,8 @@ const authenticateSession = async (req, { skipResidentAccess = false } = {}) => 
   };
   if (account.role === "resident" && !skipResidentAccess) {
     if (claimedSessionPlatform === "mobile") {
-      // Only a session bound to a device can be revoked through that device.
-      if (payload.deviceId) await require("../services/managedDevices").assertManagedSession(account._id, payload.deviceId);
+      // A signed platform label alone is not proof of a provisioned mobile session.
+      await require("../services/managedDevices").assertManagedSession(account._id, payload.deviceId);
     } else {
       // Legacy unbound credentials never establish a mobile exemption.
       req.auth.platform = "web";

@@ -1,20 +1,26 @@
 "use strict";
-const Policy = require("../models/ResidentWebPolicy");
 const User = require("../models/User");
 const asyncHandler = require("../utils/asyncHandler");
-const { badRequest, conflict, notFound } = require("../utils/AppError");
+const { badRequest, notFound } = require("../utils/AppError");
 const { isValidObjectId } = require("../utils/objectId");
 const {
   readPolicy,
   policyView,
   accessView,
 } = require("../services/residentWebAccess");
-const { createSystemLog } = require("../services/systemLogService");
+const { changeGlobalAccess, changeResidentAccess } = require("../services/residentWebAccessChange");
 const { resync } = require("../realtime/broadcast");
 const { adminRoom } = require("../realtime/rooms");
 const { disconnectResidentWeb, recheckResidentWeb } = require("../realtime/residentAuthorization");
 
 const validRevision = (revision) => Number.isSafeInteger(revision) && revision >= 0;
+const REASON_MAX_LENGTH = 300;
+const readReason = ({ reason } = {}) => {
+  if (reason === undefined || reason === null) return null;
+  if (typeof reason !== "string" || reason.trim().length > REASON_MAX_LENGTH)
+    throw badRequest(`Keep the reason to ${REASON_MAX_LENGTH} characters of plain text, or leave it empty.`);
+  return reason.trim() || null;
+};
 const validateGlobalChange = (body = {}) => {
   if (typeof body.enabled !== "boolean" || !validRevision(body.revision))
     throw badRequest(
@@ -41,44 +47,14 @@ exports.getGlobal = asyncHandler(async (_req, res) => {
 exports.setGlobal = asyncHandler(async (req, res) => {
   validateGlobalChange(req.body);
   const { enabled, revision } = req.body;
-  let policy = await Policy.findOneAndUpdate(
-    { _id: "resident-web", revision },
-    { $set: { enabled, updatedBy: req.user.userId }, $inc: { revision: 1 } },
-    { returnDocument: "after", runValidators: true },
-  ).lean();
-  if (!policy && revision === 0) {
-    try {
-      policy = await Policy.create({
-        _id: "resident-web",
-        enabled,
-        revision: 1,
-        updatedBy: req.user.userId,
-      });
-    } catch (error) {
-      if (error.code !== 11000) throw error;
-    }
+  const { policy, changed } = await changeGlobalAccess({ req, enabled, revision, reason: readReason(req.body) });
+  if (changed) {
+    // Residents with an allow override keep access, so each web socket is rechecked rather than dropped.
+    if (!enabled) await recheckResidentWeb();
+    resync("user", [adminRoom()]);
   }
-  if (!policy)
-    throw conflict(
-      "This setting changed in another session. Reload it and try again.",
-    );
-  // Residents with an allow override keep access, so each web socket is rechecked rather than dropped.
-  if (!enabled) await recheckResidentWeb();
-  await createSystemLog({
-    req,
-    action: "RESIDENT_WEB_POLICY_CHANGED",
-    description: "Admin changed global resident web access",
-    resource: "ResidentWebPolicy",
-    resourceId: "resident-web",
-    metadata: {
-      enabled,
-      previousRevision: revision,
-      revision: policy.revision,
-    },
-  });
-  resync("user", [adminRoom()]);
   res.set("Cache-Control", "no-store");
-  res.json({ success: true, policy: policyView(policy) });
+  res.json({ success: true, changed, policy: policyView(policy) });
 });
 exports.getIndividual = asyncHandler(async (req, res) => {
   const user = await resident(req.params.id);
@@ -87,45 +63,20 @@ exports.getIndividual = asyncHandler(async (req, res) => {
 });
 exports.setIndividual = asyncHandler(async (req, res) => {
   validateOverrideChange(req.body);
-  await resident(req.params.id);
   const { override, revision } = req.body;
-  const version =
-    revision === 0
-      ? {
-          $or: [
-            { webAccessRevision: 0 },
-            { webAccessRevision: { $exists: false } },
-          ],
-        }
-      : { webAccessRevision: revision };
-  const user = await User.findOneAndUpdate(
-    { _id: req.params.id, role: "resident", ...version },
-    {
-      $set: { residentWebAccessOverride: override },
-      $inc: { webAccessRevision: 1 },
-    },
-    { returnDocument: "after", runValidators: true },
-  ).lean();
-  if (!user)
-    throw conflict(
-      "This resident's setting changed in another session. Reload it and try again.",
-    );
-  const access = accessView(user, await readPolicy());
-  if (!access.effective) disconnectResidentWeb(String(user._id));
-  await createSystemLog({
+  const reason = readReason(req.body);
+  const { user, access, changed } = await changeResidentAccess({
     req,
-    action: "RESIDENT_WEB_ACCESS_CHANGED",
-    description: "Admin changed individual resident web access",
-    resource: "User",
-    resourceId: String(user._id),
-    metadata: {
-      override,
-      previousRevision: revision,
-      revision: user.webAccessRevision,
-    },
+    resident: await resident(req.params.id),
+    override,
+    revision,
+    reason,
   });
+  if (changed) {
+    if (!access.effective) disconnectResidentWeb(String(user._id));
+    resync("user", [adminRoom()]);
+  }
   res.set("Cache-Control", "no-store");
-  resync("user", [adminRoom()]);
-  res.json({ success: true, access });
+  res.json({ success: true, changed, access });
 });
 exports.resident = resident;

@@ -28,7 +28,7 @@ const resolveActor = ({ req, user, role }) => {
   };
 };
 
-const createSystemLog = async ({
+const buildLogData = ({
   req,
   action,
   user,
@@ -46,7 +46,7 @@ const createSystemLog = async ({
   const actor = resolveActor({ req, user, role });
   const isSuccess = Boolean(success);
 
-  const logData = {
+  return {
     action: normalizedAction,
     role: actor.role,
     userId: actor.userId || null,
@@ -61,6 +61,11 @@ const createSystemLog = async ({
     severity: deriveSeverity(normalizedAction, isSuccess),
     metadata: sanitizeMetadata(metadata),
   };
+};
+
+const createSystemLog = async (entry) => {
+  const logData = buildLogData(entry);
+  if (!logData) return null;
 
   try {
     return await SystemLog.create(logData);
@@ -73,8 +78,17 @@ const createSystemLog = async ({
   }
 };
 
+/** For a change that must not happen unaudited: throws on failure, and joins the caller's transaction. */
+const createRequiredSystemLog = async ({ session = null, ...entry }) => {
+  const logData = buildLogData(entry);
+  if (!logData) throw new Error(`Unknown system log action: ${entry.action}`);
+  const [log] = await SystemLog.create([logData], { session });
+  return log;
+};
+
 module.exports = {
   createSystemLog,
+  createRequiredSystemLog,
   resolveLogClientPlatform,
   normalizeRole,
   normalizeAction,

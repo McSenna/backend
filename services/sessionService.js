@@ -4,6 +4,8 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 
 const { normalizePlatform } = require("../config/platformAccess");
+const { credentialError } = require("./managedDevices");
+const { isValidObjectId } = require("../utils/objectId");
 const logger = require("../utils/logger");
 
 const TOKEN_TTL = process.env.JWT_EXPIRES_IN || "7d";
@@ -31,6 +33,9 @@ function issueSession(user, platform, deviceId = null) {
   const normalizedPlatform = normalizePlatform(platform);
   if (!normalizedPlatform) {
     throw new Error(`Cannot issue a session for unknown platform: ${platform}`);
+  }
+  if (user.role === "resident" && normalizedPlatform === "mobile" && !isValidObjectId(deviceId)) {
+    throw credentialError();
   }
 
   const sessionId = crypto.randomUUID();
