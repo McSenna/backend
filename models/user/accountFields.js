@@ -5,6 +5,13 @@ const { VALID_STATUSES } = require("./userStatus");
 const { VERIFICATION_METHODS } = require("../../config/masterList");
 
 const accountFields = {
+  // Null follows the global resident web access setting; allow or block wins over it.
+  residentWebAccessOverride: { type: String, enum: ["allow", "block", null], default: null },
+  // Replaced by residentWebAccessOverride; kept for one release so a rollback still works.
+  residentWebAccessEnabled: { type: Boolean, default: false },
+  webAccessRevision: { type: Number, default: 0 },
+  immunizationRemindersEnabled: { type: Boolean, default: true },
+  immunizationReminderFence: { type: Number, default: 0 },
   verified: {
     type: Boolean,
     default: false,
@@ -50,6 +57,15 @@ const accountFields = {
     default: null,
   },
   rejected_at: {
+    type: Date,
+    default: null,
+  },
+  deactivated_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+  },
+  deactivated_at: {
     type: Date,
     default: null,
   },

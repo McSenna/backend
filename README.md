@@ -154,3 +154,5 @@ Take the usual database backup before applying. The update matches only missing,
 null or empty roles, preserves assigned BHW/Midwife roles, does not touch account
 records or resident timestamps, and is safe to rerun. No live database was
 migrated by development or the test suite.
+
+Infant immunization setup, schedule activation, migrations and the in-app worker are documented in [the deployment guide](../docs/immunization/DEPLOYMENT.md).

@@ -5,6 +5,7 @@ const { resolveUserStatus } = require("../../models/User");
 const logger = require("../../utils/logger");
 const { createSystemLog } = require("../systemLogService");
 const { clearLoginAttempts } = require("../../middleware/rateLimiter");
+const { authorizeResidentLogin } = require("./residentSession");
 const { issueSession } = require("../sessionService");
 const { getPlatformDenial } = require("../platformService");
 const { describePlatformAccess } = require("../../config/platformAccess");
@@ -73,6 +74,20 @@ const recordLastLogin = async (user) => {
   }
 };
 
+// Approved means allowed to sign in but has not yet; this is the Approved to Active step.
+const promoteFirstSignIn = async (user) => {
+  try {
+    const { modifiedCount } = await User.updateOne({ _id: user._id, status: "approved" }, { $set: { status: "active" } });
+    if (modifiedCount === 1) user.status = "active";
+  } catch (error) {
+    logger.warn("Could not mark the account active after first sign-in", {
+      route: "auth.login",
+      errorName: error?.name,
+      errorMessage: error?.message,
+    });
+  }
+};
+
 const authenticate = async ({ req, email, password, platform }) => {
   if (!email || !password) {
     throw badRequest("Email and password are required.", ERROR_CODES.MISSING_FIELDS);
@@ -113,9 +128,11 @@ const authenticate = async ({ req, email, password, platform }) => {
 
   await assertPlatformAllowed({ req, user, platform });
 
-  const { token, sessionId } = issueSession(user, platform);
+  const deviceId = await authorizeResidentLogin(user, platform, req);
+  const { token, sessionId } = issueSession(user, platform, deviceId);
 
   await recordLastLogin(user);
+  await promoteFirstSignIn(user);
   clearLoginAttempts(user.email);
 
   await createSystemLog({

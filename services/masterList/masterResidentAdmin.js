@@ -3,8 +3,8 @@
 // The only code that writes Barangay Master List records. It never reads
 // account fields beyond a "has a linked account" flag and never writes to the
 // users collection, so maintaining the list cannot create, change or remove an
-// account. Records are deactivated, never deleted, so a linked account's
-// reference never dangles.
+// account. Deactivation and soft deletion retain the official document, so
+// linked account and clinical history references never dangle.
 
 const MasterResident = require("../../models/MasterResident");
 const { badRequest, notFound } = require("../../utils/AppError");
@@ -36,8 +36,8 @@ const listMasterResidents = async ({ search = "", status = "active", role = "all
       .limit(limitNum)
       .lean(),
     MasterResident.countDocuments(filter),
-    MasterResident.countDocuments({ isActive: true }),
-    MasterResident.countDocuments({ isActive: false }),
+    MasterResident.countDocuments({ isActive: true, deletedAt: null }),
+    MasterResident.countDocuments({ isActive: false, deletedAt: null }),
   ]);
 
   const linked = await linkedIdsAmong(records);
@@ -53,7 +53,7 @@ const loadRecord = async (id) => {
     throw badRequest("A valid master list record ID is required.", ERROR_CODES.VALIDATION_ERROR);
   }
   const record = await MasterResident.findById(id);
-  if (!record) throw notFound("Master list record not found.", ERROR_CODES.NOT_FOUND);
+  if (!record || record.deletedAt) throw notFound("Master list record not found.", ERROR_CODES.NOT_FOUND);
   // Blank legacy classifications have always meant Resident.
   if (!record.role) record.role = "resident";
   return record;
@@ -109,7 +109,26 @@ const setMasterResidentActive = async (id, active, adminId) => {
   return { record: await presentOne(record), changed };
 };
 
+// Atomic and idempotent: simultaneous confirmations produce one change and audit entry.
+// Never hard-delete a registry identity or cascade into accounts or medical records.
+const deleteMasterResident = async (id, adminId) => {
+  if (!isValidObjectId(id)) {
+    throw badRequest("A valid master list record ID is required.", ERROR_CODES.VALIDATION_ERROR);
+  }
+  const now = new Date();
+  const record = await MasterResident.findOneAndUpdate(
+    { _id: id, deletedAt: null },
+    { $set: { deletedAt: now, deletedBy: adminId, isActive: false, updatedBy: adminId } },
+    { returnDocument: "after" }
+  );
+  if (record) return { masterResidentId: record.masterResidentId, changed: true };
+  const retained = await MasterResident.findById(id).select("masterResidentId deletedAt").lean();
+  if (!retained) throw notFound("Master list record not found.", ERROR_CODES.NOT_FOUND);
+  return { masterResidentId: retained.masterResidentId, changed: false };
+};
+
 module.exports = {
+  deleteMasterResident,
   listMasterResidents,
   getMasterResident,
   createMasterResident,

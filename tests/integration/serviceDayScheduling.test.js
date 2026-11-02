@@ -9,7 +9,7 @@ const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "
 const IMMUNIZATION = { categoryKey: "immunization", durationMinutes: 10 };
 const BP = { categoryKey: "bp_checking", durationMinutes: 5 };
 const PRENATAL = { categoryKey: "prenatal", durationMinutes: 20 };
-const DAY_ERROR = "Immunization appointments are only available on Thursdays.";
+const SYSTEM_ASSIGNED = /assigned automatically|assigned by the system/;
 const OWN_SCHEDULE = /own schedule/;
 
 const run = async ({ request }, check) => {
@@ -42,20 +42,14 @@ const run = async ({ request }, check) => {
 
   console.log("\nResident booking on the weekly schedule");
   const book = (who, body) => request("/appointments", { method: "POST", token: who.token, body });
-  const shotOptions = (await request("/appointments/booking-options?consultationType=immunization", { token: residentA.token })).body;
-  check(
-    "immunization options are Thursdays only, never the old Tuesday mission",
-    shotOptions.days.length > 0 && shotOptions.days.every((d) => new Date(d.date).getDay() === THURSDAY) && !JSON.stringify(shotOptions).includes(String(legacy._id))
-  );
-  const shotBody = { consultationType: "immunization", childName: "Test Child", childDateOfBirth: "2024-05-01" };
-  const onTuesday = await book(residentA, { ...shotBody, appointmentDate: upcomingDateKey(2), requestKey: "service-day-a-tue" });
-  check("booking immunization on a Tuesday is rejected", onTuesday.status === 400 && onTuesday.body.message === DAY_ERROR, onTuesday.body.message);
-  const forced = await book(residentA, { ...shotBody, appointmentDate: firstThursday, missionScheduleId: String(legacy._id), slotStart: legacySlot, requestKey: "service-day-a-shot" });
-  check(
-    "a booking that names the old mission and time still lands on the Thursday schedule",
-    forced.status === 201 && forced.body.appointment.missionSchedule === null && new Date(forced.body.appointment.slotStart).getDay() === THURSDAY,
-    `${forced.status} ${forced.body.message}`
-  );
+  const shotOptions = await request("/appointments/booking-options?consultationType=immunization", { token: residentA.token });
+  check("immunization no longer offers mother-selected dates", shotOptions.status===400 && SYSTEM_ASSIGNED.test(shotOptions.body.message));
+  const shotBody={consultationType:"immunization",childName:"Test Child",childDateOfBirth:"2024-05-01"};
+  for(const appointmentDate of [upcomingDateKey(2),firstThursday]) {
+    const attempted=await book(residentA,{...shotBody,appointmentDate,requestKey:"system-assigned-attempt"});
+    check("direct resident booking cannot choose any immunization day",attempted.status===400 && SYSTEM_ASSIGNED.test(attempted.body.message));
+  }
+  const shot=await Appointment.create({resident:residentA.user._id,consultationType:"immunization",childName:"Fictional legacy child",ageTier:0,prioritySortKey:0,status:"confirmed",slotStart:localAt(firstThursday,"08:00"),slotEnd:localAt(firstThursday,"08:10"),immunizationSlotKey:localAt(firstThursday,"08:00").toISOString()});
 
   const bpOptions = (await request("/appointments/booking-options?consultationType=bp_checking", { token: residentA.token })).body;
   const bpLegacy = bpOptions.schedules.find((s) => s.missionScheduleId === String(legacy._id));
@@ -64,25 +58,20 @@ const run = async ({ request }, check) => {
   check("BP checking still books on that mission", bp.status === 201 && String(bp.body.appointment.missionSchedule?._id) === String(legacy._id));
 
   console.log("\nResident reschedule");
-  const shot = forced.body.appointment;
   const options = await request(`/appointments/${shot._id}/reschedule-options`, { token: residentA.token });
-  check("only Thursdays are offered", options.status === 200 && options.body.days.every((d) => new Date(d.date).getDay() === THURSDAY));
+  check("mother cannot open a date picker", options.status === 400 && SYSTEM_ASSIGNED.test(options.body.message));
   const reschedule = (who, body) => request(`/appointments/${shot._id}/reschedule`, { method: "PATCH", token: who.token, body });
   const toTuesday = await reschedule(residentA, { appointmentDate: upcomingDateKey(2, 1) });
-  check("Thursday to Tuesday is rejected", toTuesday.status === 400 && toTuesday.body.message === DAY_ERROR, toTuesday.body.message);
+  check("Thursday to Tuesday is rejected", toTuesday.status === 400 && SYSTEM_ASSIGNED.test(toTuesday.body.message), toTuesday.body.message);
   const past = await reschedule(residentA, { appointmentDate: upcomingDateKey(THURSDAY, -1) });
   check("a past Thursday is rejected", past.status === 400, `${past.status}`);
   const other = await reschedule(residentB, { appointmentDate: upcomingDateKey(THURSDAY, 1) });
   check("another resident cannot reschedule it", other.status === 403, `${other.status}`);
   check("another resident cannot read its options", (await request(`/appointments/${shot._id}/reschedule-options`, { token: residentB.token })).status === 403);
   const toNext = await reschedule(residentA, { appointmentDate: upcomingDateKey(THURSDAY, 1) });
-  check(
-    "Thursday to the next Thursday is accepted on the same record",
-    toNext.status === 200 && toNext.body.appointment.status === "rescheduled" && String(toNext.body.appointment._id) === String(shot._id) &&
-      (await Appointment.countDocuments({ resident: residentA.user._id })) === 2,
-    `${toNext.status} ${toNext.body.message}`
-  );
-  check("the moved visit keeps the 10-minute length", new Date(toNext.body.appointment.slotEnd) - new Date(toNext.body.appointment.slotStart) === 10 * 60 * 1000);
+  check("mother cannot move even to another Thursday",toNext.status===400 && SYSTEM_ASSIGNED.test(toNext.body.message));
+  const preserved=await Appointment.findById(shot._id).lean();
+  check("the legacy assigned time and duration remain unchanged",preserved.slotStart.toISOString()===localAt(firstThursday,"08:00").toISOString() && preserved.slotEnd-preserved.slotStart===600000);
 
   console.log("\nStaff scheduling paths");
   const legacySlots = await request(`/mission-schedule/${legacy._id}/available-slots?categoryKey=immunization`, { token: midwife.token });

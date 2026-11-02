@@ -25,7 +25,18 @@ const broadcast = (resource, action, payload, rooms) => {
   const targets = uniqueRooms(rooms);
   if (!io || targets.length === 0) return false;
 
-  io.to(targets).emit(eventName(resource, action), action === "resync" ? {} : payload);
+  const name = eventName(resource, action);
+  const body = action === "resync" ? {} : payload;
+  // Each resident delivery performs a fresh database authorization. This also
+  // covers writes committed by another process and avoids a permission cache.
+  io.to(targets).except("role:resident").emit(name, body);
+  for (const socket of io.sockets.sockets.values()) {
+    if (!targets.some((room) => socket.rooms.has(room))) continue;
+    if (socket.data.role !== "resident") continue;
+    socket.data.deliveryQueue = (socket.data.deliveryQueue || Promise.resolve()).then(async () => {
+      if (await require("./residentAuthorization").reauthorizeSocket(socket)) socket.emit(name, body);
+    }).catch(() => socket.disconnect(true));
+  }
   return true;
 };
 

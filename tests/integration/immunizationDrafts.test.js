@@ -1,0 +1,86 @@
+'use strict';
+const assert = require('node:assert/strict');
+const h = require('./helpers/medicalRecordHarness');
+const Dose = require('../../models/ImmunizationDose');
+const MedicalRecord = require('../../models/MedicalRecord');
+const Appointment = require('../../models/Appointment');
+const {todayManila,addDays} = require('../../services/immunization/calendar');
+const Reminder = require('../../models/ImmunizationReminder');
+const User = require('../../models/User');
+const call = (path,user,body) => h.request(`/immunization${path}`, {method:'POST',headers:user.role === 'resident' ? h.asResident(user) : h.as(user),body});
+(async () => {
+  let failed = false;
+  try {
+    await h.setupWithFixtures();
+    await require('../../services/immunization/initialize').initializeImmunization();
+    const midwife = await h.createStaff('midwife');
+    const otherMidwife = await h.createStaff('midwife');
+    const mother = await h.createStaff('resident');
+    const baby = (await call('/babies',midwife,{motherMasterResidentId:'TEST-F',dateOfBirth:'2026-01-01',requestKey:'draft-baby'})).body.baby;
+    const input = {motherMasterResidentId:'TEST-F',babyId:baby._id,doseKey:'bcg-1',expectedRevision:null,facility:'Test clinic',remarks:'Awaiting source card',historical:true};
+    assert.equal((await h.request('/immunization/drafts',{method:'POST',body:input})).status,401);
+    for (const role of ['resident','admin','doctor','bhw']) {
+      const actor = await h.createStaff(role);
+      assert.equal((await call('/drafts',actor,input)).status,403,role);
+    }
+    assert.equal((await call('/drafts',midwife,{...input,motherMasterResidentId:'TEST-A'})).status,404);
+    assert.equal((await call('/drafts',midwife,{...input,doseKey:'unknown-dose'})).status,400);
+    for (const invalid of [{administeredOn:'2026-02-30'},{administeredAt:'25:00'},{administeredOn:'2999-01-01'},{facility:22},{historical:'yes'},{remarks:'x'.repeat(2001)}]) {
+      assert.equal((await call('/drafts',midwife,{...input,...invalid})).status,400);
+    }
+    const reminder = await Reminder.create({babyId:baby._id,recipient:mother._id,visitKey:'test-draft-visit',scheduledOn:'2026-01-01',stage:'0',doseKeys:['bcg-1'],dedupeKey:'test-draft-reminder'});
+    const concurrent = await Promise.all([call('/drafts',midwife,input),call('/drafts',midwife,input)]);
+    assert.deepEqual(concurrent.map(result=>result.status),[200,200],'concurrent draft retry creates one dose');
+    assert.equal(await Dose.countDocuments({babyId:baby._id,doseKey:'bcg-1'}),1);
+    assert.equal((await Reminder.findById(reminder._id).lean()).status,'pending','draft saving cannot cancel clinical reminders');
+    assert.equal((await call('/drafts',midwife,input)).status,200,'identical retry is idempotent');
+    let record = await Dose.findOne({babyId:baby._id,doseKey:'bcg-1'}).lean();
+    assert.equal(record.workflowStatus,'draft');
+    assert.equal(record.state,'pending');
+    assert.equal(record.facility,input.facility);
+    assert.equal(record.historical,true);
+    assert.equal(record.administeredBy,'','draft does not invent clinician');
+    assert.equal(record.administeredOn,'');
+    const summary = await MedicalRecord.findOne({immunizationBabyId:baby._id}).lean();
+    assert.equal(summary.workflowStatus,'draft');
+    assert.equal(summary.immunizationProgress.administered,0);
+    assert.equal((await call('/administrations',midwife,{...input,expectedRevision:record.revision})).status,400,'completion requires date');
+    assert.equal((await call('/administrations',midwife,{...input,expectedRevision:record.revision,administeredOn:'2026-01-01'})).status,400,'historical completion requires clinician');
+    let checklist = (await call('/checklist',midwife,input)).body;
+    assert.equal(checklist.doses.find(dose=>dose.key==='bcg-1').record._id,String(record._id));
+    assert.equal(checklist.doses.find(dose=>dose.key==='hepb-1').record,null);
+    assert.equal((await call('/drafts',otherMidwife,{...input,expectedRevision:record.revision,remarks:'Source checked'})).status,200);
+    assert.equal((await call('/drafts',midwife,{...input,expectedRevision:record.revision,remarks:'Stale edit'})).status,409);
+    record = await Dose.findById(record._id).lean();
+    assert.equal(record.history.length,2);
+    assert.equal(record.history[1].previous.remarks,input.remarks);
+    await User.updateOne({_id:mother._id},{$set:{masterResidentId:'TEST-F',verificationMethod:'admin_review',status:'active',verified:true}});
+    assert.equal((await h.search(midwife)).body.records.find(row=>row._id===String(summary._id)).workflowStatus,'draft');
+    assert.equal((await h.myRecordPage(mother)).body.medicalRecords.find(row=>row._id===String(summary._id)).workflowStatus,'draft');
+    assert.equal((await call('/checklist',mother,input)).body.history[0].remarks,'Source checked');
+    const stranger = await h.createStaff('resident');
+    await User.updateOne({_id:stranger._id},{$set:{masterResidentId:'TEST-A',verificationMethod:'admin_review',status:'active',verified:true}});
+    assert.equal((await call('/checklist',stranger,input)).status,403);
+    const oldDeferral = await Dose.create({babyId:baby._id,doseKey:'hepb-1',scheduleVersion:baby.scheduleVersion,state:'deferred',followUpOn:'2999-01-01',reason:'Prior clinical deferral',recordedBy:midwife._id,history:[{action:'follow_up',reason:'Prior clinical deferral',actor:midwife._id,at:new Date(addDays(todayManila(),-1)+'T00:00:00+08:00')}]});
+    assert.equal((await call('/drafts',midwife,{...input,doseKey:'hepb-1',expectedRevision:oldDeferral.revision})).status,200);
+    const appointment = await Appointment.create({resident:mother._id,consultationType:'immunization',status:'confirmed',slotStart:new Date(todayManila()+'T00:00:00Z'),ageTier:0,prioritySortKey:0});
+    assert.equal((await call('/visits/complete',midwife,{...input,appointmentId:String(appointment._id)})).status,409,'today draft over old deferral cannot complete a clinical visit');
+    assert.equal((await Appointment.findById(appointment._id).lean()).status,'confirmed');
+    assert.equal((await Dose.findById(oldDeferral._id).lean()).followUpOn,'2999-01-01');
+    const complete = {...input,expectedRevision:record.revision,administeredOn:'2026-01-01',administeredBy:'Test clinician'};
+    assert.equal((await call('/administrations',midwife,complete)).status,201);
+    record = await Dose.findById(record._id).lean();
+    assert.equal(record.state,'administered');
+    assert.equal(record.workflowStatus,'completed');
+    assert.equal(record.history.length,3);
+    assert.equal((await call('/drafts',midwife,{...input,expectedRevision:record.revision})).status,409,'completed records cannot become drafts');
+    const currentSummary = await MedicalRecord.findById(summary._id).lean();
+    assert.equal(currentSummary.workflowStatus,'draft','remaining draft keeps summary labeled draft');
+    assert.equal(currentSummary.recordStatus,'in_progress','dose completion is separate from program completion');
+    assert.equal(currentSummary.immunizationProgress.administered,1);
+    await User.updateOne({_id:otherMidwife._id},{$set:{role:'bhw'}});
+    assert.equal((await call('/drafts',otherMidwife,{...input,doseKey:'hepb-1'})).status,403,'current database role overrides token');
+    console.log('Draft authorization, validation, replay, revision, associations, shared views and completion passed');
+  } catch(error) { failed=true; console.error(error); }
+  await h.finish(failed);
+})();

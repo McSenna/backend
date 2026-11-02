@@ -68,22 +68,16 @@ const run = async ({ request }, check) => {
   const reschedule = (who, id) =>
     request(`/appointments/${id}/reschedule`, { method: "PATCH", token: who.token, body: { appointmentDate: w1Key } });
 
-  await book(infant, "Infant Child", "race-test-infant-booking");
+  await placed(infant,localAt(w1Key,"08:00"));
   const [s1, s2, s3] = await Promise.all([r1, r2, r3].map((r, i) => placed(r, localAt(w2Key, `09:${i}0`))));
 
-  console.log("\nTwo residents reschedule onto the same Thursday at once");
-  const race = await withSlowWrites(() => Promise.all([reschedule(r1, s1._id), reschedule(r2, s2._id)]));
-  check("both moves succeed: the server hands out positions, nobody picks one", race.every((r) => r.status === 200), race.map((r) => `${r.status} ${r.body.message}`).join(" | "));
-  const times = race.map((r) => r.body.appointment?.slotStart).sort();
-  check("they get 08:10 and 08:20 (the infant holds 08:00), never the same", times.join() === [iso(localAt(w1Key, "08:10")), iso(localAt(w1Key, "08:20"))].join(), times.join());
-  const [won, lost] = await Appointment.find({ _id: { $in: [s1._id, s2._id] } }).sort({ slotStart: 1 }).lean();
-  check("order is deterministic: the earlier reschedule holds the earlier slot", won.reschedulePriorityAt < lost.reschedulePriorityAt);
-  check("no two visits on that Thursday overlap", !overlaps(await activeOnW1()));
-
-  console.log("\nA new booking races a reschedule");
-  const [booked, moved] = await withSlowWrites(() => Promise.all([book(newcomer, "Newcomer Child", "race-test-newcomer-1"), reschedule(r3, s3._id)]));
-  const afterRace = await activeOnW1();
-  check("both land on different positions", booked.status === 201 && moved.status === 200 && afterRace.length === 5 && !overlaps(afterRace), `${booked.status} ${moved.status} ${afterRace.length}`);
+  const race=await withSlowWrites(()=>Promise.all([reschedule(r1,s1._id),reschedule(r2,s2._id)]));
+  check("concurrent resident date changes are both refused",race.every(result=>result.status===400));
+  const [won,lost]=await Appointment.find({_id:{$in:[s1._id,s2._id]}}).sort({slotStart:1}).lean();
+  check("original assigned appointments retain their times",iso(won.slotStart)===iso(localAt(w2Key,"09:00")) && iso(lost.slotStart)===iso(localAt(w2Key,"09:10")));
+  const [booked,moved]=await withSlowWrites(()=>Promise.all([book(newcomer,"Newcomer Child","race-test-newcomer-1"),reschedule(r3,s3._id)]));
+  const afterRace=await activeOnW1();
+  check("a manual booking racing a manual move cannot bypass automatic assignment",booked.status===400 && moved.status===400 && afterRace.length===1 && !overlaps(afterRace));
 
   console.log("\nA mission edit or delete no longer moves anyone");
   const mission = await request("/mission-schedule", { method: "POST", token: doctor.token, body: { date: w1Key, categories: [{ categoryKey: "prenatal", durationMinutes: 20 }] } });
@@ -107,8 +101,10 @@ const run = async ({ request }, check) => {
   const listed = lists.flatMap((res) => res.body.appointments ?? []).map((a) => String(a._id));
   check("it leaves the active and pending queues", cancel.status === 200 && !listed.includes(firstMoved));
   check("it stays on record as cancelled", (await Appointment.findById(firstMoved).lean())?.status === "cancelled");
-  const options = (await request(`/appointments/${lost._id}/reschedule-options`, { token: ownerOf(lost).token })).body;
-  check("its 08:10 position opens for the next booking or move", options.days.find((d) => d.dateKey === w1Key)?.nextStart === iso(localAt(w1Key, "08:10")));
+  const options=await request(`/appointments/${lost._id}/reschedule-options`,{token:ownerOf(lost).token});
+  check("cancellation does not reopen a mother date picker",options.status===400);
+  check("cancelled legacy visit releases its slot",(await Appointment.findById(firstMoved).lean()).immunizationSlotKey===null);
+
 };
 
 (async () => {

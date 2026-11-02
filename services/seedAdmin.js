@@ -71,8 +71,6 @@ const BHW_SEED = {
 
 const DEFAULT_ACCOUNTS = [ADMIN_SEED, ADMIN2_SEED, MIDWIFE_SEED, DOCTOR_SEED, BHW_SEED];
 
-// Former defaults longer than PASSWORD_MAX_LENGTH. The app's password inputs stop at
-// that length, so accounts still on one of these could never sign in again.
 const LEGACY_DEFAULT_PASSWORDS = {
   midwife: "MaslogMidwife@2025",
   doctor: "MaslogDoctor@2025",

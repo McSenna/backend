@@ -37,41 +37,16 @@ const run = async ({ request }, check) => {
   const w1Key = upcomingDateKey(4);
   const w2Key = upcomingDateKey(4, 1);
 
-  console.log("\nA new immunization booking stays a normal appointment");
-  const aBooked = await request("/appointments", {
-    method: "POST",
-    token: residentA.token,
-    body: { consultationType: "immunization", childName: "Child A", childDateOfBirth: "2025-02-01", appointmentDate: w1Key, requestKey: "priority-test-booking-a" },
-  });
-  const aShot = await Appointment.findById(aBooked.body.appointment?._id).lean();
-  check(
-    "it is confirmed on the first Thursday at 08:00 with no reschedule priority",
-    aShot?.status === "confirmed" && iso(aShot.slotStart) === iso(localAt(w1Key, "08:00")) && aShot.reschedulePriorityAt === null,
-    JSON.stringify({ status: aShot?.status, slotStart: aShot?.slotStart })
-  );
-
-  console.log("\nRescheduling an immunization takes the first open position");
-  const bShot = await placedShot(residentB, localAt(w2Key, "09:00"));
-  const options = (await request(`/appointments/${bShot._id}/reschedule-options`, { token: residentB.token })).body;
-  const w1Option = options.days.find((d) => d.dateKey === w1Key);
-  check("the options tell the app the time is assigned, not chosen", options.assignsEarliestSlot === true && options.scheduling === "weekly");
-  check("08:00 is taken, so 08:10 is shown as the next time", w1Option?.nextStart === iso(localAt(w1Key, "08:10")));
-
-  const reschedule = (who, id, body) => request(`/appointments/${id}/reschedule`, { method: "PATCH", token: who.token, body });
-  const moved = await reschedule(residentB, bShot._id, { appointmentDate: w1Key, slotStart: iso(localAt(w1Key, "09:00")) });
-  const stored = await Appointment.findById(bShot._id).lean();
-  check(
-    "a hand-edited later time is ignored: the same record moves to 08:10, rescheduled with priority",
-    moved.status === 200 && stored.status === "rescheduled" && iso(stored.slotStart) === iso(localAt(w1Key, "08:10")) && stored.reschedulePriorityAt instanceof Date,
-    `${moved.status} ${moved.body.message}`
-  );
-  const onTuesday = await reschedule(residentB, bShot._id, { appointmentDate: upcomingDateKey(2, 1) });
-  check("a Tuesday is still refused", onTuesday.status === 400 && onTuesday.body.message.includes("Thursdays"));
-  check("no second appointment was created", (await Appointment.countDocuments({ resident: residentB.user._id })) === 1);
-  check("the patient already at 08:00 keeps that slot", iso((await Appointment.findById(aShot._id).lean()).slotStart) === iso(localAt(w1Key, "08:00")));
-  const onW1 = await Appointment.find({ consultationType: "immunization", status: { $in: ["confirmed", "rescheduled"] }, slotStart: { $gte: localAt(w1Key, "00:00"), $lt: localAt(w2Key, "00:00") } }).lean();
-  check("nothing on that Thursday overlaps", !overlaps(onW1));
-  check("the existing reschedule notification names the new time", Boolean(await Notification.findOne({ recipient: residentB.user._id, type: "appointment_rescheduled", body: /8:10/ })));
+  const aShot=await placedShot(residentA,localAt(w1Key,"08:00"));
+  const bShot=await placedShot(residentB,localAt(w2Key,"09:00"));
+  const reschedule=(who,id,body)=>request(`/appointments/${id}/reschedule`,{method:"PATCH",token:who.token,body});
+  const options=await request(`/appointments/${bShot._id}/reschedule-options`,{token:residentB.token});
+  check("resident cannot choose a replacement immunization date",options.status===400);
+  const moved=await reschedule(residentB,bShot._id,{appointmentDate:w1Key,slotStart:iso(localAt(w1Key,"09:00"))});
+  const stored=await Appointment.findById(bShot._id).lean();
+  check("resident changes cannot move the assigned visit or create priority",moved.status===400 && stored.status==="confirmed" && iso(stored.slotStart)===iso(localAt(w2Key,"09:00")) && stored.reschedulePriorityAt===null);
+  check("the other patient's original slot is preserved",iso((await Appointment.findById(aShot._id).lean()).slotStart)===iso(localAt(w1Key,"08:00")));
+  check("refused changes send no reschedule notice",await Notification.countDocuments({recipient:residentB.user._id,type:"appointment_rescheduled"})===0);
 
   console.log("\nOther services keep the resident's choice of time");
   const mission = (await request("/mission-schedule", { method: "POST", token: doctor.token, body: { date: w1Key, categories: [PRENATAL] } })).body.missionSchedule;
@@ -94,7 +69,7 @@ const run = async ({ request }, check) => {
   const fullKey = upcomingDateKey(4, 2);
   for (let i = 0; i < 24; i += 1) await placedShot(residentC, new Date(localAt(fullKey, "08:00").getTime() + i * 600000), { childName: `Full Child ${i}` });
   const full = await reschedule(residentB, bShot._id, { appointmentDate: fullKey });
-  check("a Thursday with no open position is refused", full.status === 409 && full.body.message.includes("choose another Thursday"), full.body.message);
+  check("mother cannot choose even a full Thursday", full.status === 400 && full.body.message.includes("assigned by the system"), full.body.message);
   const early = await request(`/appointments/${bShot._id}/complete`, {
     method: "POST",
     token: midwife.token,
@@ -116,7 +91,7 @@ const run = async ({ request }, check) => {
   const skip = await request(`/appointments/${infantRequest._id}/assign`, { method: "PATCH", token: midwife.token, body: { appointmentDate: w1Key } });
   check("placing the infant first is refused, as the tab order says", skip.status === 409 && skip.body.code === "TRIAGE_ORDER_VIOLATION", `${skip.status}`);
   const inOrder = await request(`/appointments/${rescheduledRequest._id}/assign`, { method: "PATCH", token: midwife.token, body: { appointmentDate: w1Key } });
-  check("placing the first in line works and uses the weekly schedule", inOrder.status === 200 && inOrder.body.appointment.missionSchedule === null && inOrder.body.appointment.slotStart === iso(localAt(w1Key, "08:20")), `${inOrder.status} ${inOrder.body.appointment?.slotStart}`);
+  check("placing the first in line works and uses the weekly schedule", inOrder.status === 200 && inOrder.body.appointment.missionSchedule === null && inOrder.body.appointment.slotStart === iso(localAt(w1Key, "08:10")), `${inOrder.status} ${inOrder.body.appointment?.slotStart}`);
 };
 
 (async () => {

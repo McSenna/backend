@@ -21,6 +21,8 @@ const UserSchema = new mongoose.Schema(
 
 UserSchema.index({ role: 1, verified: 1 });
 UserSchema.index({ organizationId: 1 });
+UserSchema.index({ lastLogin: -1, _id: -1 });
+UserSchema.index({ createdAt: -1, _id: -1 });
 // One account per master list record. Partial, so the many accounts without a
 // link never collide.
 UserSchema.index(

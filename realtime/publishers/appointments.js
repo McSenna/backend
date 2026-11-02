@@ -34,7 +34,7 @@ const publish = async (changes) => {
     for (const row of staffRows) {
       broadcast("appointment", actionOf(row._id), withQueueRole(row), serviceOwnerRooms(row.consultationType));
     }
-    for (const row of residentRows) {
+    for (const row of await require('../../services/immunization/appointmentAccess').protectedAppointmentRows(residentRows)) {
       broadcast("myAppointment", actionOf(row._id), toResidentRow(row), [userRoom(idOf(row.resident))]);
     }
   }

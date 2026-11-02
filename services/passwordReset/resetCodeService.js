@@ -21,7 +21,7 @@ const assertCooldownElapsed = (existing) => {
   );
 };
 
-const issueResetCode = async (email, req) => {
+const issueResetCode = async (email, req, { requireDelivery = false } = {}) => {
   const user = await User.findOne({ email })
     .select("_id fullname email role verified status")
     .lean();
@@ -41,7 +41,11 @@ const issueResetCode = async (email, req) => {
   });
 
   try {
-    await sendPasswordResetCodeEmail(user.email, otp, user.fullname);
+    const delivery = await sendPasswordResetCodeEmail(user.email, otp, user.fullname);
+    // With email switched off the sender returns nothing rather than failing. The mock
+    // provider is a local stand-in, where the code goes to the dev console on purpose.
+    const usingDevMock = process.env.EMAIL_PROVIDER === "mock" && process.env.NODE_ENV !== "production";
+    if (requireDelivery && !delivery && !usingDevMock) throw new Error("Email delivery is switched off");
   } catch (error) {
     // No code reached the user, so drop it rather than let it start the resend cooldown.
     await PasswordReset.deleteOne({ email });

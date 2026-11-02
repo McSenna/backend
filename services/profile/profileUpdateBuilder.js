@@ -62,6 +62,17 @@ const resolveFullName = (body, update, current) => {
   return "fullname" in body ? String(body.fullname ?? "").trim() : null;
 };
 
+/** First word, last word, and whatever sits between, leaving a stored suffix out of the surname. */
+const namePartsFromFullName = (fullname, suffix = "") => {
+  const words = fullname.trim().split(/\s+/);
+  if (suffix && words.length > 1 && words[words.length - 1].toLowerCase() === suffix.trim().toLowerCase()) words.pop();
+  return {
+    firstName: words[0],
+    middleName: words.slice(1, -1).join(" "),
+    surname: words.length > 1 ? words[words.length - 1] : "",
+  };
+};
+
 const buildProfileUpdate = (body, current) => {
   const update = {};
 
@@ -118,4 +129,4 @@ const buildProfileUpdate = (body, current) => {
   return update;
 };
 
-module.exports = { EDITABLE_FIELDS, buildProfileUpdate };
+module.exports = { EDITABLE_FIELDS, buildProfileUpdate, namePartsFromFullName };

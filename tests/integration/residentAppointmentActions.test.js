@@ -55,17 +55,8 @@ const run = async ({ request }, check) => {
   ).body.missionSchedule;
   // Immunization books on its own Thursday schedule; BP checking on the mission.
   const shotDay = upcomingDateKey(4);
-  await request("/appointments", {
-    method: "POST",
-    token: residentA.token,
-    body: {
-      consultationType: "immunization",
-      childName: "Test Child",
-      childDateOfBirth: "2025-01-10",
-      appointmentDate: shotDay,
-      requestKey: "actions-test-immunization",
-    },
-  });
+  // Preserve action coverage on a legacy visit; mothers no longer create these.
+  await scheduledVisit(residentA,"immunization",new Date(`${shotDay}T09:00:00+08:00`));
   const { schedules } = (
     await request("/appointments/booking-options?consultationType=bp_checking", { token: residentA.token })
   ).body;
@@ -107,19 +98,22 @@ const run = async ({ request }, check) => {
   const today = await scheduledVisit(residentA, "immunization", new Date(startOfToday().getTime() + 9 * 60 * 60 * 1000));
   const onDay = await complete(today._id, midwife, IMMUNIZATION_RECORD);
   check(
-    "on the scheduled day it completes and files a record",
-    onDay.status === 201 && onDay.body.appointment.status === "completed" && Boolean(onDay.body.medicalRecord?._id),
+    "legacy completion requires the baby checklist even on the scheduled day",
+    onDay.status === 400 && onDay.body.message.includes("immunization checklist"),
     `${onDay.status} ${onDay.body.message}`
   );
 
   const yesterday = await scheduledVisit(residentA, "immunization", new Date(startOfToday().getTime() - DAY_MS + 9 * 60 * 60 * 1000));
   const late = await complete(yesterday._id, midwife, IMMUNIZATION_RECORD);
-  check("after the scheduled day the existing behaviour (allowed) holds", late.status === 201, `${late.status} ${late.body.message}`);
+  check("late visits also require a baby ledger instead of free-text vaccination", late.status === 400, `${late.status} ${late.body.message}`);
 
   const bpEarly = await complete(bp._id, bhw, BP_RECORD);
   check("BP checking still completes ahead of its slot, as before", bpEarly.status === 201, `${bpEarly.status} ${bpEarly.body.message}`);
 
   console.log("\nCompleted appointments are locked");
+  // Ledger completion is covered by infantImmunization.test.js. Seed the
+  // completed lifecycle state here to keep cancellation tests independent.
+  await Appointment.updateOne({_id:today._id},{$set:{status:"completed",completedAt:new Date(),completedBy:midwife.user._id}});
   const cancelDone = await cancel(today._id, residentA);
   check(
     "a completed appointment cannot be cancelled",

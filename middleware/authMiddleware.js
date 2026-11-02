@@ -12,7 +12,7 @@ const { unauthorized } = require("../utils/AppError");
 const { ERROR_CODES } = require("../utils/errorCodes");
 const logger = require("../utils/logger");
 
-const authenticateSession = async (req) => {
+const authenticateSession = async (req, { skipResidentAccess = false } = {}) => {
   const authHeader = req.headers.authorization || "";
 
   if (!authHeader.startsWith("Bearer ")) {
@@ -52,7 +52,7 @@ const authenticateSession = async (req) => {
   }
 
   const account = await User.findById(payload.userId)
-    .select("_id role verified status")
+    .select("_id role verified status residentWebAccessOverride")
     .lean();
 
   if (!account) {
@@ -96,9 +96,20 @@ const authenticateSession = async (req) => {
   req.auth = {
     platform: sessionPlatform,
     sessionId: payload.sessionId || null,
+    deviceId: payload.deviceId || null,
     issuedAt: payload.iat ? new Date(payload.iat * 1000) : null,
     isLegacySession: !claimedSessionPlatform,
   };
+  if (account.role === "resident" && !skipResidentAccess) {
+    if (claimedSessionPlatform === "mobile") {
+      // Only a session bound to a device can be revoked through that device.
+      if (payload.deviceId) await require("../services/managedDevices").assertManagedSession(account._id, payload.deviceId);
+    } else {
+      // Legacy unbound credentials never establish a mobile exemption.
+      req.auth.platform = "web";
+      await require("../services/residentWebAccess").assertResidentWebAccess(account);
+    }
+  }
 };
 
 const auth = asyncHandler(async (req, res, next) => {
@@ -109,3 +120,10 @@ const auth = asyncHandler(async (req, res, next) => {
 module.exports = auth;
 module.exports.authenticateSession = authenticateSession;
 module.exports.enforcePlatformAccess = enforcePlatformAccess;
+
+// Recovery endpoints retain account eligibility/ownership checks while allowing
+// a web-restricted resident to request help or end their session.
+module.exports.accountOnly = asyncHandler(async (req, _res, next) => {
+  await authenticateSession(req, { skipResidentAccess: true });
+  next();
+});

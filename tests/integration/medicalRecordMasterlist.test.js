@@ -65,7 +65,7 @@ async function validation(staff) {
     const response = await encode(staff.bhw, body);
     check(`${label} is refused`, [400, 422].includes(response.status), `${response.status} ${json(response)}`);
   }
-  const unknownService = await encode(staff.admin, bpRecord({ serviceType: "surgery" }));
+  const unknownService = await encode(staff.bhw, bpRecord({ serviceType: "surgery" }));
   check("an unknown service is refused (400)", unknownService.status === 400, json(unknownService));
 }
 

@@ -9,7 +9,10 @@
     "seed:inventory": "node scripts/seedInventory.js",
     "test": "npm run test:unit && npm run test:integration",
     "test:unit": "node scripts/runTests.js tests/unit",
-    "test:integration": "node scripts/runTests.js tests/integration"
+    "test:integration": "node scripts/runTests.js tests/integration",
+    "migrate:immunization": "node scripts/migrations/immunization.js",
+    "reminders:immunization": "node scripts/runImmunizationReminders.js",
+    "migrate:resident-web-access": "node scripts/migrations/residentWebAccess.js"
   },
   "keywords": [],
   "author": "",

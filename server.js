@@ -16,6 +16,9 @@ const { migrateMedicalRecordSources } = require("./services/medicalRecord/source
 const { initializeResidentIdentity } = require("./services/masterList/residentIdentityStartup");
 const { startRealtime, stopRealtime } = require("./realtime");
 
+const { startImmunizationReminderScheduler } = require("./services/immunization/reminderWorker");
+let stopImmunizationReminders = () => {};
+
 const PORT = process.env.PORT || 3000;
 
 async function bootstrap() {
@@ -23,6 +26,8 @@ async function bootstrap() {
   await connectDB();
   await initializeResidentIdentity();
   await migrateMedicalRecordSources();
+  await require("./services/immunization/initialize").initializeImmunization();
+  await require("./services/residentWebAccess").initializeResidentWebAccess();
   await seedAdmin();
   verifyTransport();
 }
@@ -31,6 +36,7 @@ function attachShutdownHandlers(server) {
   const shutdown = (signal) => {
     logger.info(`Received ${signal}; shutting down`);
     // Open sockets would keep server.close() waiting until the timeout below.
+    stopImmunizationReminders();
     void stopRealtime();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 10000).unref();
@@ -67,6 +73,7 @@ async function startServer() {
   // Socket.IO shares this server, so REST and realtime use one port and one TLS setup.
   const server = http.createServer(createApp());
   startRealtime(server);
+  stopImmunizationReminders = startImmunizationReminderScheduler();
   server.listen(PORT, "0.0.0.0", () => {
     logger.info(`Server running on port ${PORT}`);
   });

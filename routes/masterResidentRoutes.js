@@ -7,6 +7,7 @@ const express = require("express");
 const auth = require("../middleware/authMiddleware");
 const roleCheck = require("../middleware/roleMiddleware");
 const {
+  deleteMasterResident,
   listMasterResidents,
   getMasterResident,
   createMasterResident,
@@ -24,5 +25,7 @@ router.post("/admin/master-residents/import", ...adminOnly, importMasterResident
 router.get("/admin/master-residents/:id", ...adminOnly, getMasterResident);
 router.patch("/admin/master-residents/:id", ...adminOnly, updateMasterResident);
 router.patch("/admin/master-residents/:id/status", ...adminOnly, setMasterResidentStatus);
+
+router.delete("/admin/master-residents/:id", ...adminOnly, deleteMasterResident);
 
 module.exports = router;

@@ -97,11 +97,11 @@ const run = async ({ request }, check) => {
     "a mission that does not offer the service is not listed",
     !listed.body.schedules.some((s) => s.missionScheduleId === String(wednesday._id))
   );
-  const shotOptions = (await options(alice, "immunization")).body;
+  const shotOptions = await options(alice, "immunization");
   check(
-    "immunization lists its own Thursdays, not missions",
-    shotOptions.scheduling === "weekly" && shotOptions.days.length > 0 && shotOptions.days.every((d) => new Date(d.date).getDay() === 4),
-    JSON.stringify(shotOptions.days?.map((d) => d.dateKey))
+    "immunization dates cannot be selected through resident booking",
+    shotOptions.status === 400 && /assigned automatically/.test(shotOptions.body.message),
+    JSON.stringify(shotOptions.body)
   );
   const unknownOptions = await options(alice, "surgery");
   check("an unknown service is refused", unknownOptions.status === 400, `${unknownOptions.status}`);

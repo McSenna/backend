@@ -6,11 +6,13 @@ const { takesFirstOpenSlot } = require("../appointment/reschedulePriority");
 const { isWeeklyService } = require("../../config/consultationCategories");
 const { listWeeklyDays } = require("../immunization/weeklySlots");
 const { RESCHEDULABLE_STATUSES, assertOwnership, assertStatusAllows } = require("./shared");
+const {badRequest}=require('../../utils/AppError');
 
 const getRescheduleOptionsForAppointment = async ({ appointmentId, residentId, actorRole }) => {
   const appointment = await loadAppointmentOrFail(appointmentId);
   assertOwnership(appointment, residentId, actorRole, "view");
   assertStatusAllows(appointment, RESCHEDULABLE_STATUSES, "rescheduled");
+  if (appointment.consultationType === 'immunization') throw badRequest('Immunization dates are assigned by the system. Contact the midwife for follow-up.');
 
   // A weekly service (immunization) offers its own days, never mission dates.
   const weekly = isWeeklyService(appointment.consultationType);

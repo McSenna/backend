@@ -62,7 +62,7 @@ const identityFilter = (search) => {
 const searchIdentities = async (search) => {
   const filter = identityFilter(search);
   if (!filter) return [];
-  const records = await MasterResident.find({ ...filter, isActive: true })
+  const records = await MasterResident.find({ ...filter, isActive: true, deletedAt: null })
     .select(IDENTITY_FIELDS)
     .sort({ lastName: 1, firstName: 1, _id: 1 })
     .limit(PICKER_LIMIT)
@@ -93,4 +93,7 @@ const idsMatchingSearch = async (search) => {
   return records.map((record) => record.masterResidentId);
 };
 
-module.exports = { searchIdentities, identitiesByIds, findIdentity, idsMatchingSearch, fullNameOf };
+const registryIdentity = (masterResidentId, session = null) =>
+  MasterResident.findOne({ masterResidentId, isActive: true, deletedAt: null }).select(IDENTITY_FIELDS).session(session).lean();
+
+module.exports = { registryIdentity, searchIdentities, identitiesByIds, findIdentity, idsMatchingSearch, fullNameOf };

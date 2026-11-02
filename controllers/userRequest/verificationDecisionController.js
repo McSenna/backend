@@ -21,7 +21,7 @@ const notifyResident = async (notification) => {
 };
 
 exports.approveUserRequest = asyncHandler(async (req, res) => {
-  const { verification, user, now, linkedMasterResidentId } = await approve({
+  const { verification, user, now, linkedMasterResidentId, previousVerificationStatus } = await approve({
     id: req.params.id,
     adminId: adminIdOf(req),
     masterResidentId: req.body?.masterResidentId,
@@ -43,6 +43,7 @@ exports.approveUserRequest = asyncHandler(async (req, res) => {
       masterListOutcome: verification.masterListCheck?.outcome ?? null,
       linkedMasterResidentId,
       linkChosenByAdmin: typeof req.body?.masterResidentId === "string",
+      previousVerificationStatus,
     },
   });
 

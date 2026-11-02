@@ -26,7 +26,7 @@ const CONSULTATION_CATEGORIES = [
     order: 3,
     description: "Scheduled vaccination and immunization services.",
     durationMinutes: 10,
-    residentBookable: true,
+    residentBookable: false,
     queueRole: "midwife",
     // Date#getDay() numbering: the health center's immunization day is Thursday.
     serviceWeekdays: [4],

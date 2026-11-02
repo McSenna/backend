@@ -129,12 +129,6 @@ async function runTests() {
     const asDoctor = await request(path, { headers: headersFor(doctor) });
     check(`${path} rejects non-admins`, asDoctor.status === 403, `got ${asDoctor.status}`);
   }
-  const bulkAsDoctor = await request("/users/status", {
-    method: "PATCH",
-    headers: headersFor(doctor),
-    body: { ids: [String(resident._id)], action: "deactivate" },
-  });
-  check("bulk status rejects non-admins", bulkAsDoctor.status === 403, `got ${bulkAsDoctor.status}`);
 
   console.log("\nSummary");
   const emptyRegistry = await request("/users/summary", { headers: headersFor(admin) });
@@ -148,18 +142,18 @@ async function runTests() {
   const summary = await request("/users/summary", { headers: headersFor(admin) });
   check("summary loads", summary.status === 200, `got ${summary.status}`);
   const expected = {
-    total: 6,
+    total: 7,
     staff: 4,
-    residents: 2,
-    active: 3,
+    residents: 3,
+    active: 4,
     approved: 1,
+    requests: 1,
+    rejected: 0,
     deactivated: 2,
-    addedThisMonth: 5,
+    activePercent: 57,
     masterlist: 3,
-    pendingRequests: 1,
-    rejectedRequests: 1,
   };
-  check("summary counts listed accounts only", JSON.stringify(summary.body.summary) === JSON.stringify(expected), json(summary));
+  check("summary counts every account", JSON.stringify(summary.body.summary) === JSON.stringify(expected), json(summary));
 
   check("masterlist counts active and inactive records independently of accounts", summary.body.summary?.masterlist === 3, json(summary));
   await MasterResident.updateMany({}, { $set: { isActive: false } });
@@ -167,63 +161,31 @@ async function runTests() {
   check("deactivating records preserves the masterlist total", afterDeactivation.body.summary?.masterlist === 3, json(afterDeactivation));
 
   console.log("\nList");
-  const page = await request("/users?page=1&pageSize=2&tab=accounts", { headers: headersFor(admin) });
-  check("pages all accounts", page.body.users.length === 2 && page.body.pagination.total === 6, json(page));
+  const page = await request("/users?page=1&per_page=2&segment=all", { headers: headersFor(admin) });
+  check("pages all accounts", page.body.users.length === 2 && page.body.pagination.total === 7, json(page));
   check("never returns password hashes", page.body.users.every((user) => !("password" in user)), json(page));
   check("sorts by last login, newest first", page.body.users[0].email === resident.email, page.body.users[0].email);
 
-  const active = await request("/users?page=1&tab=active", { headers: headersFor(admin) });
+  const active = await request("/users?page=1&segment=active", { headers: headersFor(admin) });
   const activeEmails = active.body.users.map((user) => user.email);
-  check("active tab holds active and approved accounts", active.body.pagination.total === 4, json(active));
-  check("active tab includes legacy verified staff", activeEmails.includes("legacy.bhw@maslogcare.test"));
-  check("active tab excludes pending applicants", !activeEmails.includes(applicant.email));
+  check("active segment holds active and approved accounts", active.body.pagination.total === 4, json(active));
+  check("active segment includes legacy verified staff", activeEmails.includes("legacy.bhw@maslogcare.test"));
+  check("active segment excludes pending applicants", !activeEmails.includes(applicant.email));
 
-  const filtered = await request("/users?page=1&tab=active&status=approved&role=resident", { headers: headersFor(admin) });
+  const filtered = await request("/users?page=1&segment=active&status=approved&role=resident", { headers: headersFor(admin) });
   check("status and role filters combine", filtered.body.pagination.total === 1, json(filtered));
 
-  const searched = await request("/users?page=1&tab=accounts&query=sitio%20test", { headers: headersFor(admin) });
+  const searched = await request("/users?page=1&segment=all&search=sitio%20test", { headers: headersFor(admin) });
   check("search matches location", searched.body.pagination.total === 1, json(searched));
-  const regexInput = await request("/users?page=1&query=.*", { headers: headersFor(admin) });
+  const regexInput = await request("/users?page=1&search=.*", { headers: headersFor(admin) });
   check("search treats input as plain text", regexInput.body.pagination.total === 0, json(regexInput));
 
   const byName = await request("/users?page=1&sort=name_asc", { headers: headersFor(admin) });
   check("sorts by name", byName.body.users[byName.body.users.length - 1].email === resident.email);
 
-  const legacy = await request("/users", { headers: headersFor(admin) });
-  check("keeps the unpaged response without page", legacy.body.count === 7 && !legacy.body.pagination, json(legacy));
+  const unpaged = await request("/users", { headers: headersFor(admin) });
+  check("always pages", unpaged.body.pagination?.perPage === 20 && !("count" in unpaged.body), json(unpaged));
 
-  console.log("\nBulk status");
-  const bad = await request("/users/status", { method: "PATCH", headers: headersFor(admin), body: { ids: [], action: "deactivate" } });
-  check("rejects an empty id list", bad.status === 400, `got ${bad.status}`);
-  const badAction = await request("/users/status", { method: "PATCH", headers: headersFor(admin), body: { ids: [String(doctor._id)], action: "delete" } });
-  check("rejects unknown actions", badAction.status === 400, `got ${badAction.status}`);
-
-  const deactivated = await request("/users/status", {
-    method: "PATCH",
-    headers: headersFor(admin),
-    body: { ids: [String(doctor._id), String(resident._id), String(admin._id), String(midwife._id)], action: "deactivate" },
-  });
-  check("deactivates eligible accounts", deactivated.status === 200 && deactivated.body.updatedIds.length === 2, json(deactivated));
-  check("skips own account and already deactivated ones", deactivated.body.skippedIds.length === 2, json(deactivated));
-  const [doctorAfter, residentAfter, adminAfter] = await Promise.all(
-    [doctor, resident, admin].map((user) => User.findById(user._id).lean())
-  );
-  check("staff become inactive", doctorAfter.status === "inactive", doctorAfter.status);
-  check("residents become deactivated", residentAfter.status === "deactivated", residentAfter.status);
-  check("the admin stays active", adminAfter.status === "active", adminAfter.status);
-
-  const reactivated = await request("/users/status", {
-    method: "PATCH",
-    headers: headersFor(admin),
-    body: { ids: [String(doctor._id), String(resident._id), String(applicant._id)], action: "reactivate" },
-  });
-  check("reactivates deactivated accounts only", reactivated.body.updatedIds.length === 2, json(reactivated));
-  const [doctorBack, residentBack, applicantAfter] = await Promise.all(
-    [doctor, resident, applicant].map((user) => User.findById(user._id).lean())
-  );
-  check("staff return to active", doctorBack.status === "active", doctorBack.status);
-  check("residents return to approved", residentBack.status === "approved", residentBack.status);
-  check("pending applicants are untouched", applicantAfter.status === "pending", applicantAfter.status);
 }
 
 (async () => {

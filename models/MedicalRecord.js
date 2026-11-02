@@ -63,6 +63,17 @@ const MedicalRecordSchema = new mongoose.Schema(
     },
 
     serviceType: { type: String, required: true, index: true },
+    // One ongoing program summary per baby; appointment/legacy records omit it.
+    immunizationBabyId: { type: mongoose.Schema.Types.ObjectId, ref: "Baby" },
+    deletedImmunizationBabyId: { type: mongoose.Schema.Types.ObjectId, ref: "Baby" },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    deletedByRole: { type: String, enum: STAFF_ROLES },
+    deletionReason: { type: String, trim: true, maxlength: 500 },
+    immunizationScheduleVersion: String,
+    workflowStatus: { type: String, enum: ["draft", "completed"] },
+    recordStatus: { type: String, enum: ["in_progress", "completed"] },
+    immunizationProgress: {type:new mongoose.Schema({administered:Number,total:Number},{_id:false}),default:undefined},
 
     // Paper records often carry only readings, so only appointments require it.
     assessment: { type: String, required: fromAppointment, default: "", trim: true, maxlength: 4000 },
@@ -92,6 +103,19 @@ const MedicalRecordSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Archived clinical documents remain available only through an explicit audit
+// query. Apply the same visibility rule to details, lists, counts and aggregates.
+MedicalRecordSchema.query.withDeleted = function () {
+  this._withDeleted = true;
+  return this;
+};
+MedicalRecordSchema.pre(/^find|^countDocuments$/, function () {
+  if (!this._withDeleted) this.where({ deletedAt: null });
+});
+MedicalRecordSchema.pre("aggregate", function () {
+  this.pipeline().unshift({ $match: { deletedAt: null } });
+});
+
 // One record per appointment. Partial, so encoded records (no appointment) never
 // collide on a missing key. scripts/migrations/medicalRecordSource.js swaps the
 // old non-partial index for this one.
@@ -110,6 +134,7 @@ MedicalRecordSchema.index(
   { unique: true, partialFilterExpression: { requestKey: { $type: "string" } } }
 );
 
+MedicalRecordSchema.index({immunizationBabyId:1},{unique:true,partialFilterExpression:{immunizationBabyId:{$type:"objectId"}}});
 MedicalRecordSchema.index({ masterResidentId: 1, completedAt: -1 });
 
 MedicalRecordSchema.index({ source: 1, completedAt: -1 });

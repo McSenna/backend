@@ -14,6 +14,7 @@ const {
 exports.getMyMedicalRecords = asyncHandler(async (req, res) => {
   const records = await MedicalRecord.find(await residentRecordFilter(req.user.userId))
     .sort({ completedAt: -1 })
+    .populate("immunizationBabyId", "name dateOfBirth")
     .populate("provider", "fullname role")
     .populate({
       path: "appointment",

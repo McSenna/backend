@@ -34,6 +34,7 @@ function buildCorsOptions() {
       return callback(null, false);
     },
     credentials: true,
+    exposedHeaders: ["X-Export-Truncated"],
   };
 }
 

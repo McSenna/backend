@@ -5,7 +5,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const { assertValidObjectId } = require("../utils/objectId");
 const { notFound } = require("../utils/AppError");
 const { ERROR_CODES, HTTP_STATUS } = require("../utils/errorCodes");
-const { mapToNotificationItem } = require("../services/notification/notificationPresenter");
+const { presentProtectedNotifications } = require("../services/notification/notificationPresenter");
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
@@ -16,10 +16,6 @@ function parseLimit(raw) {
   return Math.min(parsed, MAX_LIMIT);
 }
 
-/**
- * Cursors are "<createdAt ISO>_<id>" so that notifications sharing the same
- * millisecond (fan-out writes) are never skipped or served twice.
- */
 function buildCursorFilter(raw) {
   if (typeof raw !== "string" || !raw.includes("_")) return null;
 
@@ -70,7 +66,7 @@ exports.getNotifications = asyncHandler(async (req, res) => {
     unreadCount,
     hasMore,
     nextCursor: hasMore && last ? encodeCursor(last) : null,
-    notifications: page.map(mapToNotificationItem),
+    notifications: await presentProtectedNotifications(page, recipientId),
   });
 });
 

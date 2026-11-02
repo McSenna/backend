@@ -28,8 +28,6 @@ const assertTicketId = (ticketId) => {
   if (!isValidObjectId(ticketId)) throw ticketNotFound();
 };
 
-// ─── Requester endpoints ──────────────────────────────────────────────────────
-
 exports.getSupportOptions = (_req, res) => {
   res.status(200).json({ success: true, contact: SUPPORT_CONTACT });
 };
@@ -58,8 +56,6 @@ exports.replyToMySupportTicket = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, message });
 });
 
-// ─── Admin endpoints ──────────────────────────────────────────────────────────
-
 exports.getAdminSupportTickets = asyncHandler(async (req, res) => {
   const { status, category, search, sort } = req.query;
   const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
@@ -82,7 +78,6 @@ exports.getAdminSupportTickets = asyncHandler(async (req, res) => {
     ];
   }
 
-  // Counts ignore the status filter so every status tab keeps showing its total.
   const { status: _status, ...countFilter } = filter;
 
   const [tickets, total, statusCounts] = await Promise.all([

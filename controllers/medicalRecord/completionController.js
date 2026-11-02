@@ -3,7 +3,7 @@
 const Appointment = require("../../models/Appointment");
 const asyncHandler = require("../../utils/asyncHandler");
 const { assertValidObjectId } = require("../../utils/objectId");
-const { notFound, forbidden } = require("../../utils/AppError");
+const { notFound, forbidden, badRequest } = require("../../utils/AppError");
 const { ERROR_CODES, HTTP_STATUS } = require("../../utils/errorCodes");
 const { createSystemLog } = require("../../services/systemLogService");
 const { evaluateStockAlerts } = require("../../services/inventoryService");
@@ -36,12 +36,16 @@ exports.completeAppointment = asyncHandler(async (req, res) => {
 
   assertMayComplete(req.user, existing.consultationType);
 
+
   if (existing.status === "completed") {
     return alreadyCompletedResponse(res, existing._id, existing);
   }
 
   assertCompletable(existing.status);
   assertCompletionDayReached(existing);
+  if (existing.consultationType === "immunization" && existing.status !== "completed") {
+    throw badRequest("Record administered doses under the mother and baby in the immunization checklist. Appointment age or completion does not administer a vaccine.");
+  }
 
   const { validation, dispense } = validateSubmission(existing.consultationType, req.body);
 

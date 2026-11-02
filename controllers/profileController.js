@@ -21,7 +21,7 @@ exports.getMyProfile = asyncHandler(async (req, res) => {
 
   return res.status(HTTP_STATUS.OK).json({
     success: true,
-    user: buildUserResponse(user),
+    user: buildUserResponse(user, user.role === "resident" ? await require("../services/residentWebAccess").readPolicy() : null),
   });
 });
 
@@ -61,6 +61,6 @@ exports.updateMyProfile = asyncHandler(async (req, res) => {
   return res.status(HTTP_STATUS.OK).json({
     success: true,
     message: "Profile updated successfully.",
-    user: buildUserResponse(user),
+    user: buildUserResponse(user, user.role === "resident" ? await require("../services/residentWebAccess").readPolicy() : null),
   });
 });

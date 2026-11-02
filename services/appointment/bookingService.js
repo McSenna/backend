@@ -94,7 +94,7 @@ const residentAppointmentQuery = (filter) =>
     .populate("completedBy", "fullname role")
     .populate("medicalRecord");
 
-const listResidentAppointments = (residentId) =>
-  residentAppointmentQuery({ resident: residentId }).sort({ createdAt: -1 }).lean();
+const listResidentAppointments = async (residentId) =>
+  require('../immunization/appointmentAccess').protectedAppointmentRows(await residentAppointmentQuery({ resident: residentId }).sort({ createdAt: -1 }).lean());
 
 module.exports = { bookAppointment, listBookingOptions, listResidentAppointments, residentAppointmentQuery };

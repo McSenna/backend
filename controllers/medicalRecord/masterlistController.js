@@ -98,3 +98,12 @@ exports.updateRecord = asyncHandler(async (req, res) => {
     detail,
   });
 });
+
+exports.deleteRecord = asyncHandler(async (req,res) => {
+  const {deleteMedicalRecord} = require('../../services/medicalRecord/deletionService');
+  const result = await deleteMedicalRecord(req.user,req.body ?? {});
+  if (result.deleted) {
+    await logRecordAction(req,'MEDICAL_RECORD_DELETED','Medical record removed from active views',result.recordId);
+  }
+  return res.status(HTTP_STATUS.OK).json({success:true,...result});
+});

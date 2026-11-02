@@ -71,7 +71,7 @@ async function noMatch() {
 async function ambiguousMatch(staff) {
   console.log("\nTwo possible people: nothing attaches until an admin chooses");
   for (const id of ["TEST-B1", "TEST-B2"]) {
-    const saved = await encode(staff.admin, bpRecord({ masterResidentId: id }));
+    const saved = await encode(staff.bhw, bpRecord({ masterResidentId: id }));
     check(`a record for ${id} is saved`, saved.status === 201, json(saved));
   }
   const signUp = await register({ firstName: "Duo", surname: "Twin", dateOfBirth: "1985-01-01", sex: "male" });
@@ -149,7 +149,7 @@ async function unlinkAndRelink(staff, resident) {
   let crashed = false;
   try {
     await h.setupWithFixtures();
-    const staff = { admin: await h.createStaff("admin"), doctor: await h.createStaff("doctor") };
+    const staff = { admin: await h.createStaff("admin"), doctor: await h.createStaff("doctor"), bhw: await h.createStaff("bhw") };
     const residentA = await exactMatch(staff);
     await noMatch();
     const residentB = await ambiguousMatch(staff);

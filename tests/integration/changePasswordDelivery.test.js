@@ -1,3 +1,4 @@
+const { provisionTestDevice, managedLoginBody } = require("./helpers/managedDeviceFixtures");
 "use strict";
 
 // The answer to a password change must reflect the database write, not the
@@ -108,7 +109,7 @@ async function createAccount(password) {
     approved_at: new Date(),
   });
   const token = jwt.sign(
-    { userId: String(user._id), role: user.role, platform: "mobile" },
+    { userId: String(user._id), role: user.role, platform: "mobile", deviceId: await provisionTestDevice(user) },
     process.env.JWT_SECRET,
     { expiresIn: "1h" }
   );
@@ -117,8 +118,8 @@ async function createAccount(password) {
 
 const changePassword = (headers, body) => request("/change-password", { method: "POST", headers, body });
 
-const login = (email, password) =>
-  request("/login", { method: "POST", headers: { "X-Client-Platform": "mobile" }, body: { email, password } });
+const login = async (email, password) =>
+  request("/login", { method: "POST", headers: { "X-Client-Platform": "mobile" }, body: await managedLoginBody({ email, password }) });
 
 async function passwordState(userId, oldPassword, newPassword) {
   const stored = await User.findById(userId).select("+password");

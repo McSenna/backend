@@ -1,10 +1,5 @@
 "use strict";
 
-// Reads one search word as part of a birth date, the way the master list shows
-// it ("Mar 15, 1990"). Birth dates are stored at UTC midnight, so every part is
-// read in UTC. A word that is no date part adds nothing, and a date that cannot
-// exist (02/30/1990) matches nobody instead of rolling over to another day.
-
 const MONTHS = [
   "january", "february", "march", "april", "may", "june",
   "july", "august", "september", "october", "november", "december",

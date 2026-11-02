@@ -55,14 +55,22 @@ const toMasterlistRow = (record, { identities, linkage }) => ({
   resident: residentOf(record, identities),
   linkage: linkageOfRecord(record, linkage),
   createdAt: record.createdAt,
+  updatedAt: record.updatedAt,
+  createdById: idOf(record.createdBy),
+  providerId: idOf(record.provider),
+  recordStatus: record.recordStatus,
+  workflowStatus: record.workflowStatus,
+  immunizationProgress: record.immunizationProgress,
+  baby: record.immunizationBabyId?.name ? {_id:idOf(record.immunizationBabyId),name:record.immunizationBabyId.name,dateOfBirth:record.immunizationBabyId.dateOfBirth} : null,
 });
 
-// Admins edit any encoded record; other staff only the ones they encoded, and
-// only while their role still runs that service.
+// Clinical staff edit records they encoded while their role still runs that
+// service. Administrators have read-only access, including to legacy records.
 const canEdit = (record, user) => {
-  if (isAppointmentSource(record.source)) return false;
+  if (isAppointmentSource(record.source) || record.immunizationBabyId) return false;
   const role = normalizeRole(user);
-  if (role === "admin") return true;
+  if (!["doctor", "midwife", "bhw"].includes(role)) return false;
+  if (record.serviceType === "immunization" && role !== "midwife") return false;
   return idOf(record.createdBy) === String(user?.userId) && getCategoryKeysForRole(role).includes(record.serviceType);
 };
 

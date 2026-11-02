@@ -9,28 +9,15 @@ const normalizeRole = (role) => {
   return ROLES.includes(value) ? value : "unknown";
 };
 
+const LOCAL_ADDRESSES = ["::1", "::ffff:127.0.0.1"];
+
 const getClientIpAddress = (req) => {
   if (!req) return "unknown";
 
-  const forwarded = req.headers?.["x-forwarded-for"];
-  if (typeof forwarded === "string" && forwarded.trim()) {
-    return forwarded.split(",")[0].trim();
-  }
-  if (Array.isArray(forwarded) && forwarded.length) {
-    return String(forwarded[0]).trim();
-  }
-
-  const realIp = req.headers?.["x-real-ip"];
-  if (typeof realIp === "string" && realIp.trim()) {
-    return realIp.trim();
-  }
-
-  const socketIp = req.socket && req.socket.remoteAddress ? req.socket.remoteAddress : "";
-  if (socketIp && socketIp !== "::1" && socketIp !== "::ffff:127.0.0.1") {
-    return socketIp;
-  }
-
-  return "unknown";
+  // req.ip honours TRUST_PROXY. Forwarding headers alone can be set by any client,
+  // which would let a caller forge the address in the audit trail.
+  const address = req.ip || req.socket?.remoteAddress || "";
+  return address && !LOCAL_ADDRESSES.includes(address) ? address : "unknown";
 };
 
 const detectPlatform = (req) => {

@@ -7,6 +7,7 @@
 // is only checked through services/masterList/masterLink.js.
 
 const User = require("../../models/User");
+const { SIGN_IN_READY_STATUSES } = require("../../models/user/userStatus");
 const { badRequest, conflict, notFound } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
 const { isValidObjectId } = require("../../utils/objectId");
@@ -49,8 +50,8 @@ const linkAccount = async ({ userId, masterResidentId, reason }) => {
   const id = readMasterId(masterResidentId);
   const why = readReason(reason);
   const user = await loadResidentAccount(userId);
-  if (user.status !== "approved") {
-    throw conflict("Only approved accounts can be linked. Review the user request first.", ERROR_CODES.CONFLICT);
+  if (!SIGN_IN_READY_STATUSES.includes(user.status)) {
+    throw conflict("Only approved or active accounts can be linked. Review the user request first.", ERROR_CODES.CONFLICT);
   }
   if (user.masterResidentId) {
     throw conflict("This account is already linked. Unlink it before choosing another record.", ERROR_CODES.CONFLICT);
@@ -58,6 +59,7 @@ const linkAccount = async ({ userId, masterResidentId, reason }) => {
   await assertLinkable(id, user._id);
 
   user.masterResidentId = id;
+  user.verificationMethod = "admin_review";
   try {
     await user.save();
   } catch (error) {
@@ -75,6 +77,7 @@ const unlinkAccount = async ({ userId, reason }) => {
 
   user.masterResidentId = undefined;
   await user.save();
+  await require("../immunization/reminderWorker").cancelPendingForRecipient(user._id);
   return { user, previousMasterResidentId: previous, reason: why };
 };
 

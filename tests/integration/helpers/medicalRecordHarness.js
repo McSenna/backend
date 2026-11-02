@@ -14,9 +14,9 @@ const WEB = { "X-Client-Platform": "web" };
 const MOBILE_RESIDENT = { "X-Client-Platform": "mobile", "User-Agent": "okhttp/4.9.2" };
 
 let staffSeq = 0;
-const createStaff = (role) => {
+const createStaff = async (role) => {
   staffSeq += 1;
-  return User.create({
+  const user = await User.create({
     fullname: `Test ${role} ${staffSeq}`,
     email: `${role}.${staffSeq}@maslogcare.test`,
     password: "TestPassword123!",
@@ -29,6 +29,8 @@ const createStaff = (role) => {
     address: "Test address",
     approved_at: new Date(),
   });
+  await require("./managedDeviceFixtures").provisionTestDevice(user);
+  return user;
 };
 
 const as = (user) => ({ Authorization: `Bearer ${tokenFor(user, "web")}`, ...WEB });

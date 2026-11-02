@@ -30,8 +30,8 @@ const presentMasterResidents = async (records) => {
 const findMasterResidentRows = async (ids) =>
   presentMasterResidents(await MasterResident.find({ _id: { $in: ids } }).lean());
 
-// All official records, including inactive residents, belong to the Masterlist.
-const countMasterResidents = () => MasterResident.countDocuments({});
+// Inactive residents stay in the list; soft-deleted identities stay only for history.
+const countMasterResidents = () => MasterResident.countDocuments({ deletedAt: null });
 
 // Read-only handle for the realtime change feed, which only watches the collection.
 const masterResidentFeed = MasterResident;

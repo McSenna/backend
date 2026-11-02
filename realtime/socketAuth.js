@@ -91,6 +91,8 @@ const authenticateSocket = async (socket, next) => {
     socket.data.userId = req.user.userId;
     socket.data.role = req.user.role;
     socket.data.sessionId = req.auth.sessionId;
+    socket.data.platform = req.auth.platform;
+    socket.data.deviceId = req.auth.deviceId;
     socket.data.expiresAt = typeof req.user.exp === "number" ? req.user.exp * 1000 : null;
     return next();
   } catch (error) {

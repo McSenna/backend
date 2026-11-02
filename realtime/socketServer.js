@@ -36,6 +36,12 @@ const scheduleExpiry = (socket) => {
 const onConnection = (socket) => {
   socket.join(roomsForAccount(socket.data));
   scheduleExpiry(socket);
+  // Recheck even idle connections across server instances; data sends recheck too.
+  if (socket.data.role === "resident") {
+    const timer = setInterval(() => { void require("./residentAuthorization").reauthorizeSocket(socket); }, 15000);
+    timer.unref();
+    socket.once("disconnect", () => clearInterval(timer));
+  }
 };
 
 /** Shares the Express HTTP server: same port, same TLS, no second listener. */

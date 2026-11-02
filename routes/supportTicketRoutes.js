@@ -20,11 +20,11 @@ const router = express.Router();
 const adminOnly = roleCheck("admin");
 
 // Any signed-in account can ask for help; each user only ever sees their own tickets.
-router.get("/support/options", auth, getSupportOptions);
-router.post("/support/tickets", auth, createSupportTicket);
-router.get("/support/tickets/my", auth, getMySupportTickets);
-router.get("/support/tickets/:ticketId", auth, getMySupportTicket);
-router.post("/support/tickets/:ticketId/messages", auth, replyToMySupportTicket);
+router.get("/support/options", auth.accountOnly, getSupportOptions);
+router.post("/support/tickets", auth.accountOnly, createSupportTicket);
+router.get("/support/tickets/my", auth.accountOnly, getMySupportTickets);
+router.get("/support/tickets/:ticketId", auth.accountOnly, getMySupportTicket);
+router.post("/support/tickets/:ticketId/messages", auth.accountOnly, replyToMySupportTicket);
 
 router.get("/admin/support/tickets", auth, adminOnly, getAdminSupportTickets);
 router.get("/admin/support/tickets/:ticketId", auth, adminOnly, getAdminSupportTicket);

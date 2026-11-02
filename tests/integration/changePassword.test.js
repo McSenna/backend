@@ -1,3 +1,4 @@
+const { provisionTestDevice, managedLoginBody } = require("./helpers/managedDeviceFixtures");
 "use strict";
 
 require("dotenv").config({ path: require("path").join(__dirname, "..", "..", ".env") });
@@ -92,7 +93,7 @@ async function runTests() {
   });
 
   const token = jwt.sign(
-    { userId: String(user._id), role: user.role, platform: "mobile" },
+    { userId: String(user._id), role: user.role, platform: "mobile", deviceId: await provisionTestDevice(user) },
     process.env.JWT_SECRET,
     { expiresIn: "1h" }
   );
@@ -223,14 +224,14 @@ async function runTests() {
   const loginWithOld = await request("/login", {
     method: "POST",
     headers: { "X-Client-Platform": "mobile" },
-    body: { email: user.email, password: originalPassword },
+    body: await managedLoginBody({ email: user.email, password: originalPassword }),
   });
   check("Login with old password fails", loginWithOld.status !== 200);
 
   const loginWithNew = await request("/login", {
     method: "POST",
     headers: { "X-Client-Platform": "mobile" },
-    body: { email: user.email, password: newPassword },
+    body: await managedLoginBody({ email: user.email, password: newPassword }),
   });
   check("Login with new password succeeds with 200", loginWithNew.status === 200 && loginWithNew.body.success === true);
 

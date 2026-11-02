@@ -15,6 +15,7 @@ const parseServiceKey = (consultationType) => {
     throw badRequest("Please select a service type.", ERROR_CODES.MISSING_FIELDS);
   }
   const key = String(consultationType).trim();
+  if (key === 'immunization') throw badRequest('Immunization appointments are assigned automatically from the baby checklist. Contact the health center to review a date.', ERROR_CODES.VALIDATION_ERROR);
   if (!getResidentBookableCategories().some((category) => category.key === key)) {
     throw badRequest("The selected service is not available.", ERROR_CODES.VALIDATION_ERROR);
   }

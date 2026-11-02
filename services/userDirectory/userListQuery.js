@@ -1,28 +1,9 @@
 "use strict";
 
 const { VALID_STATUSES } = require("../../models/user/userStatus");
+const { SEGMENTS, statusGroupOf } = require("./accountLifecycle");
 
-/**
- * The admin Users screen shows three account states. Pending and rejected
- * accounts belong to the sign-up request queue, not this list.
- */
-const STATUS_GROUPS = Object.freeze({
-  active: ["active"],
-  approved: ["approved"],
-  deactivated: ["inactive", "deactivated", "suspended"],
-});
-
-const LISTED_STATUSES = Object.freeze([
-  ...STATUS_GROUPS.active,
-  ...STATUS_GROUPS.approved,
-  ...STATUS_GROUPS.deactivated,
-]);
-
-const TAB_STATUSES = Object.freeze({
-  active: [...STATUS_GROUPS.active, ...STATUS_GROUPS.approved],
-  deactivated: STATUS_GROUPS.deactivated,
-  accounts: LISTED_STATUSES,
-});
+const STATUS_FILTERS = ["requested", "approved", "active", "rejected", "deactivated"];
 
 const ROLES = ["admin", "doctor", "midwife", "bhw", "resident"];
 
@@ -33,6 +14,9 @@ const SORTS = Object.freeze({
   name_asc: { fullname: 1, _id: 1 },
   joined_desc: { createdAt: -1, _id: -1 },
 });
+
+// Case-insensitive, so "ana" and "Ana" sort together under "Name, A to Z".
+const NAME_COLLATION = { locale: "en", strength: 2 };
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -64,21 +48,20 @@ const pick = (value, allowed, fallback) => {
 };
 
 const resolveListParams = (query = {}) => {
-  const tab = pick(query.tab, Object.keys(TAB_STATUSES), "accounts");
-  const status = pick(query.status, Object.keys(STATUS_GROUPS), "");
+  const segment = pick(query.segment, Object.keys(SEGMENTS), "all");
+  const status = pick(query.status, STATUS_FILTERS, "");
   const role = pick(query.role, ROLES, "");
   const sort = pick(query.sort, Object.keys(SORTS), "last_login_desc");
-  const search = typeof query.query === "string" ? query.query.trim().slice(0, 100) : "";
+  const search = typeof query.search === "string" ? query.search.trim().slice(0, 100) : "";
   const page = Math.max(1, parseInt(query.page, 10) || 1);
-  const pageSize = Math.min(100, Math.max(1, parseInt(query.pageSize, 10) || 20));
-  return { tab, status, role, sort, search, page, pageSize };
+  const perPage = Math.min(100, Math.max(1, parseInt(query.per_page, 10) || 20));
+  return { segment, status, role, sort, search, page, perPage };
 };
 
-const buildListMatch = ({ tab, status, role, search }) => {
-  const tabStatuses = TAB_STATUSES[tab];
+const buildListMatch = ({ segment, status, role, search }) => {
   const statuses = status
-    ? STATUS_GROUPS[status].filter((value) => tabStatuses.includes(value))
-    : tabStatuses;
+    ? SEGMENTS[segment].filter((value) => statusGroupOf(value) === status)
+    : SEGMENTS[segment];
 
   const match = { effectiveStatus: { $in: statuses } };
   if (role) match.role = role;
@@ -90,9 +73,8 @@ const buildListMatch = ({ tab, status, role, search }) => {
 };
 
 module.exports = {
-  STATUS_GROUPS,
-  LISTED_STATUSES,
   SORTS,
+  NAME_COLLATION,
   effectiveStatusStage,
   resolveListParams,
   buildListMatch,

@@ -7,6 +7,7 @@
 
 const User = require("../../models/User");
 const MedicalRecord = require("../../models/MedicalRecord");
+const {verifiedAccountFilter} = require("../immunization/access");
 const { CONSULTATION_CATEGORIES } = require("../../config/consultationCategories");
 const { ENCODABLE_SOURCES } = require("../../config/medicalRecordSources");
 const { isValidObjectId } = require("../../utils/objectId");
@@ -21,14 +22,19 @@ const masterIdOf = async (userId) => {
   return user?.masterResidentId || null;
 };
 
+const verifiedMasterIdOf = async userId => (await User.findOne({_id:userId,...verifiedAccountFilter({$type:'string'})}).select('masterResidentId').lean())?.masterResidentId || null;
+
 const residentRecordFilter = async (userId) => {
   const masterResidentId = await masterIdOf(userId);
-  const own = [{ resident: userId }];
-  if (masterResidentId) own.push({ masterResidentId, source: { $in: ENCODABLE_SOURCES } });
+  const own = [{ resident: userId, immunizationBabyId:null }];
+  if (masterResidentId) own.push({ masterResidentId, source: { $in: ENCODABLE_SOURCES }, immunizationBabyId:null });
+  const verifiedId=await verifiedMasterIdOf(userId);
+  if(verifiedId)own.push({masterResidentId:verifiedId,immunizationBabyId:{$type:"objectId"}});
   return { $or: own };
 };
 
 const ownsRecord = async (userId, record) => {
+  if(record.immunizationBabyId || record.deletedImmunizationBabyId)return Boolean(record.masterResidentId && (await verifiedMasterIdOf(userId))===record.masterResidentId);
   if (String(record.resident?._id ?? record.resident ?? "") === String(userId)) return true;
   if (!record.masterResidentId || !ENCODABLE_SOURCES.includes(record.source)) return false;
   return (await masterIdOf(userId)) === record.masterResidentId;
@@ -38,11 +44,16 @@ const ownsRecord = async (userId, record) => {
 // realtime/publishers/medicalRecords.js.
 const residentRecordQuery = (filter) =>
   MedicalRecord.find(filter)
+    .populate("immunizationBabyId", "name dateOfBirth")
     .populate("provider", "fullname role")
     .populate({ path: "appointment", select: "consultationType slotStart slotEnd status createdAt approvedAt completedAt" });
 
 /** Every resident account that may read this record: the visit's own account and the holder of its identity. */
 const residentOwnersOf = async (record) => {
+  if(record.immunizationBabyId || record.deletedImmunizationBabyId) {
+    const holders=await User.find(verifiedAccountFilter(record.masterResidentId)).select('_id').lean();
+    return holders.map(holder=>String(holder._id));
+  }
   const owners = new Set();
   if (record.resident) owners.add(String(record.resident?._id ?? record.resident));
   if (record.masterResidentId && ENCODABLE_SOURCES.includes(record.source)) {

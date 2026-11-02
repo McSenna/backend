@@ -46,6 +46,12 @@ const AppointmentSchema = new mongoose.Schema(
     // Immunization only: the slot start while the visit holds its position, null
     // once it is cancelled or declined. Unique, so no two active visits share a time.
     immunizationSlotKey: { type: String, default: null },
+    immunizationBabyId: { type: mongoose.Schema.Types.ObjectId, ref: "Baby", default: null, index: true },
+    immunizationVisitKey: { type: String, default: null },
+    immunizationCancellationOrigin: { type: String, enum: ["system", "resident", null], default: null },
+    immunizationTargetOn: { type: String, default: null },
+    immunizationDoseKeys: { type: [String], default: [] },
+    immunizationAccountHistory: {type:[new mongoose.Schema({previous:{type:mongoose.Schema.Types.ObjectId,ref:'User'},current:{type:mongoose.Schema.Types.ObjectId,ref:'User'},actor:{type:mongoose.Schema.Types.ObjectId,ref:'User'},at:Date,reason:String},{_id:false})],default:[]},
 
     declineReason: { type: String, default: "", maxlength: 1000 },
     cancelReason: { type: String, default: "", maxlength: 1000 },
@@ -105,6 +111,7 @@ AppointmentSchema.index({ status: 1, prioritySortKey: 1, createdAt: 1 });
 AppointmentSchema.index({ missionSchedule: 1, slotStart: 1 });
 
 AppointmentSchema.index({ status: 1, completedAt: -1 });
+AppointmentSchema.index({ immunizationVisitKey: 1 }, { unique: true, partialFilterExpression: { immunizationVisitKey: { $type: "string" } } });
 
 AppointmentSchema.index(
   { immunizationSlotKey: 1 },

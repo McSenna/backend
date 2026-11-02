@@ -1,6 +1,6 @@
 "use strict";
 
-const { pushStatusHistory } = require("../../models/Appointment");
+const { markCancelled, cancelAutomaticVisit } = require("../immunization/appointmentCancellation");
 const { loadAppointmentOrFail } = require("../appointment/lookup");
 const { processMissionSchedulePriorityQueue } = require("../triageQueue");
 const logger = require("../../utils/logger");
@@ -55,8 +55,9 @@ const buildNotifications = ({ appointment, serviceLabel, reason, staffId }) => {
 };
 
 const cancelAppointmentByResident = async ({ req, appointmentId, residentId, reason, actorRole }) => {
-  const appointment = await loadAppointmentOrFail(appointmentId);
+  let appointment = await loadAppointmentOrFail(appointmentId);
   assertOwnership(appointment, residentId, actorRole, "cancel");
+  if (appointment.immunizationBabyId) await require('../immunization/appointmentAccess').assertAppointmentLink(appointment);
 
   if (appointment.status === "cancelled") {
     return { appointment: await loadFullAppointment(appointment._id), alreadyCancelled: true };
@@ -69,17 +70,14 @@ const cancelAppointmentByResident = async ({ req, appointmentId, residentId, rea
   const serviceLabel = serviceLabelOf(appointment.consultationType);
   const trimmedReason = trimReason(reason);
 
-  appointment.status = "cancelled";
-  appointment.cancelReason = trimmedReason;
-  appointment.missionSchedule = null;
-  appointment.slotStart = null;
-  appointment.slotEnd = null;
-  appointment.assignedCategoryKey = null;
-  appointment.assignedDurationMinutes = null;
-  appointment.immunizationSlotKey = null;
-
-  pushStatusHistory(appointment, "cancelled", residentId, trimmedReason || "Cancelled by resident");
-  await appointment.save();
+  if (appointment.immunizationBabyId) {
+    const result = await cancelAutomaticVisit({appointmentId,residentId,actorRole,reason:trimmedReason});
+    appointment = result.appointment;
+    if (result.alreadyCancelled) return {appointment:await loadFullAppointment(appointment._id),alreadyCancelled:true};
+  } else {
+    markCancelled(appointment,residentId,trimmedReason);
+    await appointment.save();
+  }
 
   await releaseFreedSlot(freedMissionScheduleId);
 

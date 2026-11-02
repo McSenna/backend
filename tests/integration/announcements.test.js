@@ -1,3 +1,4 @@
+const { provisionTestDevice, deviceIdFor } = require("./helpers/managedDeviceFixtures");
 "use strict";
 
 require("dotenv").config({ path: require("path").join(__dirname, "..", "..", ".env") });
@@ -71,8 +72,8 @@ async function teardown() {
 }
 
 let emailSeq = 0;
-const makeUser = (role, status, extra = {}) =>
-  User.create({
+const makeUser = async (role, status, extra = {}) => {
+  const user = await User.create({
     fullname: `${role} ${status} ${++emailSeq}`,
     email: `${role}.${status}.${emailSeq}@maslogcare.test`,
     password: "InitialPass123!",
@@ -85,10 +86,13 @@ const makeUser = (role, status, extra = {}) =>
     address: "Purok 1, Maslog",
     ...extra,
   });
+  await provisionTestDevice(user);
+  return user;
+};
 
 const headersFor = (user, platform = "web") => ({
   Authorization: `Bearer ${jwt.sign(
-    { userId: String(user._id), role: user.role, platform },
+    { userId: String(user._id), role: user.role, platform, deviceId: deviceIdFor(user) },
     process.env.JWT_SECRET,
     { expiresIn: "1h" }
   )}`,

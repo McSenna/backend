@@ -8,6 +8,7 @@ const normalizeAction = (action) => {
 };
 
 const MODULE_RULES = [
+  { test: /^RESIDENT_WEB_|^MANAGED_DEVICE_/, module: "User Management", logType: "User Management" },
   { test: /^LOGIN|^LOGOUT/, module: "Authentication", logType: "User Authentication" },
   {
     test: /^RESIDENT_WEB_LOGIN_BLOCKED$|^PLATFORM_ACCESS_DENIED$/,
@@ -46,7 +47,9 @@ const WARNING_ACTIONS = new Set([
   "INVENTORY_ADJUSTED",
   "INVENTORY_EXPIRED_RECORDED",
   "MASTER_RESIDENT_DEACTIVATED",
+  "MASTER_RESIDENT_DELETED",
   "MEDICAL_RECORD_DUPLICATE_CONFIRMED",
+  "MEDICAL_RECORD_DELETED",
   "ACCOUNT_MASTER_UNLINKED",
 ]);
 

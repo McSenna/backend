@@ -59,6 +59,10 @@ function createApp() {
   app.use("/api", masterResidentRoutes);
   app.use("/api", medicalRecordMasterlistRoutes);
 
+  app.use("/api", require("./routes/immunizationRoutes"));
+
+  app.use("/api", require("./routes/residentWebAccessRoutes"));
+
   app.use(notFoundHandler);
   app.use(globalErrorHandler);
 

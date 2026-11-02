@@ -17,7 +17,7 @@ exports.login = asyncHandler(async (req, res) => {
     success: true,
     message: "Login successful.",
     token,
-    user: buildUserResponse(user),
+    user: buildUserResponse(user, user.role === "resident" ? await require("../../services/residentWebAccess").readPolicy() : null),
     platform,
   });
 });

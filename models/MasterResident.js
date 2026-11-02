@@ -76,6 +76,9 @@ const MasterResidentSchema = new mongoose.Schema(
     },
     // Residents who moved away or died stay on file but are never matched.
     isActive: { type: Boolean, default: true },
+    // Soft deletion keeps account and clinical history references intact.
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     // Audit: the admin who added, last edited, or deactivated the record.
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },

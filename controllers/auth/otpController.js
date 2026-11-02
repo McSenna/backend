@@ -5,6 +5,7 @@ const logger = require("../../utils/logger");
 const { HTTP_STATUS } = require("../../utils/errorCodes");
 const { sendWelcomeEmail } = require("../../services/mailer");
 const { createSystemLog } = require("../../services/systemLogService");
+const { authorizeResidentLogin } = require("../../services/auth/residentSession");
 const { issueSession } = require("../../services/sessionService");
 const { getPlatformDenial } = require("../../services/platformService");
 const { resendOtp } = require("../../services/auth/otpResendService");
@@ -36,7 +37,7 @@ const respondWithPlatformDenial = async ({ req, res, user, platform, denial }) =
     user,
     role: user.role,
     description:
-      "Registration completed but no web session was issued: resident accounts are mobile-only",
+      "Registration completed but no session was issued: resident platform access was denied",
     resource: "Auth",
     resourceId: String(user._id),
     success: false,
@@ -71,13 +72,19 @@ exports.verifyOtp = asyncHandler(async (req, res) => {
   });
 
   const platform = platformOf(req);
-  const denial = getPlatformDenial(user.role, platform);
+  let deviceId;
+  let denial = getPlatformDenial(user.role, platform);
+  try { deviceId = await authorizeResidentLogin(user, platform, req); }
+  catch (error) {
+    if (error.statusCode !== 403) throw error;
+    denial = { code: error.code, message: error.message };
+  }
 
   if (denial) {
     return respondWithPlatformDenial({ req, res, user, platform, denial });
   }
 
-  const { token } = issueSession(user, platform);
+  const { token } = issueSession(user, platform, deviceId);
 
   return res.status(HTTP_STATUS.CREATED).json({
     success: true,

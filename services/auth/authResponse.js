@@ -1,9 +1,9 @@
 "use strict";
 
-const { describePlatformAccess } = require("../../config/platformAccess");
+const { describeAccountAccess } = require("../residentWebAccess");
 const { resolveRequestPlatform } = require("../platformService");
 
-const buildUserResponse = (user) => ({
+const buildUserResponse = (user, policy = null) => ({
   _id: user._id,
   fullname: user.fullname,
   email: user.email,
@@ -20,7 +20,7 @@ const buildUserResponse = (user) => ({
   addressDetails: user.addressDetails ?? null,
   phone: user.phone || "",
   avatarUrl: user.profilePhoto || null,
-  platformAccess: describePlatformAccess(user.role),
+  platformAccess: describeAccountAccess(user, policy),
 });
 
 const platformOf = (req) => (req.clientPlatform || resolveRequestPlatform(req)).platform;

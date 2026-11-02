@@ -7,6 +7,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const { HTTP_STATUS } = require("../utils/errorCodes");
 const { createSystemLog } = require("../services/systemLogService");
 const {
+  deleteMasterResident,
   listMasterResidents,
   getMasterResident,
   createMasterResident,
@@ -88,4 +89,15 @@ exports.importMasterResidents = asyncHandler(async (req, res) => {
   return res
     .status(HTTP_STATUS.CREATED)
     .json({ success: true, message: `${imported} master list records imported.`, imported });
+});
+
+exports.deleteMasterResident = asyncHandler(async (req, res) => {
+  const { masterResidentId, changed } = await deleteMasterResident(req.params.id, adminIdOf(req));
+  if (changed) {
+    await logRecordAction(req, "MASTER_RESIDENT_DELETED", `Admin soft-deleted master list record ${masterResidentId}`, {
+      masterResidentId,
+      policy: "soft_delete",
+    });
+  }
+  return res.status(HTTP_STATUS.OK).json({ success: true, message: "Master list record deleted." });
 });

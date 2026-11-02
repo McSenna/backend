@@ -86,7 +86,9 @@ for (const file of [...MASTER_WRITERS, ...MASTER_READERS]) {
 const masterRoutes = files.find((entry) => entry.file === "routes/masterResidentRoutes.js").text;
 const routeLines = masterRoutes.split("\n").filter((line) => /router\.(get|post|patch|put|delete)\(/.test(line));
 check("every master list route is admin-only", routeLines.length > 0 && routeLines.every((line) => line.includes("...adminOnly")));
-check("no master list route deletes records", !/router\.delete\(/.test(masterRoutes));
+check("master list writes never hard-delete official records", [...MASTER_WRITERS].every((file) =>
+  !/\.(deleteOne|deleteMany|findOneAndDelete|findByIdAndDelete)\s*\(/.test(files.find((entry) => entry.file === file).text)
+));
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {

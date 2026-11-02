@@ -46,7 +46,7 @@ const findCandidates = (applicant) => {
 
   return MasterResident.find({
     "matchKeys.barangay": barangayKey(applicant.barangay),
-    isActive: true,
+    isActive: true, deletedAt: null,
     $or: [
       { dateOfBirth: { $gte: dayStart, $lt: new Date(dayStart.getTime() + DAY_MS) } },
       {

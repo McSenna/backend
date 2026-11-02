@@ -54,7 +54,7 @@ const buildMasterResidentFilter = ({ search = "", status = "active", role = "all
   const roleFilter = role === "all" ? {} : {
     role: role === "resident" ? { $in: ["resident", null, ""] } : role,
   };
-  return { ...STATUS_FILTERS[status], ...roleFilter, ...civilFilter, ...purokFilter(purok), ...searchFilter(search) };
+  return { deletedAt: null, ...STATUS_FILTERS[status], ...roleFilter, ...civilFilter, ...purokFilter(purok), ...searchFilter(search) };
 };
 
 const SORTS = {

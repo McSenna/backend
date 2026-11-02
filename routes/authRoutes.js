@@ -34,12 +34,13 @@ router.post("/email-verification/resend", otpSendRateLimiter, sendEmailVerificat
 router.post("/email-verification/verify", otpVerifyRateLimiter, verifyEmailVerificationCode);
 
 router.post("/login", loginRateLimiter, login);
+router.get("/session/access", auth, (_req, res) => { res.set("Cache-Control", "no-store"); res.json({ success: true }); });
 
 router.post("/forgot-password", otpSendRateLimiter, forgotPassword);
 router.post("/resend-reset-code", otpSendRateLimiter, forgotPassword);
 router.post("/verify-reset-code", otpVerifyRateLimiter, verifyResetCode);
 router.post("/reset-password", otpVerifyRateLimiter, resetPassword);
-router.post("/logout", auth, logout);
+router.post("/logout", auth.accountOnly, logout);
 router.post("/change-password", auth, otpVerifyRateLimiter, changePassword);
 
 module.exports = router;

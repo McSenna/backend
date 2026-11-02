@@ -48,9 +48,9 @@ function request(path, { method = "GET", body, headers = {} } = {}) {
         res.on("data", (chunk) => (data += chunk));
         res.on("end", () => {
           try {
-            resolve({ status: res.statusCode, body: data ? JSON.parse(data) : {} });
+            resolve({ status: res.statusCode, headers: res.headers, body: data ? JSON.parse(data) : {} });
           } catch {
-            resolve({ status: res.statusCode, body: data });
+            resolve({ status: res.statusCode, headers: res.headers, body: data });
           }
         });
       }
@@ -67,7 +67,7 @@ const setAutoVerify = (on) => {
 };
 
 const tokenFor = (user, platform = "web") =>
-  jwt.sign({ userId: String(user._id), role: user.role, platform }, process.env.JWT_SECRET, {
+  jwt.sign({ userId: String(user._id), role: user.role, platform, deviceId: require("./managedDeviceFixtures").deviceIdFor(user) }, process.env.JWT_SECRET, {
     expiresIn: "1h",
   });
 const asAdmin = (admin) => ({ Authorization: `Bearer ${tokenFor(admin)}`, "X-Client-Platform": "web" });
@@ -129,6 +129,7 @@ async function register(person, extra = {}) {
   body.emailVerificationToken = await verifiedEmailToken(email);
   const response = await request("/register", { method: "POST", body, headers: MOBILE });
   const user = await User.findOne({ email }).lean();
+  await require("./managedDeviceFixtures").provisionTestDevice(user);
   const verification = user ? await ResidentVerification.findOne({ user: user._id }).lean() : null;
   return { response, user, verification, email };
 }

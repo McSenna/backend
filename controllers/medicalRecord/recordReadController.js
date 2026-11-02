@@ -17,6 +17,7 @@ const APPOINTMENT_SELECT =
   "consultationType slotStart slotEnd status createdAt approvedAt completedAt missionSchedule childName childDateOfBirth";
 
 const RECORD_POPULATE = [
+  { path: "immunizationBabyId", select: "name dateOfBirth" },
   { path: "provider", select: "fullname role" },
   { path: "resident", select: "fullname email dateOfBirth gender" },
   { path: "appointment", select: APPOINTMENT_SELECT },
@@ -40,8 +41,13 @@ exports.getMedicalRecord = asyncHandler(async (req, res) => {
   const access = describeAccess(record, req.user);
   // A resident also owns records encoded under the master list identity their
   // account holds.
-  if (access.role === "resident" && !access.isOwner) {
+  if (access.role === "resident" && (!access.isOwner || record.immunizationBabyId)) {
     access.isOwner = await ownsRecord(req.user.userId, record);
+    if (record.immunizationBabyId) {
+      // A former clinician using a resident session must follow parent ownership.
+      access.isAuthor = false;
+      access.ownsService = false;
+    }
   }
 
   if (!access.isOwner && !access.isAuthor && !access.ownsService) {

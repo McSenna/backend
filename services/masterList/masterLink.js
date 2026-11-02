@@ -20,7 +20,7 @@ const findLinkableRecordId = async ({ masterListCheck, userId }) => {
 
   const [candidateId] = candidateIds;
   const [record, otherAccount] = await Promise.all([
-    MasterResident.exists({ masterResidentId: candidateId, isActive: true }),
+    MasterResident.exists({ masterResidentId: candidateId, isActive: true, deletedAt: null }),
     User.exists({ masterResidentId: candidateId, _id: { $ne: userId } }),
   ]);
 
@@ -31,7 +31,7 @@ const findLinkableRecordId = async ({ masterListCheck, userId }) => {
 // it can: it must be active and not already held by another account.
 const linkBlockerFor = async ({ masterResidentId, userId }) => {
   const [record, otherAccount] = await Promise.all([
-    MasterResident.exists({ masterResidentId, isActive: true }),
+    MasterResident.exists({ masterResidentId, isActive: true, deletedAt: null }),
     User.exists({ masterResidentId, _id: { $ne: userId } }),
   ]);
   if (!record) return "inactive_or_missing";

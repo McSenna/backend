@@ -57,6 +57,7 @@ const rescheduleAppointmentByResident = async ({
   const appointment = await loadAppointmentOrFail(appointmentId);
   assertOwnership(appointment, residentId, actorRole, "reschedule");
   assertStatusAllows(appointment, RESCHEDULABLE_STATUSES, "rescheduled");
+  if (appointment.consultationType === 'immunization') throw badRequest('Immunization dates are assigned by the system. Ask the midwife to document a follow-up if the date needs review.', ERROR_CODES.VALIDATION_ERROR);
 
   // A weekly service (immunization) moves to another day with a server-assigned time.
   if (isWeeklyService(appointment.consultationType)) {

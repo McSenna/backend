@@ -12,6 +12,7 @@ const router = express.Router();
 const RESIDENT = ["resident"];
 
 const STAFF_READ = ["doctor", "admin", "midwife", "bhw"];
+const CLINICAL_WRITE = ["doctor", "midwife", "bhw"];
 
 const STAFF_ADMIN = ["doctor", "admin", "midwife"];
 
@@ -38,8 +39,8 @@ router.get("/appointments/suggest-slot", auth, roleCheck(STAFF_ADMIN), appointme
 
 router.get("/appointments/completion-forms", auth, roleCheck(STAFF_READ), medicalRecordController.getCompletionForms);
 router.get("/appointments/completed", auth, roleCheck(STAFF_READ), medicalRecordController.listCompletedAppointments);
-router.patch("/appointments/:id/processing", auth, roleCheck(STAFF_READ), medicalRecordController.startProcessing);
-router.post("/appointments/:id/complete", auth, roleCheck(STAFF_READ), medicalRecordController.completeAppointment);
+router.patch("/appointments/:id/processing", auth, roleCheck(CLINICAL_WRITE), medicalRecordController.startProcessing);
+router.post("/appointments/:id/complete", auth, roleCheck(CLINICAL_WRITE), medicalRecordController.completeAppointment);
 
 router.get("/medical-records/me", auth, roleCheck(RESIDENT), medicalRecordController.getMyMedicalRecords);
 router.post("/medical-records/me/search", auth, roleCheck(RESIDENT), medicalRecordController.searchMyMedicalRecords);

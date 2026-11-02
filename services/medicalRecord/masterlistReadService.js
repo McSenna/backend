@@ -11,7 +11,7 @@ const { LINKAGE, linkageFor, linkageFilter } = require("./linkageStatus");
 const { ownedServiceKeys } = require("./serviceOwnership");
 const { toMasterlistRow, toMasterlistDetail } = require("./masterlistPresenter");
 
-const ROW_FIELDS = "source serviceType completedAt providerName providerRole provider resident masterResidentId createdAt";
+const ROW_FIELDS = "source serviceType completedAt providerName providerRole provider resident masterResidentId createdBy createdAt updatedAt recordStatus workflowStatus immunizationProgress immunizationBabyId";
 const RESIDENT_FIELDS = "fullname dateOfBirth gender";
 const PERSON_FIELDS = "fullname role";
 
@@ -40,7 +40,7 @@ const serviceCountsFor = async (filter) => {
 // The list's row shape. Realtime publishes records through these two helpers
 // (realtime/publishers/medicalRecords.js), so pushed rows match listed rows.
 const masterlistRowQuery = (filter) =>
-  MedicalRecord.find(filter).select(ROW_FIELDS).populate("resident", RESIDENT_FIELDS).populate("provider", PERSON_FIELDS);
+  MedicalRecord.find(filter).select(ROW_FIELDS).populate("resident", RESIDENT_FIELDS).populate("provider", PERSON_FIELDS).populate("immunizationBabyId", "name dateOfBirth");
 
 const presentMasterlistRows = async (records) => {
   const context = await contextFor(records);
@@ -95,6 +95,7 @@ const masterlistSummary = async (user) => {
 const loadScopedRecord = async (user, id) => {
   const recordId = assertValidObjectId(id, "medical record");
   const record = await MedicalRecord.findById(recordId)
+    .populate("immunizationBabyId", "name dateOfBirth")
     .populate("resident", RESIDENT_FIELDS)
     .populate("provider", PERSON_FIELDS)
     .populate("createdBy", PERSON_FIELDS)

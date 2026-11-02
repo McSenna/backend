@@ -1,7 +1,7 @@
 "use strict";
 
 const User = require("../../models/User");
-const { serializeUser } = require("../../services/userDirectory/userPresenter");
+const { serializeUserRow } = require("../../services/userDirectory/userPresenter");
 const { serializeResident } = require("../../services/residentDirectory/residentPresenter");
 const { buildUserResponse } = require("../../services/auth/authResponse");
 const { broadcast, resync } = require("../broadcast");
@@ -16,10 +16,10 @@ const DIRECTORY_READERS = [roleRoom("bhw"), adminRoom()];
 // belongs to, so its sockets are dropped and must pass the handshake again.
 const ACCESS_KEYS = ["status", "role", "verified"];
 
-const publishAccount = (user, action, changed) => {
+const publishAccount = (user, action, changed, policy) => {
   const id = String(user._id);
-  broadcast("user", action, serializeUser(user), [adminRoom()]);
-  broadcast("profile", action, buildUserResponse(user), [userRoom(id)]);
+  broadcast("user", action, serializeUserRow(user, policy), [adminRoom()]);
+  broadcast("profile", action, buildUserResponse(user, policy), [userRoom(id)]);
 
   if (user.role === "resident") {
     broadcast("resident", action, serializeResident(user), DIRECTORY_READERS);
@@ -43,7 +43,8 @@ const publish = async (changes) => {
 
   if (liveIds.length > 0) {
     const users = await User.find({ _id: { $in: liveIds } }).select("-password").lean();
-    for (const user of users) publishAccount(user, actionOf(user._id), changed);
+    const policy = await require("../../services/residentWebAccess").readPolicy();
+    for (const user of users) publishAccount(user, actionOf(user._id), changed, policy);
   }
 
   for (const id of deletedIds) {

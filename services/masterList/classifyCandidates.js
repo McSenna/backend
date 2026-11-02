@@ -1,34 +1,5 @@
 "use strict";
 
-// Barangay Master List matching rule
-// ----------------------------------
-// The caller has already limited candidates to ACTIVE records in the applicant's
-// barangay. Each candidate is then compared field by field:
-//
-// 1. Core identity, all exact after strict normalization (case, Unicode form
-//    and spacing only): first name, last name and date of birth.
-// 2. Compatibility, checked only when the core identity agrees:
-//    - middle name: equal, or both blank. One blank side is missing information.
-//    - suffix: equal after alias folding (Jr./Junior, III/3rd), or both blank.
-//    - sex: equal.
-//    - address: every word of the applicant's house/purok and street appears in
-//      the record's address (common abbreviations expanded). A blank
-//      applicant address is missing information.
-//
-// Outcomes:
-// - matched: exactly one record passes 1 and 2, and no other record shares the
-//   date of birth with names that differ only by accents, spacing or
-//   punctuation. This is the only outcome that may verify an account, and only
-//   when policy allows it (config/masterList.js).
-// - multiple_matches: more than one record could be this person.
-// - conflict: one record passes 1 but a compatibility field disagrees.
-// - partial_match: one record passes 1 but information is missing, or records
-//   only match after loose normalization (accents and punctuation removed) or
-//   with a different date of birth.
-// - no_match: nothing comparable was found.
-// A name alone, or a name plus an address, never produces "matched", and no
-// outcome ever rejects an account: everything except "matched" goes to an admin.
-
 const { MATCH_OUTCOMES, MATCH_REASONS, MAX_CANDIDATES } = require("../../config/masterList");
 const { strictName, looseName, suffixKey, calendarDate, addressTokens } = require("./normalize");
 

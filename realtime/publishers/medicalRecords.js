@@ -42,10 +42,20 @@ const publish = async (changes) => {
     await Promise.all([publishStaffRows(liveIds, actionOf), publishResidentRows(liveIds, actionOf)]);
   }
 
-  // No route deletes records; if a script does, only the id goes out.
-  for (const id of deletedIds) {
-    broadcast("medicalRecord", "deleted", { id }, [STAFF_ROOM]);
-    broadcast("myMedicalRecord", "deleted", { id }, [roleRoom("resident")]);
+  // A soft deletion arrives as an update. Re-read its protected tombstone to
+  // authorize recipients, and emit only the identifier, never clinical values.
+  const tombstones = await MedicalRecord.find({ _id: { $in: liveIds }, deletedAt: { $ne: null } }).withDeleted().lean();
+  for (const record of tombstones) {
+    const id = String(record._id);
+    broadcast("medicalRecord", "deleted", { id }, serviceOwnerRooms(record.serviceType));
+    const owners = await residentOwnersOf(record);
+    broadcast("myMedicalRecord", "deleted", { id }, owners.map(userRoom));
+  }
+  // Hard purges have no remaining ownership evidence; clients re-fetch their
+  // scoped views without disclosing the purged identifier across audiences.
+  if (deletedIds.length) {
+    broadcast("medicalRecord", "resync", {}, [STAFF_ROOM]);
+    broadcast("myMedicalRecord", "resync", {}, [roleRoom("resident")]);
   }
 };
 

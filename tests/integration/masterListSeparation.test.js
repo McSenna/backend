@@ -1,3 +1,4 @@
+const { managedLoginBody } = require("./helpers/managedDeviceFixtures");
 "use strict";
 
 // The Barangay Master List and user accounts are separate data sets. These
@@ -26,7 +27,7 @@ const officialRow = (overrides = {}) => ({
 
 async function authorization(doctor, resident, recordId) {
   console.log("\nOnly admins reach the master list");
-  const residentLogin = await request("/login", { method: "POST", body: { email: resident.email, password: "TestPass123!" }, headers: MOBILE });
+  const residentLogin = await request("/login", { method: "POST", body: await managedLoginBody({ email: resident.email, password: "TestPass123!" }), headers: MOBILE });
   const asResident = { ...MOBILE, Authorization: `Bearer ${residentLogin.body.token}` };
   const asDoctor = { Authorization: `Bearer ${tokenFor(doctor)}`, "X-Client-Platform": "web" };
   const calls = [
@@ -118,7 +119,7 @@ async function masterWritesLeaveAccountsAlone(admin, linked) {
   check("no account was created, changed or removed", (await snapshot(User)) === usersBefore);
   const linkedAfter = await User.findById(linked._id).lean();
   check("the linked account keeps its own name", linkedAfter.firstName === linked.firstName);
-  check("the linked account stays signed-in ready", linkedAfter.status === "approved" && linkedAfter.masterResidentId === "TEST-A");
+  check("the linked account stays signed-in ready", ["approved", "active"].includes(linkedAfter.status) && linkedAfter.masterResidentId === "TEST-A");
 }
 
 async function accountWritesLeaveMasterListAlone(admin, linked) {
@@ -129,7 +130,7 @@ async function accountWritesLeaveMasterListAlone(admin, linked) {
   check("an unmatched sign-up is a pending account", unmatched.user?.status === "pending");
   check("an account can exist without a master record", unmatched.user?.masterResidentId === undefined);
 
-  const login = await request("/login", { method: "POST", body: { email: linked.email, password: "TestPass123!" }, headers: MOBILE });
+  const login = await request("/login", { method: "POST", body: await managedLoginBody({ email: linked.email, password: "TestPass123!" }), headers: MOBILE });
   const edit = await request("/profile", {
     method: "PATCH",
     headers: { ...MOBILE, Authorization: `Bearer ${login.body.token}` },
@@ -142,7 +143,7 @@ async function accountWritesLeaveMasterListAlone(admin, linked) {
   const approved = await User.findById(unmatched.user._id).lean();
   check("approval without a match links nothing", approved.status === "approved" && approved.masterResidentId === undefined);
 
-  const suspend = await request(`/users/${linked._id}/status`, { method: "PATCH", headers: asAdmin(admin), body: { status: "deactivated" } });
+  const suspend = await request(`/users/${linked._id}/status`, { method: "PATCH", headers: asAdmin(admin), body: { action: "deactivate" } });
   check("an admin can deactivate a linked account", suspend.status === 200, json(suspend));
 
   check("no master record was created, changed or removed", (await snapshot(MasterResident)) === masterBefore);

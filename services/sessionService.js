@@ -16,17 +16,18 @@ function requireSecret() {
   return process.env.JWT_SECRET;
 }
 
-function buildTokenPayload(user, platform, sessionId) {
+function buildTokenPayload(user, platform, sessionId, deviceId = null) {
   return {
     userId: user._id,
     email: user.email,
     role: user.role,
     platform,
     sessionId,
+    deviceId,
   };
 }
 
-function issueSession(user, platform) {
+function issueSession(user, platform, deviceId = null) {
   const normalizedPlatform = normalizePlatform(platform);
   if (!normalizedPlatform) {
     throw new Error(`Cannot issue a session for unknown platform: ${platform}`);
@@ -34,7 +35,7 @@ function issueSession(user, platform) {
 
   const sessionId = crypto.randomUUID();
   const token = jwt.sign(
-    buildTokenPayload(user, normalizedPlatform, sessionId),
+    buildTokenPayload(user, normalizedPlatform, sessionId, deviceId),
     requireSecret(),
     { expiresIn: TOKEN_TTL }
   );

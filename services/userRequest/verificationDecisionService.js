@@ -8,6 +8,8 @@ const { isValidObjectId } = require("../../utils/objectId");
 const { VERIFICATION_METHODS } = require("../../config/masterList");
 const { isLinkCollision, findLinkableRecordId } = require("../masterList/masterLink");
 const { assertLinkable } = require("./accountMasterLinkService");
+const { resolveUserStatus } = require("../../models/user/userStatus");
+const { assertTransition } = require("../userDirectory/accountLifecycle");
 
 const assertValidVerificationId = (id) => {
   if (!isValidObjectId(id)) {
@@ -15,14 +17,14 @@ const assertValidVerificationId = (id) => {
   }
 };
 
-const loadPendingVerification = async (id) => {
+const loadDecidableVerification = async (id, decidableStatuses) => {
   assertValidVerificationId(id);
 
   const verification = await ResidentVerification.findById(id);
   if (!verification) {
     throw notFound("Verification request not found.", ERROR_CODES.NOT_FOUND);
   }
-  if (verification.verificationStatus !== "pending") {
+  if (!decidableStatuses.includes(verification.verificationStatus)) {
     throw conflict(
       `This request has already been ${verification.verificationStatus}.`,
       ERROR_CODES.REQUEST_ALREADY_PROCESSED
@@ -76,7 +78,10 @@ const resolveLinkChoice = async ({ choice, verification, user }) => {
 };
 
 const approve = async ({ id, adminId, masterResidentId }) => {
-  const { verification, user } = await loadPendingVerification(id);
+  // A rejected request can be approved later, so a mistaken rejection is fixable.
+  const { verification, user } = await loadDecidableVerification(id, ["pending", "rejected"]);
+  const previousVerificationStatus = verification.verificationStatus;
+  if (previousVerificationStatus === "rejected") assertTransition(resolveUserStatus(user), "approved");
   const now = new Date();
   const linkableId = await resolveLinkChoice({ choice: masterResidentId, verification, user });
 
@@ -99,12 +104,10 @@ const approve = async ({ id, adminId, masterResidentId }) => {
   user.verificationMethod = VERIFICATION_METHODS.ADMIN_REVIEW;
   const linkedMasterResidentId = await saveApprovedUser(user, linkableId);
 
-  return { verification, user, now, linkedMasterResidentId };
+  return { verification, user, now, linkedMasterResidentId, previousVerificationStatus };
 };
 
-const reject = async ({ id, adminId, reason, remarks }) => {
-  assertValidVerificationId(id);
-
+const readRejection = (reason, remarks) => {
   if (!reason || typeof reason !== "string" || !reason.trim()) {
     throw badRequest("A reason for rejection is required.", ERROR_CODES.VALIDATION_ERROR);
   }
@@ -118,8 +121,14 @@ const reject = async ({ id, adminId, reason, remarks }) => {
       ERROR_CODES.VALIDATION_ERROR
     );
   }
+  return { reason: trimmedReason, remarks: trimmedRemarks };
+};
 
-  const { verification, user } = await loadPendingVerification(id);
+const reject = async ({ id, adminId, reason, remarks }) => {
+  assertValidVerificationId(id);
+  const { reason: trimmedReason, remarks: trimmedRemarks } = readRejection(reason, remarks);
+
+  const { verification, user } = await loadDecidableVerification(id, ["pending"]);
   const now = new Date();
 
   verification.verificationStatus = "rejected";
@@ -141,4 +150,4 @@ const reject = async ({ id, adminId, reason, remarks }) => {
   return { verification, user, now, trimmedReason, trimmedRemarks };
 };
 
-module.exports = { approve, reject };
+module.exports = { approve, reject, readRejection };

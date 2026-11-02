@@ -12,14 +12,19 @@ const { ERROR_CODES } = require("../../utils/errorCodes");
 const { isAppointmentSource } = require("../../config/medicalRecordSources");
 const { readNewRecord, readRecordEdit } = require("./masterlistPayload");
 const { findPossibleDuplicates, possibleDuplicateError } = require("./duplicateCheck");
-const { assertMayEncode, normalizeRole } = require("./serviceOwnership");
+const { assertMayEncode, assertMayWriteRecords, normalizeRole } = require("./serviceOwnership");
 const { canEdit } = require("./masterlistPresenter");
 const { loadScopedRecord } = require("./masterlistReadService");
 
 const actorOf = (user) => ({ userId: user.userId, role: normalizeRole(user) });
 
 const findReplay = (userId, requestKey) =>
-  requestKey ? MedicalRecord.findOne({ createdBy: userId, requestKey }).select("_id").lean() : null;
+  requestKey ? MedicalRecord.findOne({ createdBy: userId, requestKey }).withDeleted().select("_id deletedAt").lean() : null;
+
+const replayResult = (record) => {
+  if (record.deletedAt) throw conflict("This request belongs to a deleted medical record. Start a new entry if needed.");
+  return { recordId: String(record._id), created: false, duplicateConfirmed: false };
+};
 
 const assertUsableIdentity = async (masterResidentId, visitDate) => {
   const identity = await findIdentity(masterResidentId);
@@ -39,10 +44,11 @@ const isRequestKeyCollision = (error) => error?.code === 11000 && Boolean(error?
 const createEncodedRecord = async (user, body = {}) => {
   const actor = actorOf(user);
   assertMayEncode(user, typeof body.serviceType === "string" ? body.serviceType.trim() : "");
+  if (String(body.serviceType).trim() === "immunization") throw badRequest("Select the mother and baby in the immunization checklist to record a vaccine dose.");
   const input = readNewRecord(body);
 
   const replay = await findReplay(actor.userId, input.requestKey);
-  if (replay) return { recordId: String(replay._id), created: false, duplicateConfirmed: false };
+  if (replay) return replayResult(replay);
 
   await assertUsableIdentity(input.masterResidentId, input.fields.completedAt);
 
@@ -70,7 +76,7 @@ const createEncodedRecord = async (user, body = {}) => {
   } catch (error) {
     if (!isRequestKeyCollision(error)) throw error;
     const first = await findReplay(actor.userId, input.requestKey);
-    return { recordId: String(first._id), created: false, duplicateConfirmed: false };
+    return replayResult(first);
   }
 };
 
@@ -107,27 +113,42 @@ const changesBetween = (record, fields) => {
 
 // Returns { recordId, changedFields }. Nothing is written when nothing changed.
 const updateEncodedRecord = async (user, id, body = {}) => {
+  assertMayWriteRecords(user);
   const actor = actorOf(user);
   const scoped = await loadScopedRecord(user, id);
   if (isAppointmentSource(scoped.source)) {
     throw conflict("Records from completed appointments cannot be edited here.", ERROR_CODES.CONFLICT);
   }
+  if (scoped.immunizationBabyId) {
+    throw forbidden("Update this baby's doses in the immunization checklist. Corrections require a reason.");
+  }
   if (!canEdit(scoped, user)) {
-    throw forbidden("Only an admin or the staff member who encoded this record can edit it.");
+    throw forbidden("Only the clinical staff member who encoded this record can edit it.");
   }
 
   const { fields, reason } = readRecordEdit(body, scoped.serviceType);
   await assertUsableIdentity(scoped.masterResidentId, fields.completedAt);
 
   const record = await MedicalRecord.findById(scoped._id);
+  if (!record || record.updatedAt?.getTime() !== new Date(scoped.updatedAt).getTime()) throw conflict("This medical record has changed. Reload before editing it.");
   const changes = changesBetween(record.toObject(), fields);
   if (changes.length === 0) return { recordId: String(record._id), changedFields: [] };
 
+  const revision = { editedBy: actor.userId, editedByRole: actor.role, editedAt: new Date(), reason, changes };
   record.set(fields);
   record.updatedBy = actor.userId;
   record.updatedByRole = actor.role;
-  record.revisions.push({ editedBy: actor.userId, editedByRole: actor.role, editedAt: new Date(), reason, changes });
-  await record.save();
+  record.revisions.push(revision);
+  // Conditional validators use the document's source; query validators cannot
+  // distinguish an encoded record from an appointment when source is unchanged.
+  await record.validate();
+  const saved = await MedicalRecord.findOneAndUpdate(
+    { _id: record._id, updatedAt: scoped.updatedAt },
+    { $set: { ...fields, updatedBy: actor.userId, updatedByRole: actor.role },
+      $push: { revisions: revision } },
+    { returnDocument: "after" }
+  );
+  if (!saved) throw conflict("This medical record has changed. Reload before editing it.");
   return { recordId: String(record._id), changedFields: changes.map((change) => change.field) };
 };
 
