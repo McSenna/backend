@@ -11,8 +11,11 @@ const {verifiedAccountFilter} = require("../immunization/access");
 const { CONSULTATION_CATEGORIES } = require("../../config/consultationCategories");
 const { ENCODABLE_SOURCES } = require("../../config/medicalRecordSources");
 const { isValidObjectId } = require("../../utils/objectId");
+const { babiesWithoutRecords } = require("./residentBabies");
 
 const PAGE_SIZE = 30;
+const NUMBERED_PAGE_SIZE = 20;
+const MAX_PAGE = 100000;
 const RANGE_MONTHS = Object.freeze({ "6m": 6, "12m": 12 });
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -93,17 +96,40 @@ const cursorClause = (before) => {
   return { $or: [{ completedAt: { $lt: at } }, { completedAt: at, _id: { $lt: before.id } }] };
 };
 
+// One baby's program record, for a notification tap. A malformed ID matches nothing.
+const babyClause = (babyId) => {
+  if (babyId === undefined || babyId === null) return null;
+  return typeof babyId === "string" && isValidObjectId(babyId) ? { immunizationBabyId: babyId } : { _id: null };
+};
+
+const numberedPage = (value) => {
+  const page = Number(value);
+  return Number.isInteger(page) && page >= 1 ? Math.min(page, MAX_PAGE) : 1;
+};
+
 const pagedResidentRecords = async (userId, criteria = {}) => {
   const service = typeof criteria.service === "string" && criteria.service !== "all" ? criteria.service : null;
-  const months = RANGE_MONTHS[criteria.range];
+  const months = Object.hasOwn(RANGE_MONTHS, criteria.range) ? RANGE_MONTHS[criteria.range] : null;
   const clauses = [
     await residentRecordFilter(userId),
     service ? { serviceType: service } : null,
     months ? { completedAt: { $gte: monthsAgo(months) } } : null,
     await queryClause(criteria.query),
+    babyClause(criteria.babyId),
     cursorClause(criteria.before),
   ].filter(Boolean);
   const filter = { $and: clauses };
+  const babies = criteria.before ? [] : await babiesWithoutRecords(userId);
+
+  // The table reads numbered pages. Installed apps still send a cursor, so that stays.
+  if (criteria.page !== undefined) {
+    const skip = (numberedPage(criteria.page) - 1) * NUMBERED_PAGE_SIZE;
+    const [records, total] = await Promise.all([
+      residentRecordQuery(filter).sort({ completedAt: -1, _id: -1 }).skip(skip).limit(NUMBERED_PAGE_SIZE).lean(),
+      MedicalRecord.countDocuments(filter),
+    ]);
+    return { records, total, nextCursor: null, babiesWithoutRecords: babies };
+  }
 
   const [rows, total] = await Promise.all([
     residentRecordQuery(filter).sort({ completedAt: -1, _id: -1 }).limit(PAGE_SIZE + 1).lean(),
@@ -116,6 +142,7 @@ const pagedResidentRecords = async (userId, criteria = {}) => {
     records,
     total,
     nextCursor: rows.length > PAGE_SIZE ? { completedAt: last.completedAt, id: String(last._id) } : null,
+    babiesWithoutRecords: babies,
   };
 };
 

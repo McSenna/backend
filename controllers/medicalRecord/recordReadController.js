@@ -39,15 +39,13 @@ exports.getMedicalRecord = asyncHandler(async (req, res) => {
   }
 
   const access = describeAccess(record, req.user);
-  // A resident also owns records encoded under the master list identity their
-  // account holds.
-  if (access.role === "resident" && (!access.isOwner || record.immunizationBabyId)) {
+  // A resident session reads only what its account owns: its own visits and the
+  // records under the identity it holds. Having authored a record on an earlier
+  // staff account grants nothing here.
+  if (access.role === "resident") {
     access.isOwner = await ownsRecord(req.user.userId, record);
-    if (record.immunizationBabyId) {
-      // A former clinician using a resident session must follow parent ownership.
-      access.isAuthor = false;
-      access.ownsService = false;
-    }
+    access.isAuthor = false;
+    access.ownsService = false;
   }
 
   if (!access.isOwner && !access.isAuthor && !access.ownsService) {

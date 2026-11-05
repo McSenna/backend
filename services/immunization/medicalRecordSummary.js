@@ -6,6 +6,22 @@ const Schedule = require("../../models/VaccineSchedule");
 const MedicalRecord = require("../../models/MedicalRecord");
 const { todayManila } = require("./calendar");
 
+// When finalized care last happened on this record, or null if it is only a draft.
+const finalizedCareDate = (record) => {
+  if (record.state === "administered" && record.administeredOn) return record.administeredOn;
+  if (record.workflowStatus !== "draft") return todayManila(record.updatedAt || record.createdAt || new Date());
+  // A draft saved over an earlier deferral must not move that deferral's date.
+  const finalized = (record.history ?? []).filter((entry) => entry.action !== "draft_saved").at(-1);
+  return finalized ? todayManila(finalized.at) : null;
+};
+
+// Draft edits never move the record date. With only drafts it stays on the first one.
+const recordDates = (records) => {
+  const finalized = records.map(finalizedCareDate).filter(Boolean).sort();
+  if (finalized.length) return finalized;
+  return records.map((record) => todayManila(record.createdAt || new Date())).sort().slice(0, 1);
+};
+
 // A derived program summary, never a second copy of clinical dose records.
 // Caller holds the Baby revision fence inside the clinical transaction.
 const syncImmunizationMedicalRecord = async (baby, schedule, user, session) => {
@@ -22,13 +38,7 @@ const syncImmunizationMedicalRecord = async (baby, schedule, user, session) => {
   const total = keys.size;
   const recordStatus =
     total > 0 && administered === total ? "completed" : "in_progress";
-  const careDates = records
-    .map(
-      (record) =>
-        (record.state === "administered" && record.administeredOn) ||
-        todayManila(record.updatedAt || record.createdAt || new Date()),
-    )
-    .sort();
+  const careDates = recordDates(records);
   return MedicalRecord.findOneAndUpdate(
     { immunizationBabyId: baby._id },
     {

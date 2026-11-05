@@ -26,7 +26,7 @@ const assertCooldownElapsed = (pending) => {
 };
 
 const resendOtp = async (email) => {
-  if (!email) {
+  if (!email || typeof email !== "string") {
     throw badRequest("Email is required.", ERROR_CODES.MISSING_FIELDS);
   }
 

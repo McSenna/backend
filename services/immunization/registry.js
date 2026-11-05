@@ -8,6 +8,7 @@ const { assertMidwife, motherIdentity, loadContext, nameOf, presentBaby } = requ
 const { todayManila, requireDate } = require('./calendar');
 const { INITIAL_SCHEDULE } = require('./scheduleDefinition');
 const { text } = require('./validation');
+const { forResidentBaby } = require('./residentView');
 const ensureInitialSchedule = async () => {
   try {
     return await VaccineSchedule.findOneAndUpdate({version:INITIAL_SCHEDULE.version},{$setOnInsert:INITIAL_SCHEDULE},{upsert:true,returnDocument:'after'}).lean();
@@ -25,7 +26,8 @@ const searchMothers = async (user, body) => {
 };
 const listBabies = async (user, body) => {
   const mother = await motherIdentity(user,body.motherMasterResidentId);
-  return (await Baby.find({motherMasterResidentId:mother.masterResidentId}).sort({dateOfBirth:-1,_id:1}).lean()).map(presentBaby);
+  const babies = (await Baby.find({motherMasterResidentId:mother.masterResidentId}).sort({dateOfBirth:-1,_id:1}).lean()).map(presentBaby);
+  return user.role === 'resident' ? babies.map(forResidentBaby) : babies;
 };
 const createBaby = async (user, body) => {
   assertMidwife(user);

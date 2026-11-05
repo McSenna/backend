@@ -56,8 +56,8 @@ const call = (path,user,body) => h.request(`/immunization${path}`, {method:'POST
     assert.equal(record.history[1].previous.remarks,input.remarks);
     await User.updateOne({_id:mother._id},{$set:{masterResidentId:'TEST-F',verificationMethod:'admin_review',status:'active',verified:true}});
     assert.equal((await h.search(midwife)).body.records.find(row=>row._id===String(summary._id)).workflowStatus,'draft');
-    assert.equal((await h.myRecordPage(mother)).body.medicalRecords.find(row=>row._id===String(summary._id)).workflowStatus,'draft');
-    assert.equal((await call('/checklist',mother,input)).body.history[0].remarks,'Source checked');
+    assert.equal((await h.myRecordPage(mother)).body.medicalRecords.find(row=>row._id===String(summary._id)).workflowStatus,undefined,'residents see no draft label on the summary');
+    assert.equal((await call('/checklist',mother,input)).body.history.length,0,'residents never receive a draft');
     const stranger = await h.createStaff('resident');
     await User.updateOne({_id:stranger._id},{$set:{masterResidentId:'TEST-A',verificationMethod:'admin_review',status:'active',verified:true}});
     assert.equal((await call('/checklist',stranger,input)).status,403);

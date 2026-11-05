@@ -141,6 +141,17 @@ const run = async () => {
   assert.equal(await flagOf(otherAdmin), false);
   assert.equal(JSON.stringify((await webLogin(otherAdmin)).body).includes(String(kape._id)), false, "other admins are not told the designated id");
 
+  // The Users screen reads /profile, rather than trusting the sign-in response.
+  const existingAdminSession = adminHeaders(kape);
+  const profilePermission = async (headers) => {
+    const response = await h.request("/profile", { headers });
+    assert.equal(response.status, 200);
+    return response.body.user?.permissions?.manageResidentWebAccess;
+  };
+  assert.equal(await profilePermission(existingAdminSession), true, "the designated account can see the controls");
+  assert.equal(await profilePermission(adminHeaders(otherAdmin)), false, "another admin cannot see the controls");
+  assert.equal((await h.request(GLOBAL_PATH, { headers: existingAdminSession })).status, 200);
+
   // Fail closed on any missing or wrong configuration.
   const failTarget = await account("resident");
   for (const value of [undefined, "", "   ", "not-an-id", "ADM-2026-5BE2", "Kape Maslog", String(new mongoose.Types.ObjectId()), String(otherAdmin._id).slice(0, 23)]) {
@@ -150,7 +161,12 @@ const run = async () => {
     assert.equal((await setAccess(kape, failTarget, { override: "allow", revision: 0 })).status, 403, label);
     assert.equal((await setGlobal(kape, { enabled: true, revision: 0 })).status, 403, label);
     assert.equal(await flagOf(kape), false, label);
+    assert.equal(await profilePermission(existingAdminSession), false, "an existing session cannot retain an unconfigured permission");
+    assert.equal((await h.request(GLOBAL_PATH, { headers: existingAdminSession })).status, 403, label);
   }
+  process.env[ENV_KEY] = String(kape._id);
+  assert.equal(await profilePermission(existingAdminSession), true, "restoring configuration grants the same session on its next profile read");
+  assert.equal((await h.request(GLOBAL_PATH, { headers: existingAdminSession })).status, 200);
   process.env[ENV_KEY] = String(failTarget._id);
   assert.equal((await setAccess(failTarget, failTarget, { override: "allow", revision: 0 })).status, 403, "a resident id in the config grants nothing");
   process.env[ENV_KEY] = String(bhw._id);

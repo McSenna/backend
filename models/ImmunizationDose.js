@@ -11,7 +11,7 @@ const schema = new mongoose.Schema({
   administeredOn:String, administeredAt:String, administeredBy:{type:String,maxlength:120},
   recordedBy:{type:mongoose.Schema.Types.ObjectId,ref:'User',required:true},
   facility:{type:String,maxlength:160},lotNumber:{type:String,maxlength:120},route:{type:String,maxlength:80},site:{type:String,maxlength:120},
-  remarks:{type:String,maxlength:2000}, historical:{type:Boolean,default:false},reviewRequired:{type:Boolean,default:true},
+  remarks:{type:String,maxlength:2000}, immediateReaction:{type:String,maxlength:2000}, aefi:{type:String,maxlength:2000}, historical:{type:Boolean,default:false},reviewRequired:{type:Boolean,default:true},
   followUpOn:String,reason:{type:String,maxlength:500}, revision:{type:Number,default:0},
   history:{type:[new mongoose.Schema({action:{type:String,required:true},reason:String,actor:{type:mongoose.Schema.Types.ObjectId,ref:'User',required:true},at:{type:Date,required:true},previous:{type:mongoose.Schema.Types.Mixed,default:null}},{_id:false})],default:[]},
 },{timestamps:true});

@@ -13,7 +13,7 @@ const { verifyRegistrationOtp } = require("../../services/auth/otpVerificationSe
 const { buildUserResponse, platformOf } = require("../../services/auth/authResponse");
 
 exports.sendOtp = asyncHandler(async (req, res) => {
-  await resendOtp(req.body.email);
+  await resendOtp(req.body?.email);
 
   return res.status(HTTP_STATUS.OK).json({
     success: true,
@@ -56,7 +56,7 @@ const respondWithPlatformDenial = async ({ req, res, user, platform, denial }) =
 };
 
 exports.verifyOtp = asyncHandler(async (req, res) => {
-  const user = await verifyRegistrationOtp(req.body);
+  const user = await verifyRegistrationOtp(req.body ?? {});
 
   sendWelcome(user);
 

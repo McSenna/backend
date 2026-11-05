@@ -15,4 +15,6 @@ const schema = new mongoose.Schema({
   nameHistory:{type:[new mongoose.Schema({name:String,actor:{type:mongoose.Schema.Types.ObjectId,ref:'User'},at:Date},{_id:false})],default:[]},
 }, {timestamps:true});
 schema.index({createdBy:1,requestKey:1},{unique:true});
+// Finds the one baby a completed visit record belongs to.
+schema.index({'completedVisits.recordId':1});
 module.exports = mongoose.model('Baby',schema);

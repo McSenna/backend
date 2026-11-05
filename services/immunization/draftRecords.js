@@ -9,7 +9,8 @@ const saveDraft = (user, body) => inBabyTransaction(user, body, async ({baby, do
   if (current?.state === 'administered') throw conflict('This dose is already administered. Use a correction with a reason.');
   const values = draftAdministrationFields(baby, body);
   // Retrying the same complete draft snapshot is safe, including after a lost response.
-  if (current?.workflowStatus === 'draft' && Object.entries(values).every(([key,value]) => current[key] === value)) return;
+  // A draft saved before a field existed has no value for it, which matches a blank.
+  if (current?.workflowStatus === 'draft' && Object.entries(values).every(([key,value]) => (current[key] ?? (typeof value === 'string' ? '' : value)) === value)) return;
   assertRevision(current, body.expectedRevision);
   if (!current) {
     await Dose.create([{

@@ -72,6 +72,14 @@ const duplicate = (error) => error.statusCode === 409 && error.code === "DUPLICA
     await MasterResident.collection.insertOne({ ...old, masterResidentId: "LEG-3", firstName: "LegacyOne" });
     await assert.rejects(initializeResidentIdentity(), (e) => e.statusCode === 503);
     assert.equal(await MasterResident.countDocuments({ masterResidentId: "LEG-3", identityKey: { $exists: false } }), 1);
+    // An admin only ever sees problems they can fix, never a derived internal field.
+    for (const bad of [{ dateOfBirth: "not-a-date" }, { dateOfBirth: undefined }]) {
+      await assert.rejects(createMasterResident(row(bad), null), (error) => {
+        assert.equal(error.statusCode, 422);
+        assert.ok(!JSON.stringify({ message: error.message, details: error.details }).includes("identityKey"), "internal field shown to the admin");
+        return true;
+      });
+    }
     console.log("PASS: personal-information duplicates, normalization, differences, inactive status, edits, concurrency and atomic imports");
   } finally {
     await mongoose.disconnect();

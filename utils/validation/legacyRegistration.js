@@ -9,7 +9,14 @@ const {
   isValidGender,
 } = require("./basicValidators");
 
+const TEXT_FIELDS = Object.freeze(["fullname", "email", "password", "gender", "address"]);
+
 const validateRegistrationPayload = (data) => {
+  // The checks below and the profile builder call string methods on these.
+  if (TEXT_FIELDS.some((field) => data[field] !== undefined && typeof data[field] !== "string")) {
+    return { isValid: false, errors: ["Enter your details as text and try again."] };
+  }
+
   const errors = [];
 
   if (!data.fullname) errors.push("Full name is required");

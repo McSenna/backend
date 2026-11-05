@@ -20,6 +20,8 @@ const INTERNAL_FIELDS = Object.freeze([
   "requestKey",
   "duplicateAcknowledged",
   "masterResidentId",
+  // Whether a draft exists on a baby program is staff workflow, not a clinical fact.
+  "workflowStatus",
 ]);
 
 const idOf = (value) => String(value?._id ?? value ?? "");
@@ -42,6 +44,12 @@ const forResident = (record) => {
   return safe;
 };
 
+/** A resident's appointment row: the linked medical record is populated whole, so it needs the same rule. */
+const appointmentForResident = (row) =>
+  row.medicalRecord && typeof row.medicalRecord === "object"
+    ? { ...row, medicalRecord: forResident(row.medicalRecord) }
+    : row;
+
 const withoutInternals = (record) => {
   const safe = { ...record };
   delete safe.requestKey;
@@ -51,4 +59,4 @@ const withoutInternals = (record) => {
 const redactForViewer = (record, access) =>
   access.isAuthor || access.ownsService ? withoutInternals(record) : forResident(record);
 
-module.exports = { STAFF_ONLY_FIELDS, describeAccess, forResident, redactForViewer };
+module.exports = { STAFF_ONLY_FIELDS, describeAccess, forResident, appointmentForResident, redactForViewer };

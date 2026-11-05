@@ -74,7 +74,7 @@ const createVerifiedResident = (pending) =>
   });
 
 const verifyRegistrationOtp = async ({ email, otp }) => {
-  if (!email || !otp) {
+  if (!email || !otp || typeof email !== "string") {
     throw badRequest("Email and verification code are required.", ERROR_CODES.MISSING_FIELDS);
   }
   if (!isValidOTP(otp)) {

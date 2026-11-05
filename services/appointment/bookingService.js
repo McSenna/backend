@@ -1,5 +1,6 @@
 "use strict";
 
+const { appointmentForResident } = require("../medicalRecord/residentRecordView");
 const Appointment = require("../../models/Appointment");
 const User = require("../../models/User");
 const { isWeeklyService } = require("../../config/consultationCategories");
@@ -94,7 +95,9 @@ const residentAppointmentQuery = (filter) =>
     .populate("completedBy", "fullname role")
     .populate("medicalRecord");
 
-const listResidentAppointments = async (residentId) =>
-  require('../immunization/appointmentAccess').protectedAppointmentRows(await residentAppointmentQuery({ resident: residentId }).sort({ createdAt: -1 }).lean());
+const listResidentAppointments = async (residentId) => {
+  const rows = await require('../immunization/appointmentAccess').protectedAppointmentRows(await residentAppointmentQuery({ resident: residentId }).sort({ createdAt: -1 }).lean());
+  return rows.map(appointmentForResident);
+};
 
 module.exports = { bookAppointment, listBookingOptions, listResidentAppointments, residentAppointmentQuery };

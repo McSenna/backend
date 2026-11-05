@@ -4,21 +4,10 @@ const Appointment = require("../../models/Appointment");
 const { staffAppointmentQuery } = require("../../services/appointment/queueService");
 const { residentAppointmentQuery } = require("../../services/appointment/bookingService");
 const { withQueueRole } = require("../../services/queueScope");
-const { forResident } = require("../../services/medicalRecord/residentRecordView");
+const { appointmentForResident } = require("../../services/medicalRecord/residentRecordView");
 const { broadcast } = require("../broadcast");
 const { STAFF_ROOM, roleRoom, serviceOwnerRooms, userRoom } = require("../rooms");
 const { idOf, splitChanges } = require("./shared");
-
-/**
- * The resident list populates the linked medical record whole, which carries
- * staff-only fields (notes, revisions). REST still sends them (reported
- * separately); the socket strips them with the same rule the resident record
- * endpoints use.
- */
-const toResidentRow = (row) =>
-  row.medicalRecord && typeof row.medicalRecord === "object"
-    ? { ...row, medicalRecord: forResident(row.medicalRecord) }
-    : row;
 
 const publish = async (changes) => {
   const { liveIds, deletedIds, actionOf } = splitChanges(changes);
@@ -35,7 +24,7 @@ const publish = async (changes) => {
       broadcast("appointment", actionOf(row._id), withQueueRole(row), serviceOwnerRooms(row.consultationType));
     }
     for (const row of await require('../../services/immunization/appointmentAccess').protectedAppointmentRows(residentRows)) {
-      broadcast("myAppointment", actionOf(row._id), toResidentRow(row), [userRoom(idOf(row.resident))]);
+      broadcast("myAppointment", actionOf(row._id), appointmentForResident(row), [userRoom(idOf(row.resident))]);
     }
   }
 

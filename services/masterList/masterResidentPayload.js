@@ -76,7 +76,10 @@ const validateRecord = async (doc) => {
     return {};
   } catch (error) {
     if (error?.name !== "ValidationError") throw error;
-    return fieldErrorsOf(error);
+    // The key is derived from the birth date, so it is only ever missing because
+    // the birth date is, and that field already has its own message.
+    const { identityKey, ...visible } = fieldErrorsOf(error);
+    return visible;
   }
 };
 

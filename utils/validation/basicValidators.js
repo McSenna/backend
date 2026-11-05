@@ -33,7 +33,8 @@ const validatePasswordStrength = (password) => {
 };
 
 const isValidFullName = (fullname) => {
-  const len = fullname?.trim().length;
+  if (typeof fullname !== "string") return false;
+  const len = fullname.trim().length;
   return len >= 2 && len <= 100;
 };
 

@@ -32,12 +32,13 @@ exports.getMyMedicalRecords = asyncHandler(async (req, res) => {
 // Paged history for the resident's records screen. Filters travel in the body
 // so the search text stays out of URLs and request logs.
 exports.searchMyMedicalRecords = asyncHandler(async (req, res) => {
-  const { records, total, nextCursor } = await pagedResidentRecords(req.user.userId, req.body ?? {});
+  const { records, total, nextCursor, babiesWithoutRecords } = await pagedResidentRecords(req.user.userId, req.body ?? {});
   return res.json({
     success: true,
     message: "Medical records loaded successfully.",
     medicalRecords: records.map(forResident),
     total,
     nextCursor,
+    babiesWithoutRecords,
   });
 });

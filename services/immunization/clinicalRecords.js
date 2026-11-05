@@ -63,7 +63,7 @@ const correctAdministration = (user,body) => inBabyTransaction(user,body,async (
   if (!current || current.state !== 'administered' || current.revision !== body.expectedRevision) throw conflict('This record has changed. Reload before correcting it.');
   const event = audit(user,body.action,reason,current);
   if (body.action === 'correct') {
-    const values = await administrationFields(user,baby,vaccine,body.administration || {});
+    const values = await administrationFields(user,baby,vaccine,body.administration || {},current);
     values.reviewRequired = values.historical || values.administeredOn !== targetDate(baby.dateOfBirth,slot);
     current.set(values);
   } else current.set({state:'void',reviewRequired:true,followUpOn:undefined});

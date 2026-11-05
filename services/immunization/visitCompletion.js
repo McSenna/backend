@@ -11,6 +11,7 @@ const {todayManila} = require('./calendar');
 const {assertValidObjectId} = require('../../utils/objectId');
 const {badRequest,conflict,notFound} = require('../../utils/AppError');
 const {assertCompletionDayReached} = require('../appointment/serviceDayRules');
+const {visitDoseFilter} = require('./visitDoses');
 
 const completeImmunizationVisit = async (user,body) => {
   assertMidwife(user);
@@ -36,7 +37,7 @@ const completeImmunizationVisit = async (user,body) => {
       if (!COMPLETABLE_STATUSES.includes(appointment.status)) throw conflict('Only a scheduled or processing visit can be completed.');
       assertCompletionDayReached(appointment);
       const visitDay = todayManila(appointment.slotStart);
-      const doses = await Dose.find({babyId:baby._id,$or:[{state:'administered',administeredOn:visitDay},{state:{$in:['deferred','void']},history:{$elemMatch:{action:{$ne:'draft_saved'},at:{$gte:new Date(`${visitDay}T00:00:00+08:00`),$lt:new Date(new Date(`${visitDay}T00:00:00+08:00`).getTime()+86400000)}}}}]}).session(session).lean();
+      const doses = await Dose.find(visitDoseFilter(baby._id,visitDay)).session(session).lean();
       if (!doses.length) throw conflict('Record this baby’s administered doses or documented deferral for the visit date in the checklist first.');
       if(!owner)await require('./appointmentLinkCorrection').correctAppointmentRecipient(appointment,baby,mother,user,session);
       const [record] = await MedicalRecord.create([{

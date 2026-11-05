@@ -36,6 +36,7 @@ post('/follow-up',write,async (req,res) => {
   await clinical.saveFollowUp(req.user,req.body);
   res.json({success:true});
 });
+post('/visits/doses',read,async (req,res) => res.json(await require('../services/immunization/visitLedger').getVisitLedger(req.user,req.body)));
 post('/visits/complete',write,async (req,res) => {
   const result = await require('../services/immunization/visitCompletion').completeImmunizationVisit(req.user,req.body);
   res.json({success:true,...result});
