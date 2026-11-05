@@ -40,7 +40,7 @@ const SUPPORT_CONTACT = Object.freeze({
     process.env.SUPPORT_CONTACT_LOCATION ||
     `Barangay ${RESIDENCY.barangay}, ${RESIDENCY.cityMunicipality}, ${RESIDENCY.province}`,
   contactNumber: process.env.SUPPORT_CONTACT_NUMBER || "Not yet available",
-  email: process.env.SUPPORT_CONTACT_EMAIL || process.env.EMAIL_USER || "Not yet available",
+  email: process.env.SUPPORT_CONTACT_EMAIL || process.env.BREVO_SENDER_EMAIL || "Not yet available",
   officeHours: Object.freeze([
     { days: "Monday – Friday", hours: process.env.SUPPORT_OFFICE_HOURS || "8:00 AM – 5:00 PM" },
   ]),

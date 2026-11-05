@@ -19,134 +19,80 @@ class EmailServiceError extends Error {
     this.userMessage = userMessage || "The verification email service is temporarily unavailable. Please try again later.";
     this.httpStatus = httpStatus;
     this.originalError = originalError;
-    this.isRetryable = [
-      EmailErrorCode.NETWORK_ERROR,
-      EmailErrorCode.RATE_LIMITED,
-    ].includes(code);
   }
 }
 
-function classifySmtpError(err) {
-  if (err instanceof EmailServiceError) {
-    return err;
+// Brevo's message text can echo addresses, so it picks the category but is never
+// copied into the error, which ends up in logs.
+function classifyBrevoResponse(status, body, headers) {
+  const providerCode = String(body?.code || "");
+  const providerMessage = String(body?.message || "");
+  const summary = `Brevo refused the email (HTTP ${status}${providerCode ? ` ${providerCode}` : ""})`;
+
+  if (status === 429) {
+    const error = new EmailServiceError(
+      EmailErrorCode.RATE_LIMITED,
+      summary,
+      "Email service is receiving too many requests. Please wait a moment and try again.",
+      429
+    );
+    const retryAfter = Number(headers?.get?.("x-sib-ratelimit-reset"));
+    if (retryAfter > 0) error.details = { retryAfter };
+    return error;
   }
 
-  const rawMsg = String(err?.message || "").toLowerCase();
-  const rawResponse = String(err?.response || "").toLowerCase();
-  const responseCode = Number(err?.responseCode || 0);
-  const sysCode = String(err?.code || "").toUpperCase();
-
-  // Gmail reports its daily cap as a 550 too, so quota is matched on the text;
-  // any other 550 means the recipient mailbox was refused.
-  if (
-    rawResponse.includes("sending limit exceeded") ||
-    rawMsg.includes("sending limit exceeded") ||
-    rawResponse.includes("quota exceeded") ||
-    rawMsg.includes("quota exceeded")
-  ) {
+  if (status === 402 || providerCode === "not_enough_credits") {
     return new EmailServiceError(
       EmailErrorCode.QUOTA_EXCEEDED,
-      `Provider daily sending quota exceeded: ${err.message}`,
+      summary,
       "The verification email service is temporarily unavailable due to provider limits. Please try again later.",
-      503,
-      err
+      503
     );
   }
 
-  if (
-    responseCode === 535 ||
-    rawResponse.includes("authentication failed") ||
-    rawMsg.includes("authentication failed") ||
-    rawResponse.includes("bad credentials") ||
-    rawMsg.includes("bad credentials") ||
-    sysCode === "EAUTH"
-  ) {
+  if (providerCode === "account_under_validation" || /sender/i.test(providerMessage)) {
+    return new EmailServiceError(
+      EmailErrorCode.CONFIGURATION_ERROR,
+      `${summary}: check the Brevo account and BREVO_SENDER_EMAIL`,
+      "The email service is not properly configured. Please contact the system administrator.",
+      500
+    );
+  }
+
+  if (status === 401 || status === 403) {
     return new EmailServiceError(
       EmailErrorCode.AUTH_FAILED,
-      `SMTP authentication failed: ${err.message}`,
+      summary,
       "Email service authentication failed. Please contact the administrator.",
-      503,
-      err
+      503
     );
   }
 
-  if (
-    responseCode === 421 ||
-    responseCode === 429 ||
-    rawMsg.includes("too many connections") ||
-    rawResponse.includes("too many connections") ||
-    rawMsg.includes("rate limit")
-  ) {
-    const serviceErr = new EmailServiceError(
-      EmailErrorCode.RATE_LIMITED,
-      `SMTP rate limit exceeded: ${err.message}`,
-      "Email service is receiving too many requests. Please wait a moment and try again.",
-      429,
-      err
-    );
-
-    // Try to extract a Retry-After value from SMTP response or headers when available.
-    try {
-      const hdr = err?.response?.headers || err?.headers || null;
-      let retryAfter = 0;
-      if (hdr && typeof hdr === "object") {
-        const ra = hdr["retry-after"] || hdr["x-retry-after"];
-        if (ra) retryAfter = Number(String(ra).split(";")[0]) || 0;
-      }
-
-      // Some SMTP error messages include a suggested wait time like "Please try again in 30 seconds".
-      if (!retryAfter && typeof err?.message === "string") {
-        const m = err.message.match(/(\d{1,5})\s*(?:seconds|second|secs|sec)/i);
-        if (m) retryAfter = Number(m[1]) || 0;
-      }
-
-      if (retryAfter > 0) serviceErr.details = { retryAfter };
-    } catch (_) {
-      // ignore extraction errors
-    }
-
-    return serviceErr;
-  }
-
-  if (
-    responseCode === 550 ||
-    responseCode === 551 ||
-    responseCode === 553 ||
-    rawMsg.includes("recipient rejected") ||
-    rawMsg.includes("no such user") ||
-    rawResponse.includes("invalid recipient") ||
-    // EENVELOPE means the recipient list was refused or empty: permanent, so never retried.
-    sysCode === "EENVELOPE"
-  ) {
+  if (status === 400 && providerCode === "invalid_parameter" && /email|recipient/i.test(providerMessage)) {
     return new EmailServiceError(
       EmailErrorCode.RECIPIENT_INVALID,
-      `Destination recipient rejected: ${err.message}`,
+      summary,
       "The specified recipient email address could not be delivered to.",
-      400,
-      err
-    );
-  }
-
-  const networkCodes = ["ECONNREFUSED", "ETIMEDOUT", "ECONNRESET", "ESOCKETTIMEDOUT", "ENOTFOUND", "EAI_AGAIN"];
-  if (
-    networkCodes.includes(sysCode) ||
-    rawMsg.includes("connection closed") ||
-    rawMsg.includes("timed out")
-  ) {
-    return new EmailServiceError(
-      EmailErrorCode.NETWORK_ERROR,
-      `SMTP connection failure (${sysCode}): ${err.message}`,
-      "Temporary connection problem with the email service. Please try again in a few moments.",
-      503,
-      err
+      400
     );
   }
 
   return new EmailServiceError(
     EmailErrorCode.UNKNOWN_ERROR,
-    `Unclassified email error: ${err.message}`,
+    summary,
     "Failed to send email. Please try again later.",
-    500,
+    status >= 500 ? 503 : 500
+  );
+}
+
+function classifyBrevoFailure(err) {
+  const timedOut = err?.name === "TimeoutError" || err?.name === "AbortError";
+  const reason = timedOut ? "timed out" : err?.cause?.code || err?.name || "network failure";
+  return new EmailServiceError(
+    EmailErrorCode.NETWORK_ERROR,
+    `Could not reach Brevo (${reason})`,
+    "Temporary connection problem with the email service. Please try again in a few moments.",
+    503,
     err
   );
 }
@@ -154,5 +100,6 @@ function classifySmtpError(err) {
 module.exports = {
   EmailErrorCode,
   EmailServiceError,
-  classifySmtpError,
+  classifyBrevoResponse,
+  classifyBrevoFailure,
 };

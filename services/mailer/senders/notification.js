@@ -1,25 +1,26 @@
 "use strict";
-const { transporter, hasCredentials } = require("../config");
-const { generateNotificationEmailHTML } = require("../templates/notificationTemplate");
-const { buildAttachments } = require("../assets");
+const logger = require("../../../utils/logger");
+const { sendMail, hasCredentials, maskEmail } = require("../mailService");
 
 const sendNotificationEmail = async (email, fullname = "User") => {
   if (!hasCredentials()) {
-    console.warn("⚠️  Email credentials not configured. Would send notification email to:", email);
+    logger.warn("Email settings missing; notification email not sent", { to: maskEmail(email) });
     return;
   }
   try {
-    await transporter.sendMail({
-      from:        `"MaslogCare" <${process.env.EMAIL_USER}>`,
-      to:          email,
-      subject:     "MaslogCare – Health Notification",
-      html:        generateNotificationEmailHTML(fullname),
-      text:        `You have received a new healthcare update from MaslogCare. Please log in to your patient portal to view your health records and updates.\n\nQuestions? Email help@maslogcare.ph or visit the health center.`,
-      attachments: buildAttachments("logo", "heroNotif"),
+    await sendMail({
+      to: email,
+      subject: "MaslogCare – Health Notification",
+      text: [
+        `Hello ${fullname},`,
+        "",
+        "You have received a new healthcare update from MaslogCare. Please log in to your patient portal to view your health records and updates.",
+        "",
+        "Questions? Email help@maslogcare.ph or visit your nearest Maslog Barangay Health Center.",
+      ].join("\n"),
     });
-    console.log("✅ Notification email sent to:", email);
-  } catch (err) {
-    console.error("❌ Error sending notification email:", err);
+  } catch {
+    // sendMail has logged the failure, and this notice never fails the caller.
   }
 };
 

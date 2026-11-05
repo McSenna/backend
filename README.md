@@ -59,10 +59,29 @@ REST and Socket.IO accept the same origins. Without `NODE_ENV=production`
 (local development), any localhost or private-network origin is also accepted,
 so Expo's changing web port and Wi-Fi address keep working.
 
+## Email (Brevo)
+
+Every email goes through `services/mailer/mailService.js`, which calls Brevo's
+transactional API from the backend. Emails are plain text only, and the sender
+name is always `MaslogCare`.
+
+Before deploying:
+
+1. Generate an API key at https://app.brevo.com/settings/keys/api. Do not reuse a key that has been pasted anywhere.
+2. In your Brevo account, verify the sender address and authenticate its domain.
+3. Check your name menu, Security, Authorized IPs. If "Block unknown IP addresses" is on, Brevo rejects requests from other addresses even with a valid key, so allow the server's outbound addresses.
+4. On Render, set `BREVO_API_KEY` and `BREVO_SENDER_EMAIL`, then remove the old `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_PASSWORD`, `EMAIL_FROM`, `EMAIL_FROM_NAME` and `EMAIL_TLS_REJECT_UNAUTHORIZED`.
+5. Set `SUPPORT_CONTACT_EMAIL`. Without it, the support page shows the sender address.
+
+A successful send means Brevo accepted the message, not that it arrived. Bounces
+and blocks appear later in Brevo's transactional logs. Each email is attempted
+once with a 10 second timeout and no automatic retry, because a retry after a
+timeout could send the same email twice.
+
 ## Security notes
 
 - `.env` and everything in `storage/` are git-ignored. Never commit them. Uploaded IDs are personal data.
-- If a real `.env` was ever committed, rotate `JWT_SECRET`, the MongoDB password, the SMTP password and the admin password.
+- If a real `.env` was ever committed, rotate `JWT_SECRET`, the MongoDB password, the Brevo API key and the admin password.
 
 ## Master resident duplicate protection
 

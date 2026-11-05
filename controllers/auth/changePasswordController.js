@@ -64,7 +64,7 @@ exports.changePassword = asyncHandler(async (req, res) => {
     metadata: { email: user.email, changedAt: changedAt.toISOString() },
   });
 
-  // The password is already saved, so the answer must not wait on SMTP: a
+  // The password is already saved, so the answer must not wait on email: a
   // stalled mail server used to hold it past the app's timeout, and the app
   // then reported a change that had gone through as failed.
   void sendPasswordChangedEmail({

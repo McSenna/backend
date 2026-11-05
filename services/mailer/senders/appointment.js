@@ -1,124 +1,92 @@
 "use strict";
-const { transporter, hasCredentials } = require("../config");
-const {
-  generateAppointmentConfirmationHTML,
-  generateAppointmentReminderHTML,
-  generateAppointmentRescheduledHTML,
-  generateAppointmentDeclinedHTML,
-} = require("../templates/appointmentTemplate");
-const { buildAttachments } = require("../assets");
+const logger = require("../../../utils/logger");
+const { sendMail, hasCredentials, maskEmail } = require("../mailService");
 
-function safeString(v) {
-  if (v === null || v === undefined) return "";
-  return String(v);
-}
+const CONTACT_LINE = "Questions? Email help@maslogcare.ph or visit your nearest Maslog Barangay Health Center.";
+const BEFORE_YOU_COME = "Before you come: arrive 10 minutes early and bring your health booklet and a valid ID.";
+const CANT_MAKE_IT = "Can't make it? Email help@maslogcare.ph.";
 
-function getDoctorLabel(appointmentDetails) {
-  return appointmentDetails?.doctor || appointmentDetails?.worker || "Medical mission team";
-}
-
-function getAppointmentType(appointmentDetails) {
-  const t = appointmentDetails?.appointmentType;
-  return safeString(t).trim();
-}
-
-const sendAppointmentConfirmationEmail = async (email, fullname = "User", appointmentDetails = {}) => {
-  if (!hasCredentials()) {
-    console.warn("⚠️  Email credentials not configured. Would send appointment confirmation to:", email);
-    return;
-  }
-  const appointmentType = getAppointmentType(appointmentDetails);
-  const doctor = getDoctorLabel(appointmentDetails);
-  try {
-    await transporter.sendMail({
-      from:        `"MaslogCare" <${process.env.EMAIL_USER}>`,
-      to:          email,
-      subject:     "MaslogCare – Your Appointment is Confirmed",
-      html:        generateAppointmentConfirmationHTML(fullname, appointmentDetails),
-      text:        `Hello ${fullname}, ${
-        appointmentType ? `your ${appointmentType} appointment` : "your MaslogCare appointment"
-      } has been confirmed.\n\nDate: ${appointmentDetails.date}\nTime: ${appointmentDetails.time}\nDoctor: ${doctor}\nLocation: ${appointmentDetails.location}\n\nQuestions? Email help@maslogcare.ph or visit the health center.`,
-      attachments: buildAttachments("logo", "heroNotif"),
-    });
-    console.log("✅ Appointment confirmation email sent to:", email);
-  } catch (err) {
-    console.error("❌ Error sending appointment confirmation email:", err);
-    throw new Error(`Failed to send appointment confirmation email: ${err.message}`);
-  }
+const describeVisit = (details, noun) => {
+  const type = String(details?.appointmentType ?? "").trim();
+  return type ? `Your ${type} ${noun}` : `Your MaslogCare ${noun}`;
 };
 
-const sendAppointmentRescheduledEmail = async (email, fullname = "User", appointmentDetails = {}) => {
+const detailLines = (fullname, details, workerLabel = "Doctor") =>
+  [
+    ["Patient", details.patientName || fullname],
+    ["Appointment type", details.appointmentType],
+    ["Date", details.date],
+    ["Time", details.time],
+    [workerLabel, details.doctor || details.worker || "Medical mission team"],
+    ["Location", details.location],
+    ["Reason", details.declineReason],
+  ]
+    .filter(([, value]) => value)
+    .map(([label, value]) => `${label}: ${value}`);
+
+const sendAppointmentEmail = async (label, email, subject, lines) => {
   if (!hasCredentials()) {
-    console.warn("⚠️  Email credentials not configured. Would send appointment reschedule to:", email);
-    return;
-  }
-  const appointmentType = getAppointmentType(appointmentDetails);
-  const doctor = getDoctorLabel(appointmentDetails);
-
-  try {
-    await transporter.sendMail({
-      from: `"MaslogCare" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "MaslogCare – Appointment Rescheduled",
-      html: generateAppointmentRescheduledHTML(fullname, appointmentDetails),
-      text: `Hello ${fullname}, ${
-        appointmentType ? `your ${appointmentType} appointment` : "your MaslogCare appointment"
-      } has been rescheduled.\n\nDate: ${appointmentDetails.date}\nTime: ${appointmentDetails.time}\nDoctor: ${doctor}\nLocation: ${appointmentDetails.location}\n\nQuestions? Email help@maslogcare.ph or visit the health center.`,
-      attachments: buildAttachments("logo", "heroNotif"),
-    });
-    console.log("✅ Appointment rescheduled email sent to:", email);
-  } catch (err) {
-    console.error("❌ Error sending appointment rescheduled email:", err);
-    throw new Error(`Failed to send appointment rescheduled email: ${err.message}`);
-  }
-};
-
-const sendAppointmentDeclinedEmail = async (email, fullname = "User", appointmentDetails = {}) => {
-  if (!hasCredentials()) {
-    console.warn("⚠️  Email credentials not configured. Would send appointment declined email to:", email);
-    return;
-  }
-  const appointmentType = getAppointmentType(appointmentDetails);
-  const doctor = getDoctorLabel(appointmentDetails);
-
-  try {
-    await transporter.sendMail({
-      from: `"MaslogCare" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "MaslogCare – Appointment Update",
-      html: generateAppointmentDeclinedHTML(fullname, appointmentDetails),
-      text: `Hello ${fullname}, ${
-        appointmentType ? `your ${appointmentType} appointment request` : "your appointment request"
-      } has been declined.\n\nDate: ${appointmentDetails.date}\nTime: ${appointmentDetails.time}\nDoctor: ${doctor}\nLocation: ${appointmentDetails.location}\n\nQuestions? Email help@maslogcare.ph or visit the health center.`,
-      attachments: buildAttachments("logo", "heroNotif"),
-    });
-    console.log("✅ Appointment declined email sent to:", email);
-  } catch (err) {
-    console.error("❌ Error sending appointment declined email:", err);
-    throw new Error(`Failed to send appointment declined email: ${err.message}`);
-  }
-};
-
-const sendAppointmentReminderEmail = async (email, fullname = "User", appointmentDetails = {}) => {
-  if (!hasCredentials()) {
-    console.warn("⚠️  Email credentials not configured. Would send appointment reminder to:", email);
+    logger.warn(`Email settings missing; ${label} email not sent`, { to: maskEmail(email) });
     return;
   }
   try {
-    await transporter.sendMail({
-      from:        `"MaslogCare" <${process.env.EMAIL_USER}>`,
-      to:          email,
-      subject:     "MaslogCare – Reminder: Appointment Tomorrow",
-      html:        generateAppointmentReminderHTML(fullname, appointmentDetails),
-      text:        `Hello ${fullname}, this is a reminder of your upcoming MaslogCare appointment.\n\nDate: ${appointmentDetails.date}\nTime: ${appointmentDetails.time}\nHealth Worker: ${appointmentDetails.worker}\nLocation: ${appointmentDetails.location}\n\nPlease arrive 10 minutes early and bring your health booklet and valid ID.\nQuestions? Email help@maslogcare.ph`,
-      attachments: buildAttachments("logo", "heroNotif"),
-    });
-    console.log("✅ Appointment reminder email sent to:", email);
+    await sendMail({ to: email, subject, text: lines.join("\n") });
   } catch (err) {
-    console.error("❌ Error sending appointment reminder email:", err);
-    throw new Error(`Failed to send appointment reminder email: ${err.message}`);
+    throw new Error(`Failed to send ${label} email: ${err.message}`);
   }
 };
+
+const sendAppointmentConfirmationEmail = (email, fullname = "User", details = {}) =>
+  sendAppointmentEmail("appointment confirmation", email, "MaslogCare – Your Appointment is Confirmed", [
+    `Hello ${fullname},`,
+    "",
+    `${describeVisit(details, "appointment")} is confirmed.`,
+    "",
+    ...detailLines(fullname, details),
+    "",
+    BEFORE_YOU_COME,
+    "",
+    CONTACT_LINE,
+  ]);
+
+const sendAppointmentRescheduledEmail = (email, fullname = "User", details = {}) =>
+  sendAppointmentEmail("appointment rescheduled", email, "MaslogCare – Appointment Rescheduled", [
+    `Hello ${fullname},`,
+    "",
+    `${describeVisit(details, "appointment")} has been rescheduled. Please review the updated details below.`,
+    "",
+    ...detailLines(fullname, details),
+    "",
+    CANT_MAKE_IT,
+    "",
+    CONTACT_LINE,
+  ]);
+
+const sendAppointmentDeclinedEmail = (email, fullname = "User", details = {}) =>
+  sendAppointmentEmail("appointment declined", email, "MaslogCare – Appointment Update", [
+    `Hello ${fullname},`,
+    "",
+    `${describeVisit(details, "appointment request")} has been declined.`,
+    "",
+    ...detailLines(fullname, details),
+    "",
+    CONTACT_LINE,
+  ]);
+
+const sendAppointmentReminderEmail = (email, fullname = "User", details = {}) =>
+  sendAppointmentEmail("appointment reminder", email, "MaslogCare – Reminder: Appointment Tomorrow", [
+    `Hello ${fullname},`,
+    "",
+    "This is a reminder that your MaslogCare appointment is tomorrow.",
+    "",
+    ...detailLines(fullname, details, "Health worker"),
+    "",
+    BEFORE_YOU_COME,
+    "",
+    CANT_MAKE_IT,
+    "",
+    CONTACT_LINE,
+  ]);
 
 module.exports = {
   sendAppointmentConfirmationEmail,

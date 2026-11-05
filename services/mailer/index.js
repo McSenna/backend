@@ -1,36 +1,15 @@
 "use strict";
 
 const {
-  transporter,
   hasCredentials,
   isEmailEnabled,
   getMailConfig,
   verifyTransport,
   maskEmail,
-} = require("./transporter");
+} = require("./config");
 
 const { sendMail } = require("./mailService");
-const { EmailServiceError, EmailErrorCode, classifySmtpError } = require("./errors");
-const { ASSETS, buildAttachments } = require("./assets");
-
-const {
-  generateOTPEmailHTML,
-  generateNotificationEmailHTML,
-  generateWelcomeEmailHTML,
-  generateAppointmentConfirmationHTML,
-  generateAppointmentRescheduledHTML,
-  generateAppointmentDeclinedHTML,
-  generateAppointmentReminderHTML,
-  generatePasswordResetHTML,
-  generatePasswordChangedHTML,
-} = {
-  ...require("./templates/otpTemplate"),
-  ...require("./templates/notificationTemplate"),
-  ...require("./templates/welcomeTemplate"),
-  ...require("./templates/appointmentTemplate"),
-  ...require("./templates/passwordResetTemplate"),
-  ...require("./templates/passwordChangedTemplate"),
-};
+const { EmailServiceError, EmailErrorCode, classifyBrevoResponse, classifyBrevoFailure } = require("./errors");
 
 const {
   sendOTPEmail,
@@ -43,6 +22,7 @@ const {
   sendPasswordResetEmail,
   sendPasswordResetCodeEmail,
   sendPasswordChangedEmail,
+  maskEmailAddress,
 } = {
   ...require("./senders/otp"),
   ...require("./senders/notification"),
@@ -52,28 +32,17 @@ const {
 };
 
 module.exports = {
-  transporter,
   sendMail,
   hasCredentials,
   isEmailEnabled,
   getMailConfig,
   verifyTransport,
   maskEmail,
+  maskEmailAddress,
   EmailServiceError,
   EmailErrorCode,
-  classifySmtpError,
-
-  ASSETS,
-  buildAttachments,
-  generateOTPEmailHTML,
-  generateNotificationEmailHTML,
-  generateWelcomeEmailHTML,
-  generateAppointmentConfirmationHTML,
-  generateAppointmentRescheduledHTML,
-  generateAppointmentDeclinedHTML,
-  generateAppointmentReminderHTML,
-  generatePasswordResetHTML,
-  generatePasswordChangedHTML,
+  classifyBrevoResponse,
+  classifyBrevoFailure,
 
   sendOTPEmail,
   sendNotificationEmail,

@@ -1,9 +1,9 @@
 "use strict";
-// The SMTP transport is stubbed, so no real email is sent.
+// Brevo is stubbed, so no real email is sent.
 process.env.EMAIL_ENABLED = "true";
-process.env.EMAIL_PROVIDER = "smtp";
-process.env.EMAIL_USER = "sender@maslogcare.test";
-process.env.EMAIL_PASSWORD = "test-app-password";
+process.env.EMAIL_PROVIDER = "brevo";
+process.env.BREVO_API_KEY = "test-brevo-key";
+process.env.BREVO_SENDER_EMAIL = "sender@maslogcare.test";
 const assert = require("node:assert/strict");
 const http = require("http");
 const { io: connect } = require("socket.io-client");
@@ -11,7 +11,6 @@ const h = require("./helpers/masterListHarness");
 const User = require("../../models/User");
 const PasswordReset = require("../../models/PasswordReset");
 const SystemLog = require("../../models/SystemLog");
-const { transporter } = require("../../services/mailer/transporter");
 const { createApp } = require("../../app");
 const { attachRealtime, closeRealtime } = require("../../realtime/socketServer");
 const { initializeResidentWebAccess } = require("../../services/residentWebAccess");
@@ -92,7 +91,7 @@ const run = async () => {
 
   const target = await make("resident", "active");
   const sent = [];
-  transporter.sendMail = async ({ to }) => { sent.push(to); return { messageId: "synthetic", accepted: [to] }; };
+  global.fetch = async (url, init) => { sent.push(JSON.parse(init.body).to[0].email); return new Response(JSON.stringify({ messageId: "synthetic" }), { status: 201 }); };
   const ok = await reset(target);
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
   assert.equal(sent.length, 1);
@@ -108,7 +107,7 @@ const run = async () => {
   assert.equal(selfReset.body.code, "SELF_ACTION_FORBIDDEN");
 
   const failing = await make("resident", "active");
-  transporter.sendMail = async () => { throw Object.assign(new Error("SMTP down"), { responseCode: 550 }); };
+  global.fetch = async () => new Response(JSON.stringify({ code: "unauthorized", message: "Key not found" }), { status: 401 });
   const failed = await reset(failing, h.asAdmin(second));
   assert.equal(failed.status, 502, JSON.stringify(failed.body));
   assert.equal(failed.body.code, "EMAIL_SEND_FAILED");
@@ -116,7 +115,7 @@ const run = async () => {
   assert.equal(await SystemLog.findOne({ action: "USER_PASSWORD_RESET_SENT", resourceId: String(failing._id) }).lean(), null, "no success is logged");
 
   const silent = await make("resident", "active");
-  transporter.sendMail = async () => { throw new Error("must not send while email is off"); };
+  global.fetch = async () => { throw new Error("must not send while email is off"); };
   process.env.EMAIL_ENABLED = "false";
   const notSent = await reset(silent, h.asAdmin(second));
   process.env.EMAIL_ENABLED = "true";

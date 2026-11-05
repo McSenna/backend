@@ -1,8 +1,8 @@
 "use strict";
 
 const assert = require("assert");
-const { classifySmtpError, EmailErrorCode, EmailServiceError } = require("../../services/mailer/errors");
-const { maskEmail, getMailConfig } = require("../../services/mailer/transporter");
+const { classifyBrevoResponse, classifyBrevoFailure, EmailErrorCode } = require("../../services/mailer/errors");
+const { maskEmail } = require("../../services/mailer/config");
 const bcrypt = require("bcryptjs");
 
 async function runTests() {
@@ -41,79 +41,34 @@ async function runTests() {
     assert.strictEqual(maskEmail(""), "unknown");
   });
 
-  test("TEST 2: Gmail 550 Daily sending limit classified as EMAIL_QUOTA_EXCEEDED", () => {
-    const gmailQuotaError = {
-      message: "Data command failed: 550-5.4.5 Daily user sending limit exceeded.",
-      code: "EENVELOPE",
-      responseCode: 550,
-      command: "DATA",
-      response: "550-5.4.5 Daily user sending limit exceeded. For more information...",
-    };
-
-    const classified = classifySmtpError(gmailQuotaError);
+  test("TEST 2: Brevo out of credits classified as EMAIL_QUOTA_EXCEEDED", () => {
+    const classified = classifyBrevoResponse(402, { code: "not_enough_credits", message: "Not enough credits" });
     assert.strictEqual(classified.code, EmailErrorCode.QUOTA_EXCEEDED);
     assert.strictEqual(classified.httpStatus, 503);
-    assert.strictEqual(classified.isRetryable, false);
   });
 
-  test("TEST 3: SMTP 535 Bad Credentials classified as EMAIL_AUTH_FAILED", () => {
-    const authError = {
-      message: "Invalid login: 535-5.7.8 Username and Password not accepted.",
-      code: "EAUTH",
-      responseCode: 535,
-      command: "AUTH PLAIN",
-    };
-
-    const classified = classifySmtpError(authError);
+  test("TEST 3: Brevo 401 classified as EMAIL_AUTH_FAILED", () => {
+    const classified = classifyBrevoResponse(401, { code: "unauthorized", message: "Key not found" });
     assert.strictEqual(classified.code, EmailErrorCode.AUTH_FAILED);
     assert.strictEqual(classified.httpStatus, 503);
-    assert.strictEqual(classified.isRetryable, false);
   });
 
-  test("TEST 4: Network failure classified as EMAIL_NETWORK_ERROR with retryable flag", () => {
-    const connError = {
-      message: "connect ECONNREFUSED 127.0.0.1:465",
-      code: "ECONNREFUSED",
-    };
-
-    const classified = classifySmtpError(connError);
+  test("TEST 4: Network failure classified as EMAIL_NETWORK_ERROR", () => {
+    const classified = classifyBrevoFailure(Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNREFUSED" } }));
     assert.strictEqual(classified.code, EmailErrorCode.NETWORK_ERROR);
     assert.strictEqual(classified.httpStatus, 503);
-    assert.strictEqual(classified.isRetryable, true);
   });
 
   test("TEST 5: Provider rate limit 429 classified as EMAIL_RATE_LIMITED", () => {
-    const rateError = {
-      message: "421 4.7.0 Try again later, closing connection.",
-      responseCode: 421,
-    };
-
-    const classified = classifySmtpError(rateError);
+    const classified = classifyBrevoResponse(429, {});
     assert.strictEqual(classified.code, EmailErrorCode.RATE_LIMITED);
     assert.strictEqual(classified.httpStatus, 429);
   });
 
-  test("TEST 5b: Gmail 550 5.1.1 unknown mailbox classified as EMAIL_RECIPIENT_INVALID, not quota", () => {
-    const unknownMailbox = {
-      message: "Can't send mail - all recipients were rejected: 550-5.1.1 The email account that you tried to reach does not exist.",
-      code: "EENVELOPE",
-      responseCode: 550,
-      command: "RCPT TO",
-      response: "550-5.1.1 The email account that you tried to reach does not exist.",
-    };
-
-    const classified = classifySmtpError(unknownMailbox);
+  test("TEST 5b: Brevo invalid recipient classified as EMAIL_RECIPIENT_INVALID", () => {
+    const classified = classifyBrevoResponse(400, { code: "invalid_parameter", message: "Invalid email address" });
     assert.strictEqual(classified.code, EmailErrorCode.RECIPIENT_INVALID);
     assert.strictEqual(classified.httpStatus, 400);
-    assert.strictEqual(classified.isRetryable, false);
-  });
-
-  test("TEST 5c: EENVELOPE without a response code is a permanent recipient error, not retried", () => {
-    const noRecipients = { message: "No recipients defined", code: "EENVELOPE" };
-
-    const classified = classifySmtpError(noRecipients);
-    assert.strictEqual(classified.code, EmailErrorCode.RECIPIENT_INVALID);
-    assert.strictEqual(classified.isRetryable, false);
   });
 
   await asyncTest("TEST 6: OTP is properly hashed with bcrypt", async () => {

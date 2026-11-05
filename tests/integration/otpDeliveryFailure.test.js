@@ -1,20 +1,19 @@
 "use strict";
 
-// When Gmail rejects an OTP email, the user must be able to retry right away:
+// When Brevo refuses an OTP email, the user must be able to retry right away:
 // a send that never left the server must not start the resend cooldown, and a
-// permanent recipient rejection must not be retried. The SMTP transport is
+// permanent recipient rejection must not be retried. Brevo is
 // stubbed, so no real email is sent. Every address here is invented.
 
 require("dotenv").config({ path: require("path").join(__dirname, "..", "..", ".env") });
 process.env.EMAIL_ENABLED = "true";
-process.env.EMAIL_PROVIDER = "smtp";
-process.env.EMAIL_USER = "sender@maslogcare.test";
-process.env.EMAIL_PASSWORD = "test-app-password";
+process.env.EMAIL_PROVIDER = "brevo";
+process.env.BREVO_API_KEY = "test-brevo-key";
+process.env.BREVO_SENDER_EMAIL = "sender@maslogcare.test";
 
 const http = require("http");
 const mongoose = require("mongoose");
 const { MongoMemoryServer } = require("mongodb-memory-server");
-const { transporter } = require("../../services/mailer/transporter");
 const logger = require("../../utils/logger");
 const { createApp } = require("../../app");
 const User = require("../../models/User");
@@ -41,17 +40,14 @@ function check(name, condition, detail = "") {
   }
 }
 
-const UNKNOWN_MAILBOX = Object.assign(
-  new Error("Can't send mail - all recipients were rejected: 550-5.1.1 The email account that you tried to reach does not exist."),
-  { code: "EENVELOPE", responseCode: 550, command: "RCPT TO" }
-);
-
-let smtpCalls = 0;
-let smtpMode = "reject";
-transporter.sendMail = async () => {
-  smtpCalls += 1;
-  if (smtpMode === "reject") throw UNKNOWN_MAILBOX;
-  return { messageId: `stub-${smtpCalls}`, response: "250 OK" };
+let brevoCalls = 0;
+let brevoMode = "reject";
+global.fetch = async () => {
+  brevoCalls += 1;
+  if (brevoMode === "reject") {
+    return new Response(JSON.stringify({ code: "invalid_parameter", message: "email is not valid in to" }), { status: 400 });
+  }
+  return new Response(JSON.stringify({ messageId: `stub-${brevoCalls}` }), { status: 201 });
 };
 
 const loggedErrors = [];
@@ -82,8 +78,8 @@ async function testRegistrationCode() {
   console.log("\n--- Registration code: rejected recipient ---");
   const email = "no-such-mailbox@maslogcare.test";
 
-  smtpMode = "reject";
-  smtpCalls = 0;
+  brevoMode = "reject";
+  brevoCalls = 0;
   let caught = null;
   try {
     await sendEmailVerification(email);
@@ -92,12 +88,12 @@ async function testRegistrationCode() {
   }
 
   check("rejected recipient surfaces as EMAIL_RECIPIENT_INVALID", caught?.code === "EMAIL_RECIPIENT_INVALID", caught?.code);
-  check("a permanent rejection is attempted once, not retried", smtpCalls === 1, `calls=${smtpCalls}`);
+  check("a permanent rejection is attempted once, not retried", brevoCalls === 1, `calls=${brevoCalls}`);
 
   const record = await EmailVerification.findOne({ email }).select("+lastOtpSentAt");
   check("a failed send does not start the resend cooldown", !record?.lastOtpSentAt);
 
-  smtpMode = "accept";
+  brevoMode = "accept";
   let retryError = null;
   try {
     await sendEmailVerification(email);
@@ -131,7 +127,7 @@ async function testPasswordResetCode() {
     address: "Purok 1, Maslog",
   });
 
-  smtpMode = "reject";
+  brevoMode = "reject";
   loggedErrors.length = 0;
   const first = await post("/forgot-password", { email });
   check("forgot-password keeps the neutral response on failure", first.status === 200, `status=${first.status}`);
@@ -143,10 +139,10 @@ async function testPasswordResetCode() {
   const record = await PasswordReset.findOne({ email });
   check("a failed reset send leaves no code behind to block a retry", record === null);
 
-  smtpMode = "accept";
-  smtpCalls = 0;
+  brevoMode = "accept";
+  brevoCalls = 0;
   const retry = await post("/forgot-password", { email });
-  check("the user can request a reset code again immediately", retry.status === 200 && smtpCalls === 1, `status=${retry.status} calls=${smtpCalls}`);
+  check("the user can request a reset code again immediately", retry.status === 200 && brevoCalls === 1, `status=${retry.status} calls=${brevoCalls}`);
 }
 
 async function testPendingRegistrationResend() {
@@ -163,14 +159,14 @@ async function testPendingRegistrationResend() {
     otpExpires: new Date(Date.now() + 60 * 60 * 1000),
   });
 
-  smtpMode = "reject";
+  brevoMode = "reject";
   const first = await post("/send-otp", { email });
   check("rejected recipient returns 400 EMAIL_RECIPIENT_INVALID", first.status === 400 && first.body?.code === "EMAIL_RECIPIENT_INVALID", `status=${first.status} code=${first.body?.code}`);
 
-  smtpMode = "accept";
-  smtpCalls = 0;
+  brevoMode = "accept";
+  brevoCalls = 0;
   const retry = await post("/send-otp", { email });
-  check("the user can request a new code immediately", retry.status === 200 && smtpCalls === 1, `status=${retry.status} code=${retry.body?.code}`);
+  check("the user can request a new code immediately", retry.status === 200 && brevoCalls === 1, `status=${retry.status} code=${retry.body?.code}`);
 }
 
 async function main() {

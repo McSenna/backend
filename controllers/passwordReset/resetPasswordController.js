@@ -6,10 +6,7 @@ const asyncHandler = require("../../utils/asyncHandler");
 const logger = require("../../utils/logger");
 const { badRequest } = require("../../utils/AppError");
 const { ERROR_CODES, HTTP_STATUS } = require("../../utils/errorCodes");
-const { sendPasswordChangedEmail } = require("../../services/mailer");
-const {
-  maskEmailAddress,
-} = require("../../services/mailer/templates/passwordChangedTemplate");
+const { sendPasswordChangedEmail, maskEmailAddress } = require("../../services/mailer");
 const { createSystemLog } = require("../../services/systemLogService");
 const {
   INVALID_CODE_MESSAGE,

@@ -2,22 +2,21 @@ const { provisionTestDevice, managedLoginBody } = require("./helpers/managedDevi
 "use strict";
 
 // The answer to a password change must reflect the database write, not the
-// notice email. A stalled SMTP server once held the response past the app's
+// notice email. A stalled mail server once held the response past the app's
 // 15 second timeout after the password had already changed, so the app said
-// "Password not changed". The SMTP transport is stubbed, so no real email is
+// "Password not changed". Brevo is stubbed, so no real email is
 // sent. Every address here is invented.
 
 require("dotenv").config({ path: require("path").join(__dirname, "..", "..", ".env") });
 process.env.EMAIL_ENABLED = "true";
-process.env.EMAIL_PROVIDER = "smtp";
-process.env.EMAIL_USER = "sender@maslogcare.test";
-process.env.EMAIL_PASSWORD = "test-app-password";
+process.env.EMAIL_PROVIDER = "brevo";
+process.env.BREVO_API_KEY = "test-brevo-key";
+process.env.BREVO_SENDER_EMAIL = "sender@maslogcare.test";
 
 const http = require("http");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const { MongoMemoryServer } = require("mongodb-memory-server");
-const { transporter } = require("../../services/mailer/transporter");
 const logger = require("../../utils/logger");
 const { createApp } = require("../../app");
 const User = require("../../models/User");
@@ -40,20 +39,16 @@ function check(name, condition, detail = "") {
   }
 }
 
-// A server that accepts the connection and never answers: what a blocked SMTP
-// port looks like from inside the API.
-let smtpMode = "stall";
-let smtpCalls = 0;
-transporter.sendMail = async () => {
-  smtpCalls += 1;
-  if (smtpMode === "stall") return new Promise(() => {});
-  if (smtpMode === "reject") {
-    throw Object.assign(new Error("Invalid login: 535-5.7.8 Username and Password not accepted"), {
-      code: "EAUTH",
-      responseCode: 535,
-    });
+// A provider that accepts the connection and never answers.
+let brevoMode = "stall";
+let brevoCalls = 0;
+global.fetch = async () => {
+  brevoCalls += 1;
+  if (brevoMode === "stall") return new Promise(() => {});
+  if (brevoMode === "reject") {
+    return new Response(JSON.stringify({ code: "unauthorized", message: "Key not found" }), { status: 401 });
   }
-  return { messageId: `stub-${smtpCalls}`, response: "250 OK" };
+  return new Response(JSON.stringify({ messageId: `stub-${brevoCalls}` }), { status: 201 });
 };
 
 const logged = [];
@@ -134,7 +129,7 @@ const NEW = "NewSecure456!";
 const change = { currentPassword: OLD, newPassword: NEW, confirmPassword: NEW };
 
 async function stalledNoticeDoesNotDelayTheAnswer() {
-  smtpMode = "stall";
+  brevoMode = "stall";
   const { user, headers } = await createAccount(OLD);
   const res = await settle(changePassword(headers, change));
 
@@ -158,7 +153,7 @@ async function stalledNoticeDoesNotDelayTheAnswer() {
 }
 
 async function failedNoticeIsLoggedNotReported() {
-  smtpMode = "reject";
+  brevoMode = "reject";
   logged.length = 0;
   const { user, headers } = await createAccount(OLD);
   const res = await changePassword(headers, change);
@@ -177,7 +172,7 @@ async function failedNoticeIsLoggedNotReported() {
 }
 
 async function failureBeforeTheWriteLeavesThePassword() {
-  smtpMode = "accept";
+  brevoMode = "accept";
   const { user, headers } = await createAccount(OLD);
   const originalSave = User.prototype.save;
   User.prototype.save = async function failingSave() {
@@ -197,7 +192,7 @@ async function failureBeforeTheWriteLeavesThePassword() {
 }
 
 async function wrongCurrentPasswordChangesNothing() {
-  smtpMode = "accept";
+  brevoMode = "accept";
   const { user, headers } = await createAccount(OLD);
   const res = await changePassword(headers, { ...change, currentPassword: "WrongPass999!" });
 
@@ -211,7 +206,7 @@ async function wrongCurrentPasswordChangesNothing() {
 }
 
 async function repeatedSubmissionsEndConsistent() {
-  smtpMode = "accept";
+  brevoMode = "accept";
   const { user, headers } = await createAccount(OLD);
   const [first, second] = await Promise.all([changePassword(headers, change), changePassword(headers, change)]);
   const retry = await changePassword(headers, change);
