@@ -162,7 +162,7 @@ const run = async () => {
   check("the look-alike address does not sign in to this account", lookAlikeLogin.status === 401 && !lookAlikeLogin.data?.token);
 
   const adminLogin = await request("POST", "/login", {
-    body: { email: process.env.ADMIN_EMAIL || "maslog@admin.gov.ph", password: process.env.ADMIN_DEFAULT_PASSWORD || "MaslogAdmin@2025" },
+    body: { email: process.env.ADMIN_EMAIL || "maslog@admin.gov.ph", password: process.env.ADMIN_DEFAULT_PASSWORD },
     headers: WEB,
   });
   const adminToken = adminLogin.data?.token;
@@ -183,7 +183,7 @@ const main = async () => {
   const uri = mongo.getUri("maslogcare_email_test");
   process.chdir(BACKEND);
   backendRequire("dotenv").config({ path: path.join(BACKEND, ".env") });
-  Object.assign(process.env, { MONGO_URI: uri, NODE_ENV: "development", EMAIL_PROVIDER: "mock" });
+  Object.assign(process.env, { MONGO_URI: uri, NODE_ENV: "development", EMAIL_PROVIDER: "mock", ADMIN_DEFAULT_PASSWORD: "SyntheticAdmin1!" });
 
   const { createApp } = backendRequire("./app");
   await backendRequire("./config/db")();

@@ -6,6 +6,7 @@ const cors = require("cors");
 const { buildCorsOptions } = require("./config/cors");
 const { globalErrorHandler, notFoundHandler } = require("./middleware/errorHandler");
 const { attachRequestPlatform } = require("./middleware/platformMiddleware");
+const { rejectNullBytes } = require("./middleware/rejectNullBytes");
 
 const organizationRoutes = require("./routes/organizationRoutes");
 const authRoutes = require("./routes/authRoutes");
@@ -34,6 +35,13 @@ function createApp() {
   const bodyLimit = process.env.REQUEST_BODY_LIMIT || "10mb";
   app.use(express.json({ limit: bodyLimit }));
   app.use(express.urlencoded({ limit: bodyLimit, extended: true }));
+  // Express 5 leaves req.body undefined when nothing was parsed, and handlers read
+  // fields from it directly, so a request with no JSON body used to answer 500.
+  app.use((req, _res, next) => {
+    req.body ??= {};
+    next();
+  });
+  app.use(rejectNullBytes);
 
   app.use(attachRequestPlatform);
 

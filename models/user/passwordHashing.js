@@ -19,6 +19,8 @@ const attachPasswordHashing = (schema) => {
   });
 
   schema.methods.comparePassword = async function (passwordInput) {
+    // bcrypt throws on anything but strings, and the login body is client input.
+    if (typeof passwordInput !== "string" || typeof this.password !== "string") return false;
     return bcrypt.compare(passwordInput, this.password);
   };
 };

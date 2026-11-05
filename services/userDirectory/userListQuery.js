@@ -47,13 +47,16 @@ const pick = (value, allowed, fallback) => {
   return allowed.includes(normalized) ? normalized : fallback;
 };
 
+// Past this, the skip value overflows what MongoDB accepts and the list answers 500.
+const MAX_PAGE = 1_000_000;
+
 const resolveListParams = (query = {}) => {
   const segment = pick(query.segment, Object.keys(SEGMENTS), "all");
   const status = pick(query.status, STATUS_FILTERS, "");
   const role = pick(query.role, ROLES, "");
   const sort = pick(query.sort, Object.keys(SORTS), "last_login_desc");
   const search = typeof query.search === "string" ? query.search.trim().slice(0, 100) : "";
-  const page = Math.max(1, parseInt(query.page, 10) || 1);
+  const page = Math.min(MAX_PAGE, Math.max(1, parseInt(query.page, 10) || 1));
   const perPage = Math.min(100, Math.max(1, parseInt(query.per_page, 10) || 20));
   return { segment, status, role, sort, search, page, perPage };
 };

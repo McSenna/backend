@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const { RESIDENCY } = require("../config/residency");
 const { PASSWORD_MAX_LENGTH } = require("../config/passwordPolicy");
+const logger = require("../utils/logger");
 
 const ADMIN_EMAIL = "maslog@admin.gov.ph";
 const ADMIN2_EMAIL = "maslog2@admin.gov.ph";
@@ -14,7 +15,7 @@ const ADMIN_SEED = {
   dateOfBirth: new Date("2005-04-16"),
   email: ADMIN_EMAIL,
   profilePhoto: "",
-  password: process.env.ADMIN_DEFAULT_PASSWORD || "MaslogAdmin@2025",
+  passwordEnv: "ADMIN_DEFAULT_PASSWORD",
   verified: true,
   role: "admin",
   address: HEALTH_CENTER_ADDRESS,
@@ -26,7 +27,7 @@ const ADMIN2_SEED = {
   dateOfBirth: new Date("2006-05-20"),
   email: ADMIN2_EMAIL,
   profilePhoto: "",
-  password: process.env.ADMIN2_DEFAULT_PASSWORD || "maslogadmin2@com",
+  passwordEnv: "ADMIN2_DEFAULT_PASSWORD",
   verified: true,
   role: "admin",
   address: HEALTH_CENTER_ADDRESS,
@@ -38,7 +39,7 @@ const MIDWIFE_SEED = {
   dateOfBirth: new Date("1990-01-15"),
   email: MIDWIFE_EMAIL,
   profilePhoto: "",
-  password: process.env.MIDWIFE_DEFAULT_PASSWORD || "MaslogMW@2025",
+  passwordEnv: "MIDWIFE_DEFAULT_PASSWORD",
   verified: true,
   role: "midwife",
   address: HEALTH_CENTER_ADDRESS,
@@ -50,7 +51,7 @@ const DOCTOR_SEED = {
   dateOfBirth: new Date("1985-06-01"),
   email: DOCTOR_EMAIL,
   profilePhoto: "",
-  password: process.env.DOCTOR_DEFAULT_PASSWORD || "MaslogDoc@2025",
+  passwordEnv: "DOCTOR_DEFAULT_PASSWORD",
   verified: true,
   role: "doctor",
   address: HEALTH_CENTER_ADDRESS,
@@ -62,7 +63,7 @@ const BHW_SEED = {
   dateOfBirth: new Date("1995-12-10"),
   email: BHW_EMAIL,
   profilePhoto: "",
-  password: process.env.BHW_DEFAULT_PASSWORD || "MaslogBHW@2025",
+  passwordEnv: "BHW_DEFAULT_PASSWORD",
   verified: true,
   role: "bhw",
   address: HEALTH_CENTER_ADDRESS,
@@ -90,8 +91,14 @@ const retireLegacyDefault = async (seed) => {
 
 const seedAdmin = async () => {
   try {
-    for (const seed of DEFAULT_ACCOUNTS) {
+    for (const { passwordEnv, ...account } of DEFAULT_ACCOUNTS) {
+      const seed = { ...account, password: process.env[passwordEnv] };
       const existing = await User.findOne({ email: seed.email, role: seed.role }).lean();
+      // This repository is public, so a password written here would be known to anyone.
+      if (!seed.password) {
+        if (!existing) logger.warn(`${passwordEnv} is not set; the default ${seed.role} account was not created`);
+        continue;
+      }
       if (!existing) {
         await User.create(seed);
         console.log(`Default ${seed.role} account created for:`, seed.email);
