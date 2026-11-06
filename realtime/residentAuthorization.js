@@ -14,11 +14,12 @@ const disconnectResidentWeb = (userId) =>
       data.platform !== "mobile" &&
       (!userId || data.userId === userId),
   );
-const disconnectManagedDevice = (deviceId) =>
-  disconnectWhere((data) => data.deviceId === deviceId);
+
+const tokenOf = (socket) => socket.handshake.auth?.token;
 
 const reauthorizeSocket = async (socket) => {
   if (!socket.connected) return false;
+  const checkedToken = tokenOf(socket);
   try {
     const {
       authenticateSession,
@@ -34,6 +35,9 @@ const reauthorizeSocket = async (socket) => {
     );
     return socket.connected;
   } catch (error) {
+    // The session was re-issued a token while this check ran (a password
+    // change): the refusal is about the old one, so check the new one.
+    if (tokenOf(socket) !== checkedToken) return reauthorizeSocket(socket);
     const denied = error.statusCode === 401 || error.statusCode === 403;
     socket.emit("access:revoked", {
       code: denied ? error.code : "SERVER_UNAVAILABLE",
@@ -54,6 +58,5 @@ const recheckResidentWeb = async () => {
 module.exports = {
   disconnectResidentWeb,
   recheckResidentWeb,
-  disconnectManagedDevice,
   reauthorizeSocket,
 };

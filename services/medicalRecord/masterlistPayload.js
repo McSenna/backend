@@ -9,6 +9,7 @@ const { ENCODABLE_SOURCES, MEDICAL_RECORD_SOURCES } = require("../../config/medi
 const { STAFF_ROLES } = require("../../models/medicalRecord/encodedFields");
 const { validateMedicalRecordInput, coerceText } = require("../../utils/medicalRecordValidation");
 const { parseCalendarDate } = require("../../utils/calendarDate");
+const { todayManila } = require("../immunization/calendar");
 const { validationFailed } = require("../../utils/AppError");
 
 const MASTER_ID = /^[A-Za-z0-9-]{3,40}$/;
@@ -26,13 +27,16 @@ const textFor = (body, key, max, fieldErrors, label) => {
   return coerceText(raw, max);
 };
 
-const readVisitDate = (raw, fieldErrors) => {
+// Compared as Manila calendar days: the stored UTC midnight of today is still
+// ahead of the clock until 08:00 in Manila, which used to refuse a visit
+// recorded early on the day it happened.
+const readVisitDate = (raw, fieldErrors, today = todayManila()) => {
   const date = parseCalendarDate(raw);
   if (!date) {
     fieldErrors.visitDate = "Enter the visit date as YYYY-MM-DD, for example 2024-03-15.";
     return null;
   }
-  if (date.getTime() > Date.now() || date.getTime() < EARLIEST_VISIT) {
+  if (raw.trim() > today || date.getTime() < EARLIEST_VISIT) {
     fieldErrors.visitDate = "The visit date must be a past date.";
     return null;
   }
@@ -121,4 +125,4 @@ const readRecordEdit = (body = {}, serviceType) => {
   return { fields, reason };
 };
 
-module.exports = { readNewRecord, readRecordEdit };
+module.exports = { readNewRecord, readRecordEdit, readVisitDate };

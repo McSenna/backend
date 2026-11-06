@@ -55,9 +55,28 @@ const CONSULTATION_CATEGORIES = [
     label: "BP Checking",
     order: 5,
     description: "Blood pressure reading and monitoring.",
-    durationMinutes: 5,
+    // Each appointment holds one 10-minute slot.
+    durationMinutes: 10,
     residentBookable: true,
     queueRole: "bhw",
+    // Runs on its own regular schedule, never on a medical mission (2026-11-06).
+    scheduling: "weekly",
+    // The resident picks the date and the start time. Immunization's is assigned.
+    residentPicksTime: true,
+    // Date#getDay() numbering: Monday to Saturday. Sunday is closed.
+    serviceWeekdays: [1, 2, 3, 4, 5, 6],
+    // Starts run every `durationMinutes` from each window's start, and the last
+    // one ends exactly at the window's end: 08:00 to 11:50, then 13:00 to 15:50.
+    // The gap between the windows is the 12:00 to 13:00 lunch break.
+    serviceWindows: [
+      { start: "08:00", end: "12:00" },
+      { start: "13:00", end: "16:00" },
+    ],
+    // Saturday is a half day. Its closing time was not given, so 12:00 is an
+    // assumption to confirm with the health office.
+    serviceWindowsByWeekday: { 6: [{ start: "08:00", end: "12:00" }] },
+    // No booking horizon has been set for BP, so any future service day can be
+    // booked. Set `bookingHorizonWeeks` here to limit it; the API and the app follow it.
   },
 ];
 
@@ -89,6 +108,11 @@ function getCategory(key) {
 /** True for a service with its own weekly schedule (immunization), which missions never carry. */
 function isWeeklyService(key) {
   return getCategory(key)?.scheduling === "weekly";
+}
+
+/** True for a weekly service where the resident chooses the date and time (BP checking). */
+function residentPicksTime(key) {
+  return isWeeklyService(key) && getCategory(key)?.residentPicksTime === true;
 }
 
 function getQueueRole(key) {
@@ -153,6 +177,7 @@ module.exports = {
   canCreateMission,
   getCategory,
   isWeeklyService,
+  residentPicksTime,
   getQueueRole,
   getCategoryKeysForRole,
   getResidentBookableCategories,

@@ -5,6 +5,7 @@ const {
   otpSendRateLimiter,
   otpVerifyRateLimiter,
   loginRateLimiter,
+  changePasswordRateLimiter,
 } = require("../middleware/rateLimiter");
 const {
   register,
@@ -41,6 +42,6 @@ router.post("/resend-reset-code", otpSendRateLimiter, forgotPassword);
 router.post("/verify-reset-code", otpVerifyRateLimiter, verifyResetCode);
 router.post("/reset-password", otpVerifyRateLimiter, resetPassword);
 router.post("/logout", auth.accountOnly, logout);
-router.post("/change-password", auth, otpVerifyRateLimiter, changePassword);
+router.post("/change-password", auth, changePasswordRateLimiter, changePassword);
 
 module.exports = router;

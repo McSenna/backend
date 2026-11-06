@@ -25,7 +25,7 @@ const run = async ({ request }, check) => {
     const res = await createMission(upcomingDateKey(weekday, 2), [IMMUNIZATION, BP]);
     check(`a ${WEEKDAY_NAMES[weekday]} mission offering immunization is rejected`, res.status === 400 && OWN_SCHEDULE.test(res.body.message), `${res.status} ${res.body.message}`);
   }
-  const tuesday = await createMission(upcomingDateKey(2, 2), [PRENATAL, BP]);
+  const tuesday = await createMission(upcomingDateKey(2, 2), [PRENATAL]);
   check("a mission without immunization is still created", tuesday.status === 201);
   const addShot = await request(`/mission-schedule/${tuesday.body.missionSchedule._id}`, {
     method: "PATCH",
@@ -51,11 +51,13 @@ const run = async ({ request }, check) => {
   }
   const shot=await Appointment.create({resident:residentA.user._id,consultationType:"immunization",childName:"Fictional legacy child",ageTier:0,prioritySortKey:0,status:"confirmed",slotStart:localAt(firstThursday,"08:00"),slotEnd:localAt(firstThursday,"08:10"),immunizationSlotKey:localAt(firstThursday,"08:00").toISOString()});
 
-  const bpOptions = (await request("/appointments/booking-options?consultationType=bp_checking", { token: residentA.token })).body;
-  const bpLegacy = bpOptions.schedules.find((s) => s.missionScheduleId === String(legacy._id));
-  check("BP checking is still offered on the old Tuesday mission", Boolean(bpLegacy?.availableSlotStarts.length));
-  const bp = await book(residentA, { consultationType: "bp_checking", description: "Monthly reading", missionScheduleId: String(legacy._id), slotStart: bpLegacy.availableSlotStarts[0], requestKey: "service-day-a-bp" });
-  check("BP checking still books on that mission", bp.status === 201 && String(bp.body.appointment.missionSchedule?._id) === String(legacy._id));
+  // Since 2026-11-06 BP checking has its own Monday to Saturday schedule, so an
+  // old mission that still lists it no longer offers or takes BP bookings.
+  const legacyTuesday = upcomingDateKey(2);
+  const bpOptions = (await request(`/appointments/booking-options?consultationType=bp_checking&date=${legacyTuesday}`, { token: residentA.token })).body;
+  check("BP checking lists its own schedule, not the old Tuesday mission", bpOptions.scheduling === "regular" && !bpOptions.schedules && bpOptions.day.slots.length > 0);
+  const bp = await book(residentA, { consultationType: "bp_checking", description: "Monthly reading", missionScheduleId: String(legacy._id), appointmentDate: legacyTuesday, slotStart: bpOptions.day.slots[0].start, requestKey: "service-day-a-bp" });
+  check("BP checking books that Tuesday on its own schedule, not the mission", bp.status === 201 && bp.body.appointment.missionSchedule == null, `${bp.status} ${bp.body.message}`);
 
   console.log("\nResident reschedule");
   const options = await request(`/appointments/${shot._id}/reschedule-options`, { token: residentA.token });
@@ -79,7 +81,7 @@ const run = async ({ request }, check) => {
   const suggest = await request(`/appointments/suggest-slot?missionScheduleId=${legacy._id}&categoryKey=immunization`, { token: midwife.token });
   check("the slot suggestion refuses immunization", suggest.status === 400);
   const bpSlots = await request(`/mission-schedule/${legacy._id}/available-slots?categoryKey=bp_checking`, { token: midwife.token });
-  check("BP checking slots on that Tuesday still load", bpSlots.status === 200 && bpSlots.body.availableSlotStarts.length > 0);
+  check("the staff slot list refuses BP checking on a mission too", bpSlots.status === 400 && OWN_SCHEDULE.test(bpSlots.body.message));
   const reassign = await request(`/appointments/${shot._id}/reassign`, {
     method: "PATCH",
     token: midwife.token,

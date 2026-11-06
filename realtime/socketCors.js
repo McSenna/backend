@@ -11,12 +11,6 @@ const hostOf = (origin) => {
   }
 };
 
-/**
- * Socket.IO's `cors` option covers only HTTP long-polling. Browsers apply no
- * CORS to a WebSocket upgrade, so the Origin is checked here, with the same
- * rule REST uses. Allowed without a listed origin: native clients that send
- * none, and React Native's default Origin, which is the API's own host.
- */
 const isAllowedOrigin = (req) => {
   const origin = req.headers.origin;
   if (!origin) return true;

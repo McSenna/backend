@@ -12,13 +12,13 @@ const { CONSULTATION_CATEGORIES } = require("../../config/consultationCategories
 const { ENCODABLE_SOURCES } = require("../../config/medicalRecordSources");
 const { isValidObjectId } = require("../../utils/objectId");
 const { babiesWithoutRecords } = require("./residentBabies");
+const { escapeRegex } = require("../../utils/escapeRegex");
 
 const PAGE_SIZE = 30;
 const NUMBERED_PAGE_SIZE = 20;
 const MAX_PAGE = 100000;
 const RANGE_MONTHS = Object.freeze({ "6m": 6, "12m": 12 });
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const masterIdOf = async (userId) => {
   const user = await User.findById(userId).select("masterResidentId").lean();

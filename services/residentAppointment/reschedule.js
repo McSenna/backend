@@ -4,7 +4,8 @@ const { loadAppointmentOrFail, loadMissionOrFail } = require("../appointment/loo
 const { assertMissionOffersCategory, missionDurationFor } = require("../appointment/slotService");
 const { commitResidentReschedule } = require("./rescheduleCommit");
 const { buildRescheduleNotifications } = require("./rescheduleNotice");
-const { isWeeklyService } = require("../../config/consultationCategories");
+const { isWeeklyService, residentPicksTime } = require("../../config/consultationCategories");
+const { rescheduleRegularByResident } = require("../regularSchedule/reschedule");
 const { rescheduleWeeklyByResident } = require("../immunization/weeklyReschedule");
 const { processMissionSchedulePriorityQueue } = require("../triageQueue");
 const { assertValidObjectId } = require("../../utils/objectId");
@@ -58,6 +59,11 @@ const rescheduleAppointmentByResident = async ({
   assertOwnership(appointment, residentId, actorRole, "reschedule");
   assertStatusAllows(appointment, RESCHEDULABLE_STATUSES, "rescheduled");
   if (appointment.consultationType === 'immunization') throw badRequest('Immunization dates are assigned by the system. Ask the midwife to document a follow-up if the date needs review.', ERROR_CODES.VALIDATION_ERROR);
+
+  // BP checking moves to the date and start the resident chose on its own schedule.
+  if (residentPicksTime(appointment.consultationType)) {
+    return rescheduleRegularByResident({ req, appointment, residentId, actorRole, appointmentDate, slotStart });
+  }
 
   // A weekly service (immunization) moves to another day with a server-assigned time.
   if (isWeeklyService(appointment.consultationType)) {

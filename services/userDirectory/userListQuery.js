@@ -2,6 +2,7 @@
 
 const { VALID_STATUSES } = require("../../models/user/userStatus");
 const { SEGMENTS, statusGroupOf } = require("./accountLifecycle");
+const { escapeRegex } = require("../../utils/escapeRegex");
 
 const STATUS_FILTERS = ["requested", "approved", "active", "rejected", "deactivated"];
 
@@ -18,7 +19,6 @@ const SORTS = Object.freeze({
 // Case-insensitive, so "ana" and "Ana" sort together under "Name, A to Z".
 const NAME_COLLATION = { locale: "en", strength: 2 };
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * Mirrors resolveUserStatus: older accounts have no `status`, only `verified`,

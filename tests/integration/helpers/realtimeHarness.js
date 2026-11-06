@@ -24,13 +24,7 @@ const createAccount = async (role) => {
     dateOfBirth: new Date("1990-01-15"),
     address: "Test address",
   });
-  let deviceId = null;
-  if (role === "resident") {
-    const ManagedDevice = require("../../../models/ManagedDevice");
-    const device = await ManagedDevice.create({ residentId: user._id, createdBy: user._id, credentialHash: "mock" });
-    deviceId = String(device._id);
-  }
-  const token = jwt.sign({ userId: String(user._id), role, platform: "mobile", deviceId }, process.env.JWT_SECRET, {
+  const token = jwt.sign({ userId: String(user._id), role, platform: "mobile" }, process.env.JWT_SECRET, {
     expiresIn: "1h",
   });
   return { user, token };

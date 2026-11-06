@@ -1,4 +1,3 @@
-const { managedLoginBody } = require("./helpers/managedDeviceFixtures");
 "use strict";
 
 const User = require("../../models/User");
@@ -15,7 +14,7 @@ const publicKeysOf = (response) => Object.keys(response.body).sort().join(",");
 const login = async (email) =>
   request("/login", {
     method: "POST",
-    body: await managedLoginBody({ email, password: "TestPass123!" }),
+    body: { email, password: "TestPass123!" },
     headers: MOBILE,
   });
 
@@ -189,7 +188,7 @@ async function adminReview(admin, policyOffMatch, wrongSex) {
 
 async function masterRecordsUntouched(before, fern) {
   console.log("\nMaster list integrity");
-  const login = await request("/login", { method: "POST", body: await managedLoginBody({ email: fern.email, password: "TestPass123!" }), headers: MOBILE });
+  const login = await request("/login", { method: "POST", body: { email: fern.email, password: "TestPass123!" }, headers: MOBILE });
   const edit = await request("/profile", {
     method: "PATCH",
     headers: { ...MOBILE, Authorization: `Bearer ${login.body.token}` },

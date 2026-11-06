@@ -1,4 +1,3 @@
-const { managedLoginBody } = require("./helpers/managedDeviceFixtures");
 "use strict";
 
 // The Barangay Master List and user accounts are separate data sets. These
@@ -27,7 +26,7 @@ const officialRow = (overrides = {}) => ({
 
 async function authorization(doctor, resident, recordId) {
   console.log("\nOnly admins reach the master list");
-  const residentLogin = await request("/login", { method: "POST", body: await managedLoginBody({ email: resident.email, password: "TestPass123!" }), headers: MOBILE });
+  const residentLogin = await request("/login", { method: "POST", body: { email: resident.email, password: "TestPass123!" }, headers: MOBILE });
   const asResident = { ...MOBILE, Authorization: `Bearer ${residentLogin.body.token}` };
   const asDoctor = { Authorization: `Bearer ${tokenFor(doctor)}`, "X-Client-Platform": "web" };
   const calls = [
@@ -130,7 +129,7 @@ async function accountWritesLeaveMasterListAlone(admin, linked) {
   check("an unmatched sign-up is a pending account", unmatched.user?.status === "pending");
   check("an account can exist without a master record", unmatched.user?.masterResidentId === undefined);
 
-  const login = await request("/login", { method: "POST", body: await managedLoginBody({ email: linked.email, password: "TestPass123!" }), headers: MOBILE });
+  const login = await request("/login", { method: "POST", body: { email: linked.email, password: "TestPass123!" }, headers: MOBILE });
   const edit = await request("/profile", {
     method: "PATCH",
     headers: { ...MOBILE, Authorization: `Bearer ${login.body.token}` },

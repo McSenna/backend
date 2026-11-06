@@ -11,11 +11,11 @@ const { parseCalendarDate, utcDayRange } = require("../../utils/calendarDate");
 const { isValidObjectId } = require("../../utils/objectId");
 const { ownedServiceKeys } = require("./serviceOwnership");
 const { APPOINTMENT_FILTER, linkageFilter } = require("./linkageStatus");
+const { escapeRegex } = require("../../utils/escapeRegex");
 
 const NAME_MATCH_CAP = 500;
 const REFERENCE = /^(?:rec-)?([0-9a-f]{8})$/i;
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const serviceScope = (user, requested) => {
   const owned = ownedServiceKeys(user);

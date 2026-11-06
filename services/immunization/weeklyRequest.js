@@ -3,7 +3,7 @@
 const { getCategory } = require("../../config/consultationCategories");
 const { badRequest } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
-const { isServiceDay, serviceDayMessage } = require("../appointment/serviceDayRules");
+const { isServiceDay, serviceDayMessage, serviceDayWord } = require("../appointment/serviceDayRules");
 const { dayStartOf, startOfDay, upcomingDays } = require("./weeklyCalendar");
 
 // Letters (any script, with accents), then letters, spaces, periods, apostrophes, hyphens.
@@ -15,7 +15,7 @@ const labelOf = (categoryKey) => getCategory(categoryKey)?.label ?? "This servic
 /** The requested service day: a real date, on the service's weekday, inside the booking window. */
 const parseBookableDay = (categoryKey, raw, now = new Date()) => {
   if (!raw) {
-    throw badRequest("Please choose a Thursday for the appointment.", ERROR_CODES.MISSING_FIELDS);
+    throw badRequest(`Please choose a ${serviceDayWord(categoryKey)} for the appointment.`, ERROR_CODES.MISSING_FIELDS);
   }
   const dayStart = dayStartOf(raw);
   if (!dayStart) {
@@ -29,8 +29,8 @@ const parseBookableDay = (categoryKey, raw, now = new Date()) => {
   const { bookingHorizonWeeks } = getCategory(categoryKey);
   throw badRequest(
     dayStart.getTime() <= startOfDay(now).getTime()
-      ? `${labelOf(categoryKey)} times for that day have passed. Please choose a later Thursday.`
-      : `${labelOf(categoryKey)} can be booked up to ${bookingHorizonWeeks} weeks ahead. Please choose an earlier Thursday.`,
+      ? `${labelOf(categoryKey)} times for that day have passed. Please choose a later ${serviceDayWord(categoryKey)}.`
+      : `${labelOf(categoryKey)} can be booked up to ${bookingHorizonWeeks} weeks ahead. Please choose an earlier ${serviceDayWord(categoryKey)}.`,
     ERROR_CODES.VALIDATION_ERROR
   );
 };

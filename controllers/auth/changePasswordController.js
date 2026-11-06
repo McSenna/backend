@@ -7,35 +7,40 @@ const { ERROR_CODES, HTTP_STATUS } = require("../../utils/errorCodes");
 const { createSystemLog } = require("../../services/systemLogService");
 const { sendPasswordChangedEmail } = require("../../services/mailer");
 const { validatePasswordStrength } = require("../../services/passwordReset/resetPolicy");
+const { issueSession } = require("../../services/sessionService");
+const { adoptSessionToken, disconnectOtherSessions } = require("../../realtime/socketServer");
 const logger = require("../../utils/logger");
 
+// `fieldErrors` tells the app which input to mark; the message stays for app
+// versions that only read it.
+const fieldError = (field, message, code = ERROR_CODES.VALIDATION_ERROR) =>
+  badRequest(message, code, { fieldErrors: { [field]: message } });
+
 exports.changePassword = asyncHandler(async (req, res) => {
+  // Never trimmed: spaces are legal password characters.
   const currentPassword = String(req.body?.currentPassword || "");
   const newPassword = String(req.body?.newPassword || "");
   const confirmPassword = req.body?.confirmPassword ? String(req.body.confirmPassword) : null;
 
   if (!currentPassword) {
-    throw badRequest("Current password is required.", ERROR_CODES.VALIDATION_ERROR);
+    throw fieldError("currentPassword", "Current password is required.");
   }
 
   if (!newPassword) {
-    throw badRequest("New password is required.", ERROR_CODES.VALIDATION_ERROR);
+    throw fieldError("newPassword", "New password is required.");
   }
 
   if (confirmPassword !== null && confirmPassword !== newPassword) {
-    throw badRequest("Passwords do not match.", ERROR_CODES.VALIDATION_ERROR);
+    throw fieldError("confirmPassword", "Passwords do not match.");
   }
 
   if (currentPassword === newPassword) {
-    throw badRequest(
-      "Your new password must be different from your current password.",
-      ERROR_CODES.VALIDATION_ERROR
-    );
+    throw fieldError("newPassword", "Your new password must be different from your current password.");
   }
 
   const problems = validatePasswordStrength(newPassword);
   if (problems.length) {
-    throw badRequest(problems.join(" "), ERROR_CODES.VALIDATION_ERROR);
+    throw fieldError("newPassword", problems.join(" "));
   }
 
   const user = await User.findById(req.user.userId).select("+password");
@@ -45,13 +50,23 @@ exports.changePassword = asyncHandler(async (req, res) => {
 
   const isMatch = await user.comparePassword(currentPassword);
   if (!isMatch) {
-    throw badRequest("Current password is incorrect.", ERROR_CODES.INVALID_CREDENTIALS);
+    throw fieldError("currentPassword", "Current password is incorrect.", ERROR_CODES.INVALID_CREDENTIALS);
   }
 
+  // Saved together, so there is no moment where the new password works while
+  // sessions opened with the old one still do.
   user.password = newPassword;
+  user.tokenVersion = (user.tokenVersion ?? 0) + 1;
   await user.save();
 
   const changedAt = new Date();
+  // Same session id, so this device's live feed and logout keep matching it.
+  const { token } = issueSession(user, req.auth.platform, req.auth.sessionId);
+  adoptSessionToken(user._id, req.auth.sessionId, token);
+
+  disconnectOtherSessions(user._id, req.auth.sessionId).catch((error) => {
+    logger.warn("Other sessions' live feeds not dropped after password change", { errorName: error?.name });
+  });
 
   void createSystemLog({
     req,
@@ -61,7 +76,7 @@ exports.changePassword = asyncHandler(async (req, res) => {
     description: `${user.fullname} changed their password`,
     resource: "User",
     resourceId: String(user._id),
-    metadata: { email: user.email, changedAt: changedAt.toISOString() },
+    metadata: { email: user.email, changedAt: changedAt.toISOString(), otherSessionsSignedOut: true },
   });
 
   // The password is already saved, so the answer must not wait on email: a
@@ -78,5 +93,6 @@ exports.changePassword = asyncHandler(async (req, res) => {
   return res.status(HTTP_STATUS.OK).json({
     success: true,
     message: "Password changed successfully.",
+    token,
   });
 });

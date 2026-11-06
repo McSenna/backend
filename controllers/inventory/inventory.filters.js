@@ -4,6 +4,7 @@ const InventoryBatch = require("../../models/InventoryBatch");
 const { INVENTORY_CATEGORIES } = require("../../models/InventoryItem");
 const Supplier = require("../../models/Supplier");
 const { EXPIRY_THRESHOLDS, startOfDay } = require("../../services/inventoryService");
+const { escapeRegex } = require("../../utils/escapeRegex");
 
 const SORT_FIELDS = {
   updated_desc: { updatedAt: -1 },
@@ -60,8 +61,7 @@ async function buildListFilter(query) {
 
   const term = String(search || "").trim();
   if (term) {
-    const safe = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(safe, "i");
+    const pattern = new RegExp(escapeRegex(term), "i");
 
     const [batches, suppliers] = await Promise.all([
       InventoryBatch.find({ batchNumber: pattern }).select("item").lean(),

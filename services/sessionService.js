@@ -4,8 +4,6 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 
 const { normalizePlatform } = require("../config/platformAccess");
-const { credentialError } = require("./managedDevices");
-const { isValidObjectId } = require("../utils/objectId");
 const logger = require("../utils/logger");
 
 const TOKEN_TTL = process.env.JWT_EXPIRES_IN || "7d";
@@ -18,29 +16,30 @@ function requireSecret() {
   return process.env.JWT_SECRET;
 }
 
-function buildTokenPayload(user, platform, sessionId, deviceId = null) {
+function buildTokenPayload(user, platform, sessionId) {
   return {
     userId: user._id,
     email: user.email,
     role: user.role,
     platform,
     sessionId,
-    deviceId,
+    tokenVersion: user.tokenVersion ?? 0,
   };
 }
 
-function issueSession(user, platform, deviceId = null) {
+/**
+ * `sessionId` is passed only when re-issuing a token for a session that already
+ * exists (after a password change), so its live socket and logout still match.
+ */
+function issueSession(user, platform, existingSessionId = null) {
   const normalizedPlatform = normalizePlatform(platform);
   if (!normalizedPlatform) {
     throw new Error(`Cannot issue a session for unknown platform: ${platform}`);
   }
-  if (user.role === "resident" && normalizedPlatform === "mobile" && !isValidObjectId(deviceId)) {
-    throw credentialError();
-  }
 
-  const sessionId = crypto.randomUUID();
+  const sessionId = existingSessionId || crypto.randomUUID();
   const token = jwt.sign(
-    buildTokenPayload(user, normalizedPlatform, sessionId, deviceId),
+    buildTokenPayload(user, normalizedPlatform, sessionId),
     requireSecret(),
     { expiresIn: TOKEN_TTL }
   );

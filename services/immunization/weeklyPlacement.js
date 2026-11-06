@@ -6,10 +6,11 @@ const { conflict } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
 const { withBookingDayLock } = require("../appointment/dayLock");
 const { byPriorityThenCreated, tagPendingAppointments } = require("../triage/triagePriority");
-const { endOfPosition, upcomingDays } = require("./weeklyCalendar");
+const { endOfPosition, upcomingDays, weeklySlotKey } = require("./weeklyCalendar");
 const { parseBookableDay } = require("./weeklyRequest");
 const { dayLockKey, fullDayConflict } = require("./weeklyBooking");
 const { loadBookedOnDay, openStarts } = require("./weeklySlots");
+const { serviceDayWord } = require("../appointment/serviceDayRules");
 
 const STALE_MESSAGE = "This appointment has already been updated. Please refresh and try again.";
 
@@ -46,7 +47,7 @@ const placeOnDay = ({ appointmentId, categoryKey, dayStart, staffId, now }) =>
       assignedDurationMinutes: Math.round((slotEnd - slotStart) / 60000),
       slotStart,
       slotEnd,
-      immunizationSlotKey: slotStart.toISOString(),
+      immunizationSlotKey: weeklySlotKey(categoryKey, slotStart),
       assignedBy: staffId,
       assignedAt: now,
       approvedAt: current.approvedAt ?? now,
@@ -78,7 +79,7 @@ const placePendingWeekly = async ({ appointment, payload = {}, staffId, now = ne
     if (named) throw fullDayConflict(categoryKey, dayStart);
   }
   throw conflict(
-    "Every Thursday in the booking window is full. Decline the request or try again later.",
+    `Every ${serviceDayWord(categoryKey)} in the booking window is full. Decline the request or try again later.`,
     ERROR_CODES.SLOT_UNAVAILABLE
   );
 };

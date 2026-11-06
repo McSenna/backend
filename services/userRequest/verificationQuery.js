@@ -1,8 +1,8 @@
 "use strict";
 
 const User = require("../../models/User");
+const { escapeRegex } = require("../../utils/escapeRegex");
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const applyDateRange = (query, dateFrom, dateTo) => {
   if (!dateFrom && !dateTo) return;

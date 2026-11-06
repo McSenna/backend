@@ -3,7 +3,7 @@
 const { appointmentForResident } = require("../medicalRecord/residentRecordView");
 const Appointment = require("../../models/Appointment");
 const User = require("../../models/User");
-const { isWeeklyService } = require("../../config/consultationCategories");
+const { isWeeklyService, residentPicksTime } = require("../../config/consultationCategories");
 const { announceAutoConfirm } = require("../triage/autoConfirmNotifier");
 const { listBookableSchedules } = require("./bookableSchedules");
 const { parseMissionRequest, parseRequestKey, parseServiceKey } = require("./bookingRequest");
@@ -13,6 +13,9 @@ const { parseWeeklyRequest } = require("../immunization/weeklyRequest");
 const { commitWeeklyBooking } = require("../immunization/weeklyBooking");
 const { listWeeklyDays } = require("../immunization/weeklySlots");
 const { scheduleOf } = require("../immunization/weeklyCalendar");
+const { listRegularOptions } = require("../regularSchedule/availability");
+const { parseRegularRequest } = require("../regularSchedule/request");
+const { commitRegularBooking } = require("../regularSchedule/booking");
 const { notFound } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
 
@@ -25,9 +28,14 @@ const loadBookedAppointment = (id) =>
     .populate("missionSchedule", MISSION_POPULATE)
     .lean();
 
-/** Mission services list mission days and times; a weekly service lists its own days. */
-const listBookingOptions = async (consultationType) => {
+/**
+ * Mission services list mission days and times; a weekly service lists its own
+ * days; a regular-schedule service (BP checking) lists a calendar month and the
+ * open slots of the chosen date.
+ */
+const listBookingOptions = async (consultationType, { month = null, date = null } = {}) => {
   const key = parseServiceKey(consultationType);
+  if (residentPicksTime(key)) return listRegularOptions(key, { month, date });
   if (!isWeeklyService(key)) {
     return { consultationType: key, scheduling: "mission", schedules: await listBookableSchedules({ categoryKey: key }) };
   }
@@ -41,17 +49,17 @@ const listBookingOptions = async (consultationType) => {
 
 /**
  * Books and confirms in one step. The resident is the signed-in user; the body
- * only says what and when. Weekly services (immunization) get a server-assigned
- * time; mission services keep the start the resident chose.
+ * only says what and when. Immunization gets a server-assigned time; mission
+ * and regular-schedule services keep the start the resident chose.
  */
 const bookAppointment = async ({ residentId, payload = {} }) => {
   const now = new Date();
   const categoryKey = parseServiceKey(payload.consultationType);
   const requestKey = parseRequestKey(payload.requestKey);
-  const weekly = isWeeklyService(categoryKey);
-  const request = weekly
-    ? parseWeeklyRequest(categoryKey, payload, now)
-    : parseMissionRequest(categoryKey, payload, now);
+  const regular = residentPicksTime(categoryKey);
+  const weekly = isWeeklyService(categoryKey) && !regular;
+  const parse = regular ? parseRegularRequest : weekly ? parseWeeklyRequest : parseMissionRequest;
+  const request = parse(categoryKey, payload, now);
 
   const resident = await User.findById(residentId).lean();
   if (!resident) {
@@ -63,7 +71,7 @@ const bookAppointment = async ({ residentId, payload = {} }) => {
     return { populated: await loadBookedAppointment(earlier._id), replayed: true, categoryKey: earlier.consultationType };
   }
 
-  const commit = weekly ? commitWeeklyBooking : commitMissionBooking;
+  const commit = regular ? commitRegularBooking : weekly ? commitWeeklyBooking : commitMissionBooking;
   const { appointment, replayed, providerId } = await commit({ request, resident, requestKey, now }).catch(
     (error) => recoverFromDuplicateKey(error, { residentId: resident._id, requestKey })
   );

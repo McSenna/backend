@@ -400,10 +400,8 @@ async function run() {
     `status ${reapprove.status}`
   );
 
-  const managedDevice = await request("POST", `/admin/users/${registered.data.userId}/devices`, { token: adminToken, headers: WEB, body: {} });
-  check("admin provisions a managed mobile device", managedDevice.status === 201);
   const approvedLogin = await request("POST", "/login", {
-    body: { email: emailFor("approve"), password: PASSWORD, deviceCredential: managedDevice.data?.credential },
+    body: { email: emailFor("approve"), password: PASSWORD },
     headers: NATIVE,
   });
   check(

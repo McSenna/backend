@@ -12,7 +12,8 @@ const {
 const CONFIRMED_MESSAGE = "Your appointment is confirmed.";
 
 exports.getBookingOptions = asyncHandler(async (req, res) => {
-  const options = await listBookingOptions(req.query.consultationType);
+  const { consultationType, month, date } = req.query;
+  const options = await listBookingOptions(consultationType, { month, date });
   return res.json({
     success: true,
     message: "Open appointment times loaded.",

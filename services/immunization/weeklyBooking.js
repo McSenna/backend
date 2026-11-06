@@ -10,8 +10,9 @@ const { findEarlierBooking } = require("../appointment/bookingReplay");
 const { withBookingDayLock } = require("../appointment/dayLock");
 const { addDays, dayKeyOf, endOfPosition } = require("./weeklyCalendar");
 const { loadBookedOnDay, openStarts } = require("./weeklySlots");
+const { escapeRegex } = require("../../utils/escapeRegex");
+const { serviceDayWord } = require("../appointment/serviceDayRules");
 
-const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const formatDay = (date) =>
   date.toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric" });
@@ -22,7 +23,7 @@ const dayLockKey = (categoryKey, dayStart) => `${categoryKey}:${dayKeyOf(dayStar
 
 const fullDayConflict = (categoryKey, dayStart) =>
   conflict(
-    `No ${(getCategory(categoryKey)?.label ?? "appointment").toLowerCase()} times are left on ${formatDay(dayStart)}. Please choose another Thursday.`,
+    `No ${(getCategory(categoryKey)?.label ?? "appointment").toLowerCase()} times are left on ${formatDay(dayStart)}. Please choose another ${serviceDayWord(categoryKey)}.`,
     ERROR_CODES.SLOT_UNAVAILABLE
   );
 

@@ -72,9 +72,8 @@ exports.verifyOtp = asyncHandler(async (req, res) => {
   });
 
   const platform = platformOf(req);
-  let deviceId;
   let denial = getPlatformDenial(user.role, platform);
-  try { deviceId = await authorizeResidentLogin(user, platform, req); }
+  try { await authorizeResidentLogin(user, platform); }
   catch (error) {
     if (error.statusCode !== 403) throw error;
     denial = { code: error.code, message: error.message };
@@ -84,7 +83,7 @@ exports.verifyOtp = asyncHandler(async (req, res) => {
     return respondWithPlatformDenial({ req, res, user, platform, denial });
   }
 
-  const { token } = issueSession(user, platform, deviceId);
+  const { token } = issueSession(user, platform);
 
   return res.status(HTTP_STATUS.CREATED).json({
     success: true,

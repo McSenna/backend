@@ -1,4 +1,3 @@
-const { provisionTestDevice, managedLoginBody } = require("./helpers/managedDeviceFixtures");
 "use strict";
 
 require("dotenv").config({ path: require("path").join(__dirname, "..", "..", ".env") });
@@ -93,7 +92,7 @@ async function runTests() {
   });
 
   const token = jwt.sign(
-    { userId: String(user._id), role: user.role, platform: "mobile", deviceId: await provisionTestDevice(user) },
+    { userId: String(user._id), role: user.role, platform: "mobile" },
     process.env.JWT_SECRET,
     { expiresIn: "1h" }
   );
@@ -224,16 +223,60 @@ async function runTests() {
   const loginWithOld = await request("/login", {
     method: "POST",
     headers: { "X-Client-Platform": "mobile" },
-    body: await managedLoginBody({ email: user.email, password: originalPassword }),
+    body: { email: user.email, password: originalPassword },
   });
   check("Login with old password fails", loginWithOld.status !== 200);
 
   const loginWithNew = await request("/login", {
     method: "POST",
     headers: { "X-Client-Platform": "mobile" },
-    body: await managedLoginBody({ email: user.email, password: newPassword }),
+    body: { email: user.email, password: newPassword },
   });
   check("Login with new password succeeds with 200", loginWithNew.status === 200 && loginWithNew.body.success === true);
+
+  // Test 11: The refusals name the field the app should mark.
+  check("Wrong current password is tagged on currentPassword", Boolean(wrongCurrentRes.body.fieldErrors?.currentPassword));
+  check("Weak new password is tagged on newPassword", Boolean(weakPasswordRes.body.fieldErrors?.newPassword));
+  check("Reused password is tagged on newPassword", Boolean(samePasswordRes.body.fieldErrors?.newPassword));
+
+  // Test 12: Tokens issued before the change stop working; the one returned keeps this device signed in.
+  const profileWith = (bearer) =>
+    request("/profile", { headers: { Authorization: `Bearer ${bearer}`, "X-Client-Platform": "mobile" } });
+  const oldTokenRes = await profileWith(token);
+  check("Token from before the change is refused with 401", oldTokenRes.status === 401 && oldTokenRes.body.code === "INVALID_TOKEN", JSON.stringify(oldTokenRes.body));
+  check("Change response carries a replacement token", typeof successRes.body.token === "string");
+  const rotatedRes = await profileWith(successRes.body.token);
+  check("Replacement token is accepted", rotatedRes.status === 200, JSON.stringify(rotatedRes.body));
+  const loginTokenRes = await profileWith(loginWithNew.body.token);
+  check("A login after the change is accepted", loginTokenRes.status === 200);
+
+  // Test 13: Attempts are limited per signed-in account, with a Retry-After.
+  const limited = await User.create({
+    fullname: "Test Fixture Limit",
+    email: "limit.change@maslogcare.test",
+    password: originalPassword,
+    role: "admin",
+    verified: true,
+    status: "active",
+    phone: "09171234568",
+    gender: "female",
+    dateOfBirth: new Date("1990-01-01"),
+    address: "Test purok",
+  });
+  const limitedToken = jwt.sign({ userId: String(limited._id), role: "admin", platform: "web" }, process.env.JWT_SECRET, { expiresIn: "1h" });
+  const guess = () =>
+    request("/change-password", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${limitedToken}`, "X-Client-Platform": "web" },
+      body: { currentPassword: "WrongPass999!", newPassword: "NewSecure456!" },
+    });
+  for (let attempt = 0; attempt < 8; attempt += 1) await guess();
+  const limitedRes = await guess();
+  check(
+    "Ninth attempt in the window is refused with 429 and Retry-After",
+    limitedRes.status === 429 && Number(limitedRes.headers["retry-after"]) > 0 && limitedRes.body.retryAfter > 0,
+    JSON.stringify({ status: limitedRes.status, body: limitedRes.body })
+  );
 
   console.log(`\nResults: ${passed} passed, ${failed} failed.`);
   if (failed > 0) {

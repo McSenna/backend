@@ -2,9 +2,6 @@
 
 const { getQueueRole } = require("../config/consultationCategories");
 
-// Every socket joins its own user room and its role room; staff also join
-// "staff". Publishers pick rooms that mirror the REST guard of the GET a record
-// comes from, so a socket never receives a record its account could not load.
 const STAFF_ROLES = Object.freeze(["admin", "doctor", "midwife", "bhw"]);
 
 const STAFF_ROOM = "staff";

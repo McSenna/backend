@@ -1,4 +1,3 @@
-const { provisionTestDevice, managedLoginBody } = require("./helpers/managedDeviceFixtures");
 "use strict";
 
 // The answer to a password change must reflect the database write, not the
@@ -104,7 +103,7 @@ async function createAccount(password) {
     approved_at: new Date(),
   });
   const token = jwt.sign(
-    { userId: String(user._id), role: user.role, platform: "mobile", deviceId: await provisionTestDevice(user) },
+    { userId: String(user._id), role: user.role, platform: "mobile" },
     process.env.JWT_SECRET,
     { expiresIn: "1h" }
   );
@@ -114,7 +113,7 @@ async function createAccount(password) {
 const changePassword = (headers, body) => request("/change-password", { method: "POST", headers, body });
 
 const login = async (email, password) =>
-  request("/login", { method: "POST", headers: { "X-Client-Platform": "mobile" }, body: await managedLoginBody({ email, password }) });
+  request("/login", { method: "POST", headers: { "X-Client-Platform": "mobile" }, body: { email, password } });
 
 async function passwordState(userId, oldPassword, newPassword) {
   const stored = await User.findById(userId).select("+password");
@@ -148,8 +147,12 @@ async function stalledNoticeDoesNotDelayTheAnswer() {
   check("Sign-in with the old password is refused", withOld.status === 401, String(withOld.status));
   check("Sign-in with the new password works", withNew.status === 200 && withNew.body.success === true);
 
-  const profile = await request("/profile", { headers });
-  check("The session that changed the password stays signed in", profile.status === 200, String(profile.status));
+  // Every token from before the change is revoked; the answer carries this session's replacement.
+  const stale = await request("/profile", { headers });
+  check("The token from before the change is refused", stale.status === 401, String(stale.status));
+  const rotated = { ...headers, Authorization: `Bearer ${res.value?.body.token}` };
+  const profile = await request("/profile", { headers: rotated });
+  check("The session that changed the password stays signed in on the returned token", profile.status === 200, String(profile.status));
 }
 
 async function failedNoticeIsLoggedNotReported() {
@@ -209,7 +212,8 @@ async function repeatedSubmissionsEndConsistent() {
   brevoMode = "accept";
   const { user, headers } = await createAccount(OLD);
   const [first, second] = await Promise.all([changePassword(headers, change), changePassword(headers, change)]);
-  const retry = await changePassword(headers, change);
+  const answered = [first, second].find((res) => res.status === 200);
+  const retry = await changePassword({ ...headers, Authorization: `Bearer ${answered?.body.token}` }, change);
 
   check(
     "Two identical submissions each answer 200 or a refused current password",

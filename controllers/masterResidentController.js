@@ -32,11 +32,14 @@ const logRecordAction = (req, action, description, metadata) =>
 
 exports.listMasterResidents = asyncHandler(async (req, res) => {
   const result = await listMasterResidents(req.query);
+  // Rows hold dates of birth and civil status (RA 10173): never keep a copy in a shared browser's cache.
+  res.set("Cache-Control", "no-store");
   return res.status(HTTP_STATUS.OK).json({ success: true, ...result });
 });
 
 exports.getMasterResident = asyncHandler(async (req, res) => {
   const record = await getMasterResident(req.params.id);
+  res.set("Cache-Control", "no-store");
   return res.status(HTTP_STATUS.OK).json({ success: true, record });
 });
 

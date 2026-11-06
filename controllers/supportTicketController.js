@@ -13,6 +13,7 @@ const {
   toTicket,
   toTicketSummary,
 } = require("../services/support/supportTicketSerializer");
+const { escapeRegex } = require("../utils/escapeRegex");
 
 const ADMIN_SORTS = {
   recent: { lastActivityAt: -1 },
@@ -20,7 +21,6 @@ const ADMIN_SORTS = {
   created: { createdAt: -1 },
 };
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const ticketNotFound = () => notFound("Support ticket not found.");
 

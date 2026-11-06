@@ -1,4 +1,3 @@
-const { managedLoginBody } = require("./helpers/managedDeviceFixtures");
 "use strict";
 
 // Sign-up and sign-in with an address from any provider, end to end through the
@@ -171,7 +170,7 @@ const run = async () => {
     const ours = (listed.data?.requests ?? []).find((item) => item.resident?.email === STORED);
     if (ours) await request("PATCH", `/admin/user-requests/${ours._id ?? ours.id}/approve`, { token: adminToken, headers: WEB });
   }
-  const signedIn = await request("POST", "/login", { body: await managedLoginBody({ email: ADDRESS, password: PASSWORD }), headers: NATIVE });
+  const signedIn = await request("POST", "/login", { body: { email: ADDRESS, password: PASSWORD }, headers: NATIVE });
   check("the owner signs in with the address in any letter case", signedIn.status === 200 && Boolean(signedIn.data?.token), `${signedIn.status} ${signedIn.data?.code}`);
   check("the session belongs to the exact address", signedIn.data?.user?.email === STORED, signedIn.data?.user?.email);
 };

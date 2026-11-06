@@ -14,7 +14,8 @@ const MissionSchedule = require("../../models/MissionSchedule");
 const Notification = require("../../models/Notification");
 
 const GENERAL = { categoryKey: "general_checkup", durationMinutes: 20 };
-const BP = { categoryKey: "bp_checking", durationMinutes: 5 };
+// A second mission service. BP checking left missions on 2026-11-06 (bpRegularSchedule.test.js).
+const CONSULT = { categoryKey: "consultation", durationMinutes: 20 };
 const iso = (date) => new Date(date).toISOString();
 let keyCount = 0;
 const newKey = () => `test-key-${Date.now().toString(36)}-${(keyCount += 1)}`;
@@ -57,14 +58,14 @@ const run = async ({ request }, check) => {
     await request("/mission-schedule", {
       method: "POST",
       token: doctor.token,
-      body: { date: thursdayKey, categories: [GENERAL, BP] },
+      body: { date: thursdayKey, categories: [GENERAL, CONSULT] },
     })
   ).body.missionSchedule;
   const wednesday = (
     await request("/mission-schedule", {
       method: "POST",
       token: doctor.token,
-      body: { date: wednesdayKey, categories: [BP] },
+      body: { date: wednesdayKey, categories: [CONSULT] },
     })
   ).body.missionSchedule;
 
@@ -228,7 +229,7 @@ const run = async ({ request }, check) => {
   );
   const otherService = await book(cara, {
     ...general(iso(localAt(thursdayKey, "14:00"))),
-    consultationType: "bp_checking",
+    consultationType: "consultation",
   });
   check("a different service on the same day is still allowed", otherService.status === 201, `${otherService.status}`);
 

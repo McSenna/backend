@@ -4,9 +4,9 @@ const { MASTER_RESIDENT_ROLES, CIVIL_STATUS_OPTIONS, PUROK_OPTIONS } = require("
 const { badRequest } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
 const { birthDateClauses } = require("./birthDateSearch");
+const { escapeRegex } = require("../../utils/escapeRegex");
 
 const STATUS_FILTERS = { active: { isActive: true }, inactive: { isActive: false }, all: {} };
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const searchFilter = (search) => {
   const tokens = String(search ?? "").trim().slice(0, 60).split(/\s+/).filter(Boolean).slice(0, 5);

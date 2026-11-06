@@ -1,5 +1,7 @@
 "use strict";
 
+const { escapeRegex } = require("../../utils/escapeRegex");
+
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
 
@@ -45,7 +47,6 @@ const STATUS_FILTERS = Object.keys(STATUS_BUCKETS);
 const bucketOfStatus = (status) =>
   STATUS_FILTERS.find((bucket) => STATUS_BUCKETS[bucket].includes(status)) ?? null;
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const statusQuery = (bucket) => {
   const stored = { status: { $in: STATUS_BUCKETS[bucket] } };

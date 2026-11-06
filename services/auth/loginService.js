@@ -128,8 +128,8 @@ const authenticate = async ({ req, email, password, platform }) => {
 
   await assertPlatformAllowed({ req, user, platform });
 
-  const deviceId = await authorizeResidentLogin(user, platform, req);
-  const { token, sessionId } = issueSession(user, platform, deviceId);
+  await authorizeResidentLogin(user, platform);
+  const { token, sessionId } = issueSession(user, platform);
 
   await recordLastLogin(user);
   await promoteFirstSignIn(user);

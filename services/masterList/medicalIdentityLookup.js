@@ -9,6 +9,7 @@ const MasterResident = require("../../models/MasterResident");
 const User = require("../../models/User");
 const { calendarDate } = require("./normalize");
 const { parseCalendarDate } = require("../../utils/calendarDate");
+const { escapeRegex } = require("../../utils/escapeRegex");
 
 const IDENTITY_FIELDS = "masterResidentId firstName middleName lastName suffix dateOfBirth sex address isActive";
 const PICKER_LIMIT = 10;
@@ -16,7 +17,6 @@ const PICKER_LIMIT = 10;
 // stops a one-letter search from pulling in the whole list.
 const NAME_MATCH_CAP = 500;
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const fullNameOf = (record) =>
   [record.firstName, record.middleName, record.lastName, record.suffix].filter(Boolean).join(" ");

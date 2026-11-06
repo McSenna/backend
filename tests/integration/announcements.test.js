@@ -1,4 +1,3 @@
-const { provisionTestDevice, deviceIdFor } = require("./helpers/managedDeviceFixtures");
 "use strict";
 
 require("dotenv").config({ path: require("path").join(__dirname, "..", "..", ".env") });
@@ -86,13 +85,12 @@ const makeUser = async (role, status, extra = {}) => {
     address: "Purok 1, Maslog",
     ...extra,
   });
-  await provisionTestDevice(user);
   return user;
 };
 
 const headersFor = (user, platform = "web") => ({
   Authorization: `Bearer ${jwt.sign(
-    { userId: String(user._id), role: user.role, platform, deviceId: deviceIdFor(user) },
+    { userId: String(user._id), role: user.role, platform },
     process.env.JWT_SECRET,
     { expiresIn: "1h" }
   )}`,

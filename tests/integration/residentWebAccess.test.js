@@ -65,33 +65,21 @@ async function run() {
   const bhw = await account("bhw", "bhw");
   assert.equal((await h.request("/admin/resident-web-access", { headers: h.asAdmin(bhw) })).status, 403);
   const plainMobile = require("jsonwebtoken").sign({ userId: String(resident._id), role: "resident", platform: "mobile" }, process.env.JWT_SECRET);
-  assert.equal((await h.request("/profile", { headers: authorization(plainMobile) })).status, 403, "unbound mobile sessions require device setup");
-  const mobileNoCredential = await login(resident, { clientPlatform: "mobile" });
-  assert.equal(mobileNoCredential.status, 403, JSON.stringify(mobileNoCredential.body));
-  const nativeNoCredential = await login(resident, { clientPlatform: "mobile", deviceCredential: null });
-  assert.equal(nativeNoCredential.status, 403, "a null credential does not establish mobile access");
-  assert.equal((await login(resident, { clientPlatform: "mobile", deviceCredential: "not-a-credential" })).body.code, "DEVICE_CREDENTIAL_REQUIRED", "a credential that is sent must be valid");
+  assert.equal((await h.request("/profile", { headers: authorization(plainMobile) })).status, 200, "a mobile session needs no device setup");
+  const nativeOldApp = await login(resident, { clientPlatform: "mobile", deviceCredential: null });
+  assert.equal(nativeOldApp.status, 200, "an older app's empty credential field is ignored");
   const blockedOnWeb = await account("resident", "blockedweb");
   await individual(blockedOnWeb, "block");
   assert.equal((await login(blockedOnWeb)).status, 403);
   const browserClaimingMobile = await h.request("/login", { method: "POST", headers: { Origin: "http://localhost:8081" }, body: { email: blockedOnWeb.email, password, clientPlatform: "mobile" } });
   assert.equal(browserClaimingMobile.status, 403, "a browser claiming mobile is still treated as web");
   const devicePath = `/admin/users/${resident._id}/devices`;
-  const provisioned = await h.request(devicePath, { method: "POST", headers, body: {} });
-  assert.equal(provisioned.status, 201, JSON.stringify(provisioned.body));
-  const { credential, device } = provisioned.body;
-  const storedDevice = await mongoose.connection.collection("manageddevices").findOne({ _id: new mongoose.Types.ObjectId(device.id) });
-  assert.ok(!JSON.stringify(storedDevice).includes(credential), "raw secret not persisted");
-  assert.ok(!JSON.stringify((await h.request(devicePath, { headers })).body).includes(storedDevice.credentialHash), "hash not returned");
-  assert.equal((await h.request(devicePath, { method: "POST", headers: webHeaders, body: {} })).status, 403);
-  assert.equal((await login(other, { clientPlatform: "mobile", deviceCredential: credential })).status, 403);
-  const mobile = await login(resident, { clientPlatform: "mobile", deviceCredential: credential });
+  assert.equal((await h.request(devicePath, { method: "POST", headers, body: {} })).status, 404, "device provisioning was removed");
+  const mobile = await login(resident, { clientPlatform: "mobile" });
   assert.equal(mobile.status, 200, JSON.stringify(mobile.body));
   const mobileHeaders = authorization(mobile.body.token);
-  const audit = await require("../../models/SystemLog").find({ action: { $in: ["RESIDENT_WEB_POLICY_CHANGED", "RESIDENT_WEB_ACCESS_CHANGED", "MANAGED_DEVICE_PROVISIONED"] } }).lean();
+  const audit = await require("../../models/SystemLog").find({ action: { $in: ["RESIDENT_WEB_POLICY_CHANGED", "RESIDENT_WEB_ACCESS_CHANGED"] } }).lean();
   assert.ok(audit.some((entry) => entry.action === "RESIDENT_WEB_POLICY_CHANGED"));
-  assert.ok(audit.some((entry) => entry.action === "MANAGED_DEVICE_PROVISIONED"));
-  assert.ok(!JSON.stringify(audit).includes(credential), "audit never includes device secret");
   const restartProbe = `const mongoose=require('mongoose');(async()=>{await mongoose.connect(process.env.PROBE_URI);await require('./services/residentWebAccess').initializeResidentWebAccess();const policy=await require('./models/ResidentWebPolicy').findById('resident-web').lean();const user=await require('./models/User').findById(process.env.PROBE_USER).lean();require('node:assert/strict').equal(policy.enabled,true);require('node:assert/strict').equal(user.residentWebAccessOverride,'allow');await mongoose.disconnect()})().catch(()=>process.exit(1));`;
   require("node:child_process").execFileSync(process.execPath, ["-e", restartProbe], { env: { ...process.env, PROBE_URI: mongoose.connection.getClient().s.url, PROBE_USER: String(resident._id) }, stdio: "pipe" });
   assert.equal((await h.request("/profile", { headers: mobileHeaders })).status, 200);
@@ -130,10 +118,8 @@ async function run() {
     broadcast("profile", "updated", { protected: "synthetic" }, [userRoom(String(other._id))]);
     await drop; assert.equal(leaked, false); guarded.close();
     await Policy.updateOne({ _id: "resident-web" }, { $set: { enabled: true } });
-    assert.equal((await h.request(`${devicePath}/${device.id}`, { method: "DELETE", headers })).status, 200);
-    assert.equal((await h.request("/profile", { headers: mobileHeaders })).status, 403, "revoking a device ends its sessions");
-    assert.equal((await login(resident, { clientPlatform: "mobile", deviceCredential: credential })).status, 403);
-    assert.equal((await login(resident, { clientPlatform: "mobile" })).status, 403, "revocation cannot be bypassed by omitting the credential");
+    assert.equal((await h.request(`${devicePath}/${new mongoose.Types.ObjectId()}`, { method: "DELETE", headers })).status, 404, "device revocation was removed");
+    assert.equal((await h.request("/profile", { headers: mobileHeaders })).status, 200);
     assert.equal((await h.request("/profile", { headers: webHeaders })).status, 200);
     for (const status of ["pending", "rejected", "deactivated", "inactive"]) {
       await User.updateOne({ _id: resident._id }, { $set: { status, verified: false } });
@@ -152,6 +138,6 @@ async function run() {
     assert.equal(concurrent.filter((result) => result.body.changed === true).length, 1, "concurrent saves cannot silently overwrite");
     assert.equal((await get()).body.policy.enabled, !state.enabled);
   } finally { socket.close(); followsGlobal.close(); native.close(); closeRealtime(); await new Promise((resolve) => socketServer.close(resolve)); }
-  console.log("Resident web policy, devices, REST and realtime assertions passed");
+  console.log("Resident web policy, password-only mobile sign-in, REST and realtime assertions passed");
 }
 run().then(() => h.teardown()).catch(async (error) => { console.error(error); closeRealtime(); await h.teardown(); process.exitCode = 1; });

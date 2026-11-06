@@ -79,4 +79,3 @@ exports.setIndividual = asyncHandler(async (req, res) => {
   res.set("Cache-Control", "no-store");
   res.json({ success: true, changed, access });
 });
-exports.resident = resident;

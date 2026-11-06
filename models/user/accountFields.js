@@ -10,6 +10,9 @@ const accountFields = {
   // Replaced by residentWebAccessOverride; kept for one release so a rollback still works.
   residentWebAccessEnabled: { type: Boolean, default: false },
   webAccessRevision: { type: Number, default: 0 },
+  // Signed into every session token. A password change bumps it, so tokens
+  // issued before the change stop working everywhere at once.
+  tokenVersion: { type: Number, default: 0 },
   immunizationRemindersEnabled: { type: Boolean, default: true },
   immunizationReminderFence: { type: Number, default: 0 },
   verified: {

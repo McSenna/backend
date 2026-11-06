@@ -39,7 +39,7 @@ const changeLogs = (resident) =>
 const webLogin = (user, extra = {}) =>
   h.request("/login", { method: "POST", headers: BROWSER, body: { email: user.email, password, clientPlatform: "web", ...extra } });
 const mobileLogin = async (user) =>
-  h.request("/login", { method: "POST", headers: { "X-Client-Platform": "mobile" }, body: await require("./helpers/managedDeviceFixtures").managedLoginBody({ email: user.email, password, clientPlatform: "mobile" }) });
+  h.request("/login", { method: "POST", headers: { "X-Client-Platform": "mobile" }, body: { email: user.email, password, clientPlatform: "mobile" } });
 const protectedRead = (token, extra = {}) => h.request("/profile", { headers: bearer(token, extra) });
 
 const run = async () => {
@@ -330,14 +330,11 @@ const run = async () => {
   // Other admin features are unchanged, and status stays visible read-only.
   const list = await h.request("/users?page=1&pageSize=5&tab=all", { headers: adminHeaders(otherAdmin) });
   assert.equal(list.status, 200, JSON.stringify(list.body));
-  assert.equal((await h.request(`/admin/users/${existing._id}/devices`, { headers: adminHeaders(otherAdmin) })).status, 200, "device management stays with every admin");
   assert.equal((await h.request("/system-logs", { headers: adminHeaders(otherAdmin) })).status, 200, "the system log stays with every admin");
 
-  // Omitting browser signals and claiming mobile never replaces device proof.
+  // The mobile app signs in with email and password only, whatever the web setting.
   const nonBrowser = await h.request("/login", { method: "POST", headers: { "X-Client-Platform": "mobile" }, body: { email: person.email, password, clientPlatform: "mobile" } });
-  assert.equal(nonBrowser.status, 403);
-  assert.equal(nonBrowser.body.code, "DEVICE_CREDENTIAL_REQUIRED");
-  assert.equal(nonBrowser.body.token, undefined);
+  assert.equal(nonBrowser.status, 200, JSON.stringify(nonBrowser.body));
 
   console.log("residentWebAccessDesignatedAdmin: all checks passed");
 };

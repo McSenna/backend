@@ -37,37 +37,28 @@ const scheduledVisit = (resident, consultationType, slotStart, status = "confirm
   });
 
 const run = async ({ request }, check) => {
-  const doctor = await createUser("doctor");
   const midwife = await createUser("midwife");
   const bhw = await createUser("bhw");
   const residentA = await createUser("resident", "1985-11-09");
   const residentB = await createUser("resident", "1994-02-17");
 
-  const mission = (
-    await request("/mission-schedule", {
-      method: "POST",
-      token: doctor.token,
-      body: {
-        date: upcomingDateKey(4),
-        categories: [{ categoryKey: "bp_checking", durationMinutes: 5 }],
-      },
-    })
-  ).body.missionSchedule;
-  // Immunization books on its own Thursday schedule; BP checking on the mission.
+  // Immunization books on its own Thursday schedule; BP checking on its own
+  // Monday to Saturday schedule, with no mission.
   const shotDay = upcomingDateKey(4);
   // Preserve action coverage on a legacy visit; mothers no longer create these.
   await scheduledVisit(residentA,"immunization",new Date(`${shotDay}T09:00:00+08:00`));
-  const { schedules } = (
-    await request("/appointments/booking-options?consultationType=bp_checking", { token: residentA.token })
+  const bpDay = upcomingDateKey(4);
+  const { day: bpOptions } = (
+    await request(`/appointments/booking-options?consultationType=bp_checking&date=${bpDay}`, { token: residentA.token })
   ).body;
-  const [bpStart] = schedules.find((s) => s.missionScheduleId === String(mission._id)).availableSlotStarts;
+  const bpStart = bpOptions.slots[0].start;
   await request("/appointments", {
     method: "POST",
     token: residentA.token,
     body: {
       consultationType: "bp_checking",
       description: "Scheduled visit",
-      missionScheduleId: String(mission._id),
+      appointmentDate: bpDay,
       slotStart: bpStart,
       requestKey: "actions-test-bp_checking",
     },

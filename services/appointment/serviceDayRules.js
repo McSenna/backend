@@ -1,6 +1,6 @@
 "use strict";
 
-const { getCategory } = require("../../config/consultationCategories");
+const { getCategory, residentPicksTime } = require("../../config/consultationCategories");
 const { startOfDay } = require("../../utils/dateWindow");
 const { badRequest, conflict } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
@@ -37,6 +37,19 @@ const isServiceDay = (categoryKey, date) => {
   return !Number.isNaN(day.getTime()) && weekdays.includes(day.getDay());
 };
 
+/** "Thursday" for a one-day service, "day" for a service open on several days. */
+const serviceDayWord = (categoryKey) => {
+  const weekdays = serviceWeekdaysOf(categoryKey);
+  return weekdays?.length === 1 ? WEEKDAY_NAMES[weekdays[0]] : "day";
+};
+
+/** "every Thursday", or "Mondays, Tuesdays, ... and Saturdays" for a multi-day service. */
+const serviceDaysPhrase = (categoryKey) => {
+  const weekdays = serviceWeekdaysOf(categoryKey);
+  if (!weekdays) return "every day";
+  return weekdays.length === 1 ? `every ${WEEKDAY_NAMES[weekdays[0]]}` : `on ${weekdaysLabel(weekdays)}`;
+};
+
 const serviceDayMessage = (categoryKey) =>
   `${labelOf(categoryKey)} appointments are only available on ${weekdaysLabel(serviceWeekdaysOf(categoryKey))}.`;
 
@@ -69,6 +82,9 @@ const formatDay = (date) =>
  */
 const assertCompletionDayReached = (appointment, now = new Date()) => {
   if (!serviceWeekdaysOf(appointment.consultationType)) return;
+  // BP checking runs six days a week and was never locked to its day, so a
+  // resident who comes in early can still be seen and signed off.
+  if (residentPicksTime(appointment.consultationType)) return;
 
   const scheduledDay = appointment.slotStart ? startOfDay(appointment.slotStart) : null;
   if (scheduledDay && startOfDay(now).getTime() >= scheduledDay.getTime()) return;
@@ -84,6 +100,8 @@ const assertCompletionDayReached = (appointment, now = new Date()) => {
 
 module.exports = {
   isServiceDay,
+  serviceDayWord,
+  serviceDaysPhrase,
   serviceDayMessage,
   assertServiceDay,
   assertCategoriesFitDay,

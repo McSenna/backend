@@ -29,7 +29,6 @@ const createStaff = async (role) => {
     address: "Test address",
     approved_at: new Date(),
   });
-  await require("./managedDeviceFixtures").provisionTestDevice(user);
   return user;
 };
 

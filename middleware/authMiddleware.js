@@ -52,13 +52,21 @@ const authenticateSession = async (req, { skipResidentAccess = false } = {}) => 
   }
 
   const account = await User.findById(payload.userId)
-    .select("_id role verified status residentWebAccessOverride")
+    .select("_id role verified status residentWebAccessOverride tokenVersion")
     .lean();
 
   if (!account) {
     throw unauthorized(
       "Your account is no longer available. Please log in again.",
       ERROR_CODES.ACCOUNT_NOT_FOUND
+    );
+  }
+
+  // INVALID_TOKEN rather than a new code: installed app versions already sign out on it.
+  if ((payload.tokenVersion ?? 0) !== (account.tokenVersion ?? 0)) {
+    throw unauthorized(
+      "Your password was changed. Please sign in with your new password.",
+      ERROR_CODES.INVALID_TOKEN
     );
   }
 
@@ -97,14 +105,12 @@ const authenticateSession = async (req, { skipResidentAccess = false } = {}) => 
   req.auth = {
     platform: sessionPlatform,
     sessionId: payload.sessionId || null,
-    deviceId: payload.deviceId || null,
     issuedAt: payload.iat ? new Date(payload.iat * 1000) : null,
     isLegacySession: !claimedSessionPlatform,
   };
   if (account.role === "resident" && !skipResidentAccess) {
     if (claimedSessionPlatform === "mobile") {
-      // A signed platform label alone is not proof of a provisioned mobile session.
-      await require("../services/managedDevices").assertManagedSession(account._id, payload.deviceId);
+      await require("../services/auth/revokedDeviceSessions").assertDeviceSessionNotRevoked(payload.deviceId);
     } else {
       // Legacy unbound credentials never establish a mobile exemption.
       req.auth.platform = "web";

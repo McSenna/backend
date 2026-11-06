@@ -15,13 +15,6 @@ const hostOf = (value) => {
   }
 };
 
-/**
- * REST treats any Origin header as a browser. That cannot hold for sockets:
- * React Native's Android WebSocket always sends `Origin: <scheme>://<api host>`,
- * so every resident would be refused as "a mobile session used in a browser".
- * Browsers send Fetch Metadata headers on WebSocket handshakes, and their
- * Origin is the page's host rather than the API's, so either one marks a browser.
- */
 const isBrowserHandshake = (headers) => {
   if (FETCH_METADATA_HEADERS.some((name) => typeof headers[name] === "string")) return true;
   const origin = typeof headers.origin === "string" ? hostOf(headers.origin) : null;
@@ -56,11 +49,6 @@ const toRequest = (handshake) => {
   };
 };
 
-/**
- * The client reads `data.code`: an auth code signs the user out, anything else
- * is retried. A database outage during the handshake must never look like an
- * expired session, or every connected device would be logged out at once.
- */
 const toRefusal = (error) => {
   const isAuthRefusal = error?.statusCode === 401 || error?.statusCode === 403;
   const refusal = new Error(isAuthRefusal ? "Unauthorized" : "Unavailable");
@@ -73,11 +61,6 @@ const runPlatformGuard = (req) =>
     enforcePlatformAccess(req, null, (error) => (error ? reject(error) : resolve()));
   });
 
-/**
- * Socket.IO middleware. Uses the same checks as every REST call (signature,
- * expiry, account exists and is not blocked, role allowed on this platform)
- * and stores what the connection needs on socket.data.
- */
 const authenticateSocket = async (socket, next) => {
   try {
     const req = toRequest(socket.handshake);
@@ -92,7 +75,6 @@ const authenticateSocket = async (socket, next) => {
     socket.data.role = req.user.role;
     socket.data.sessionId = req.auth.sessionId;
     socket.data.platform = req.auth.platform;
-    socket.data.deviceId = req.auth.deviceId;
     socket.data.expiresAt = typeof req.user.exp === "number" ? req.user.exp * 1000 : null;
     return next();
   } catch (error) {

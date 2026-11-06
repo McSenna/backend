@@ -19,7 +19,11 @@ function targetEmail(req) {
   return String(req.body?.email || "").toLowerCase().trim();
 }
 
-function buildLimiter({ ipStore, emailStore, code, deviceMessage, accountMessage }) {
+function signedInUserId(req) {
+  return req.user?.userId ? String(req.user.userId) : "";
+}
+
+function buildLimiter({ ipStore, emailStore, code, deviceMessage, accountMessage, accountKeyOf = targetEmail }) {
   return function rateLimit(req, _res, next) {
     const ipKey = clientIpOf(req);
     if (ipStore.isLimited(ipKey)) {
@@ -32,7 +36,7 @@ function buildLimiter({ ipStore, emailStore, code, deviceMessage, accountMessage
       return next(err);
     }
 
-    const email = targetEmail(req);
+    const email = accountKeyOf(req);
     if (email && emailStore.isLimited(email)) {
       const err = tooManyRequests(accountMessage, code);
       if (typeof emailStore.getRetryAfterSeconds === "function") {
@@ -74,9 +78,29 @@ const loginRateLimiter = buildLimiter({
   accountMessage: `Too many sign-in attempts. Please wait ${WINDOW_MINUTES} minutes and try again.`,
 });
 
+// Keyed by the signed-in account, not a body email: a stolen session must not
+// get unlimited guesses at the current password from rotating IPs.
+const changePasswordIpStore = new SlidingWindowStore(15 * 60 * 1000, 20);
+const changePasswordUserStore = new SlidingWindowStore(15 * 60 * 1000, 8);
+
+const changePasswordRateLimiter = buildLimiter({
+  ipStore: changePasswordIpStore,
+  emailStore: changePasswordUserStore,
+  accountKeyOf: signedInUserId,
+  code: "RATE_LIMITED",
+  deviceMessage: `Too many password change attempts from this device. Please wait ${WINDOW_MINUTES} minutes and try again.`,
+  accountMessage: `Too many password change attempts. Please wait ${WINDOW_MINUTES} minutes and try again.`,
+});
+
 function clearLoginAttempts(email) {
   const key = String(email || "").toLowerCase().trim();
   if (key) loginEmailStore.reset(key);
 }
 
-module.exports = { otpSendRateLimiter, otpVerifyRateLimiter, loginRateLimiter, clearLoginAttempts };
+module.exports = {
+  otpSendRateLimiter,
+  otpVerifyRateLimiter,
+  loginRateLimiter,
+  changePasswordRateLimiter,
+  clearLoginAttempts,
+};

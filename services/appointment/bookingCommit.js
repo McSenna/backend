@@ -21,13 +21,15 @@ const formatWhen = (date) =>
 
 // A resident books for themself, so a second visit for the same service on the
 // same day is almost always an accidental repeat from a fresh form.
-const assertNoSameDayBooking = async ({ residentId, categoryKey, slotStartDate, session }) => {
+// A reschedule passes its own appointment as `excludeAppointmentId`.
+const assertNoSameDayBooking = async ({ residentId, categoryKey, slotStartDate, session, excludeAppointmentId = null }) => {
   const { start, end } = todayBounds(slotStartDate);
   const existing = await Appointment.findOne({
     resident: residentId,
     consultationType: categoryKey,
     status: { $in: QUEUE_ACTIVE_STATUSES },
     slotStart: { $gte: start, $lt: end },
+    ...(excludeAppointmentId ? { _id: { $ne: excludeAppointmentId } } : {}),
   })
     .select("slotStart")
     .session(session)
@@ -115,4 +117,4 @@ const commitMissionBooking = async ({ request, resident, requestKey, now }) => {
   });
 };
 
-module.exports = { commitMissionBooking };
+module.exports = { commitMissionBooking, assertNoSameDayBooking };

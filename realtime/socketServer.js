@@ -8,16 +8,10 @@ const { buildSocketCorsOptions } = require("./socketCors");
 const { roomsForAccount, userRoom } = require("./rooms");
 const { setRealtimeServer, getRealtimeServer } = require("./broadcast");
 
-// Clients only listen; the largest thing they send is the handshake.
 const MAX_CLIENT_MESSAGE_BYTES = 4 * 1024;
-// setTimeout overflows past ~24.8 days; tokens are far shorter, but stay safe.
+
 const MAX_TIMER_MS = 2 ** 31 - 1;
 
-/**
- * A socket outlives the request that opened it, so the token's expiry is
- * enforced here: when it lapses the server drops the socket, and the client's
- * reconnect is refused with TOKEN_EXPIRED, which signs it out like a REST 401.
- */
 const scheduleExpiry = (socket) => {
   const { expiresAt } = socket.data;
   if (!expiresAt) return;
@@ -78,10 +72,25 @@ const disconnectSession = async (userId, sessionId) => {
   }
 };
 
-/**
- * Drops every socket so the HTTP server can finish closing. Not io.close():
- * that also closes the HTTP server, which shutdown already does.
- */
+const adoptSessionToken = (userId, sessionId, token) => {
+  const io = getRealtimeServer();
+  if (!io || !sessionId) return;
+  for (const socket of io.sockets.sockets.values()) {
+    if (socket.data.userId !== String(userId) || socket.data.sessionId !== sessionId) continue;
+    socket.handshake.auth = { ...socket.handshake.auth, token };
+  }
+};
+
+/** Drops every socket of an account except one session's, e.g. after that session changed the password. */
+const disconnectOtherSessions = async (userId, keepSessionId) => {
+  const io = getRealtimeServer();
+  if (!io) return;
+  const sockets = await io.in(userRoom(userId)).fetchSockets();
+  for (const socket of sockets) {
+    if (!keepSessionId || socket.data.sessionId !== keepSessionId) socket.disconnect(true);
+  }
+};
+
 const closeRealtime = () => {
   const io = getRealtimeServer();
   if (!io) return;
@@ -89,4 +98,11 @@ const closeRealtime = () => {
   io.disconnectSockets(true);
 };
 
-module.exports = { attachRealtime, disconnectUser, disconnectSession, closeRealtime };
+module.exports = {
+  attachRealtime,
+  disconnectUser,
+  disconnectSession,
+  adoptSessionToken,
+  disconnectOtherSessions,
+  closeRealtime,
+};

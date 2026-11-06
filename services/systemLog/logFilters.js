@@ -3,6 +3,7 @@
 const User = require("../../models/User");
 const { normalizeRole } = require("./requestContext");
 const { MODULE_RULES } = require("./logClassification");
+const { escapeRegex } = require("../../utils/escapeRegex");
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 const VALID_SEVERITIES = ["info", "success", "warning", "error"];
@@ -35,7 +36,6 @@ const buildDateRange = (fromDate, toDate) => {
   return Object.keys(range).length > 0 ? { createdAt: range } : {};
 };
 
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const findMatchingUserIds = async (regex) => {
   const users = await User.find({ $or: [{ fullname: regex }, { email: regex }] })
