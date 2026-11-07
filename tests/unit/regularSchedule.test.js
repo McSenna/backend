@@ -43,7 +43,7 @@ const start = (appointmentDate, time, now = FRIDAY_BEFORE) => thrown(() => parse
 console.log("\nBP checking is its own regular schedule, never a mission service");
 check("BP checking is a weekly service where the resident picks the time", isWeeklyService(BP) && residentPicksTime(BP));
 check("immunization keeps its assigned time", isWeeklyService("immunization") && !residentPicksTime("immunization"));
-check("mission services are unchanged", !residentPicksTime("general_checkup") && !isWeeklyService("prenatal"));
+check("doctor services stay mission services", !residentPicksTime("general_checkup") && !isWeeklyService("consultation"));
 check("a mission may not list BP checking", /own schedule/.test(thrown(() => assertMissionService(BP))?.message ?? ""));
 
 console.log("\nWeekday schedule: 42 slots, lunch break excluded");

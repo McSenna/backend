@@ -28,15 +28,21 @@ const announceAutoConfirm = ({ appointment, updated, staffId, doctorLabel }) => 
   };
   const timeLabel = formatSlotStartForNotification(updated.slotStart);
 
+  // Keyed to this placement, so a repeated run cannot confirm the same slot twice,
+  // while a visit released by a mission edit and placed again is still told.
+  const placedAt = new Date(updated.assignedAt ?? updated.slotStart).getTime();
   void Notification.create({
     recipient: resident?._id ?? appointment.resident,
     appointment: updated._id,
+    dedupeKey: `appointment-confirmed:${updated._id}:${placedAt}`,
     type: "appointment_confirmed",
     title: "Appointment confirmed",
     body: confirmedBody({ labels, appointmentTypeLabel, details, doctorLabel }),
     time: timeLabel,
     tone: "success",
-  }).catch(warn("Auto-confirm notification failed"));
+  }).catch((error) => {
+    if (error?.code !== 11000) warn("Auto-confirm notification failed")(error);
+  });
 
   if (staffId) {
     void Notification.create({

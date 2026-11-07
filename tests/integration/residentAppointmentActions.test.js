@@ -157,7 +157,7 @@ const run = async ({ request }, check) => {
     statusHistory: [{ status: "pending", timestamp: new Date() }],
   });
   const pendingOptions = await request(`/appointments/${pending._id}/reschedule-options`, { token: residentA.token });
-  check("a pending request has no reschedule options yet", pendingOptions.status === 409 && pendingOptions.body.message.includes("no schedule yet"));
+  check("a pending request has no reschedule options yet", pendingOptions.status === 409 && pendingOptions.body.message.includes("still in the queue"));
   check("a pending request can still be withdrawn", (await cancel(pending._id, residentA)).status === 200);
 };
 

@@ -1,8 +1,5 @@
 "use strict";
 
-// Browsers send Origin as scheme://host[:port] in lower case, with no path or
-// trailing slash. Comparing raw strings made "https://maslogcare.com/" in
-// CLIENT_ORIGINS refuse the real site with no error anywhere.
 function normalizeOrigin(value) {
   try {
     const { origin, protocol } = new URL(String(value).trim());

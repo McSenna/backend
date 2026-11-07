@@ -44,6 +44,29 @@ const stillFits = (appointment, windows, categoryMap) => {
   return okSlot && okCategory;
 };
 
+const RELEASED_FIELDS = "_id resident consultationType slotStart";
+
+// The visit goes back to pending with its original request time, so it keeps
+// its place in line, and the history says why it lost its slot.
+const releaseOps = (rows, note) =>
+  rows.map((appointment) => ({
+    updateOne: {
+      filter: { _id: appointment._id, status: { $in: BOOKED_STATUSES } },
+      update: {
+        $set: { ...RESET_TO_PENDING, declineReason: "" },
+        $push: { statusHistory: { status: "pending", timestamp: new Date(), changedBy: null, note } },
+      },
+    },
+  }));
+
+const toReleased = (appointment) => ({
+  _id: appointment._id,
+  resident: appointment.resident,
+  consultationType: appointment.consultationType,
+  slotStart: appointment.slotStart,
+});
+
+/** Returns the visits it released, with the slot each one had, for the notice that follows. */
 const releaseAppointmentsThatNoLongerFit = async (mission) => {
   const windows = getMissionDayWindows(mission);
   const categoryMap = new Map(
@@ -54,23 +77,27 @@ const releaseAppointmentsThatNoLongerFit = async (mission) => {
     missionSchedule: mission._id,
     status: { $in: BOOKED_STATUSES },
     ...MISSION_SERVICE_FILTER,
-  });
+  }).lean();
 
-  const resetOps = booked
-    .filter((appointment) => !stillFits(appointment, windows, categoryMap))
-    .map((appointment) => ({
-      updateOne: { filter: { _id: appointment._id }, update: { $set: { ...RESET_TO_PENDING } } },
-    }));
-
-  if (resetOps.length) {
-    await Appointment.bulkWrite(resetOps, { ordered: true });
+  const released = booked.filter((appointment) => !stillFits(appointment, windows, categoryMap));
+  if (released.length) {
+    await Appointment.bulkWrite(releaseOps(released, "Returned to the queue: the mission schedule changed"), { ordered: true });
   }
+  return released.map(toReleased);
 };
 
-const releaseAllAppointments = (missionId) =>
-  Appointment.updateMany(
-    { missionSchedule: missionId, status: { $in: BOOKED_STATUSES }, ...MISSION_SERVICE_FILTER },
-    { $set: { ...RESET_TO_PENDING, declineReason: "" } }
-  );
+const releaseAllAppointments = async (missionId) => {
+  const booked = await Appointment.find({
+    missionSchedule: missionId,
+    status: { $in: BOOKED_STATUSES },
+    ...MISSION_SERVICE_FILTER,
+  })
+    .select(RELEASED_FIELDS)
+    .lean();
+  if (booked.length) {
+    await Appointment.bulkWrite(releaseOps(booked, "Returned to the queue: the mission was removed"), { ordered: true });
+  }
+  return booked.map(toReleased);
+};
 
 module.exports = { releaseAppointmentsThatNoLongerFit, releaseAllAppointments };

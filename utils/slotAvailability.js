@@ -92,7 +92,6 @@ function listAvailableStarts(mission, bookedAppointments, durationMinutes, exclu
   return candidates;
 }
 
-/** Free starts that are still ahead of `nowTime`, earliest first. */
 function listOpenStarts(mission, bookedAppointments, durationMinutes, excludeAppointmentId, nowTime = Date.now()) {
   return listAvailableStarts(mission, bookedAppointments, durationMinutes, excludeAppointmentId).filter(
     (startIso) => new Date(startIso).getTime() > nowTime

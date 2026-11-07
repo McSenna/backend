@@ -11,13 +11,13 @@ exports.login = asyncHandler(async (req, res) => {
   const platform = platformOf(req);
   const { email, password } = req.body;
 
-  const { user, token } = await authenticate({ req, email, password, platform });
+  const { user, token, policy } = await authenticate({ req, email, password, platform });
 
   return res.status(HTTP_STATUS.OK).json({
     success: true,
     message: "Login successful.",
     token,
-    user: buildUserResponse(user, user.role === "resident" ? await require("../../services/residentWebAccess").readPolicy() : null),
+    user: buildUserResponse(user, policy),
     platform,
   });
 });

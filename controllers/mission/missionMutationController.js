@@ -19,6 +19,7 @@ const {
   releaseAllAppointments,
 } = require("../../services/mission/missionRebooking");
 const { assertCategoriesFitDay } = require("../../services/appointment/serviceDayRules");
+const { notifyStillQueued } = require("../../services/doctorQueue/allocation");
 const { DEFAULT_WINDOWS, assertDateIsFree, logScheduleChange } = require("./missionShared");
 
 exports.createMissionSchedule = asyncHandler(async (req, res) => {
@@ -91,9 +92,12 @@ exports.updateMissionSchedule = asyncHandler(async (req, res) => {
   await mission.save();
 
   const updatedMission = await MissionSchedule.findById(mission._id).lean();
-  await releaseAppointmentsThatNoLongerFit(updatedMission);
+  const released = await releaseAppointmentsThatNoLongerFit(updatedMission);
 
-  await processMissionSchedulePriorityQueue(mission._id, { staffId: req.user.userId });
+  // Every upcoming mission, not only this one: a visit the edit released may
+  // fit an earlier or later mission that still has room.
+  await processUpcomingMissionSchedulesPriorityQueue({ staffId: req.user.userId });
+  await notifyStillQueued(released);
 
   await logScheduleChange({
     req,
@@ -117,9 +121,10 @@ exports.deleteMissionSchedule = asyncHandler(async (req, res) => {
     throw notFound("Mission schedule not found.", ERROR_CODES.MISSION_NOT_FOUND);
   }
 
-  await releaseAllAppointments(mission._id);
+  const released = await releaseAllAppointments(mission._id);
   await MissionSchedule.deleteOne({ _id: mission._id });
   await processUpcomingMissionSchedulesPriorityQueue({ staffId: req.user.userId });
+  await notifyStillQueued(released);
 
   await logScheduleChange({
     req,

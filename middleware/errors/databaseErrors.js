@@ -13,6 +13,8 @@ const UNAVAILABLE_ERROR_NAMES = [
   "MongooseServerSelectionError",
   "MongoNetworkTimeoutError",
   "MongoTimeoutError",
+  "MongoWaitQueueTimeoutError",
+  "MongoOperationTimeoutError",
 ];
 
 const isDatabaseUnavailableError = (err) => {
@@ -21,7 +23,9 @@ const isDatabaseUnavailableError = (err) => {
   const message = String(err?.message || "");
   return (
     message.includes("buffering timed out") ||
-    message.includes("Client must be connected before running operations")
+    message.includes("Client must be connected before running operations") ||
+    message.includes("bufferCommands = false") ||
+    (err?.name === "MongoServerError" && err?.code === 50)
   );
 };
 

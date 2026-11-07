@@ -8,7 +8,8 @@ const THURSDAY = 4;
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const IMMUNIZATION = { categoryKey: "immunization", durationMinutes: 10 };
 const BP = { categoryKey: "bp_checking", durationMinutes: 5 };
-const PRENATAL = { categoryKey: "prenatal", durationMinutes: 20 };
+// Any mission service that is not immunization; prenatal left missions on 2026-11-07.
+const PRENATAL = { categoryKey: "consultation", durationMinutes: 20 };
 const SYSTEM_ASSIGNED = /assigned automatically|assigned by the system/;
 const OWN_SCHEDULE = /own schedule/;
 

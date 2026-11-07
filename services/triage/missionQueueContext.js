@@ -7,6 +7,7 @@ const { listOpenStarts } = require("../../utils/slotAvailability");
 const { tagPendingAppointments, byPriorityThenCreated } = require("./triagePriority");
 const { SLOT_OCCUPYING_STATUSES } = require("../queueScope");
 const { isServiceDay } = require("../appointment/serviceDayRules");
+const logger = require("../../utils/logger");
 
 const PENDING_SELECT =
   "consultationType createdAt ageTier prioritySortKey ageAtSubmission reschedulePriorityAt childDateOfBirth _id";
@@ -47,9 +48,23 @@ const loadRankedPending = async (residentFields) => {
   return pending;
 };
 
+// Mission durations are checked when a mission is saved, so this only fires for
+// a mission stored before a range changed. Its visits are skipped, never guessed.
+const warnAboutUnusableDurations = (mission) => {
+  for (const { categoryKey, durationMinutes } of mission.categories || []) {
+    if (isWeeklyService(categoryKey) || validateDurationForCategory(categoryKey, durationMinutes).ok) continue;
+    logger.warn("Mission service has no usable visit length; its queued requests are not placed on it", {
+      missionScheduleId: String(mission._id),
+      categoryKey,
+      durationMinutes: durationMinutes ?? null,
+    });
+  }
+};
+
 const loadMissionQueue = async (missionScheduleId, residentFields) => {
   const mission = await MissionSchedule.findById(missionScheduleId).lean();
   if (!mission) return null;
+  warnAboutUnusableDurations(mission);
 
   return {
     mission,

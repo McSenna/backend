@@ -37,16 +37,12 @@ function coerceDate(field, value, errors) {
   return d;
 }
 
-// Calendar day of a date value: a typed "YYYY-MM-DD" as written, otherwise the
-// server's local day (Asia/Manila), so a time zone never moves it.
 function dayKeyOf(raw, date) {
   if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}/.test(raw.trim())) return raw.trim().slice(0, 10);
   const pad = (n) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-// `when` on a date field: "past" means today or earlier (a dose given);
-// "after_visit" means the visit day or later (a follow-up, a next dose).
 function checkDateRange(field, raw, value, errors, visitDay) {
   if (!(value instanceof Date) || !field.when) return;
   const day = dayKeyOf(raw, value);
@@ -92,8 +88,6 @@ function isMissing(value) {
   return value === undefined || value === null || value === "";
 }
 
-// `optionalKeys` relaxes required fields for records encoded from paper, which
-// often carry readings without a written assessment.
 function validateMedicalRecordInput(categoryKey, input, { optionalKeys = [], visitDay = null } = {}) {
   const errors = [];
   const body = input && typeof input === "object" ? input : {};

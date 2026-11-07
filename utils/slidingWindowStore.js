@@ -24,9 +24,6 @@ class SlidingWindowStore {
     return false;
   }
 
-  // If the key is currently limited, return how many whole seconds remain
-  // until the window expires for the earliest recorded hit. Returns 0 when
-  // not limited.
   getRetryAfterSeconds(key) {
     const now = Date.now();
     const timestamps = this.hits.get(key) || [];
@@ -52,9 +49,6 @@ class SlidingWindowStore {
   }
 }
 
-// req.ip only honours X-Forwarded-For when app "trust proxy" is set (TRUST_PROXY).
-// Reading the header directly let any client send a fresh fake IP per request
-// and skip the per-device login and OTP limits.
 function clientIpOf(req) {
   return req.ip || req.socket?.remoteAddress || "unknown-ip";
 }

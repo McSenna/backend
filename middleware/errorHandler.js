@@ -8,6 +8,7 @@ const { normalizeError, isProduction } = require("./errors/errorTranslators");
 
 const globalErrorHandler = (err, req, res, next) => {
   const { statusCode, code, message, details, unexpected } = normalizeError(err);
+  res.locals.failureCode = code;
 
   logger.requestError(err, req, {
     statusCode,

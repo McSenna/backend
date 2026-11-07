@@ -1,6 +1,6 @@
 "use strict";
 
-const { getCategory } = require("../../config/consultationCategories");
+const { closedWeekdayReason, getCategory } = require("../../config/consultationCategories");
 const { badRequest } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
 const { serviceDayMessage } = require("../appointment/serviceDayRules");
@@ -11,12 +11,13 @@ const labelOf = (categoryKey) => getCategory(categoryKey)?.label ?? "This servic
 
 const trimTo = (value, maxLength) => (typeof value === "string" ? value.trim().slice(0, maxLength) : "");
 
-const closureMessage = (categoryKey, closure) => {
+const closureMessage = (categoryKey, closure, dayStart) => {
   switch (closure) {
     case DAY_STATUS.PAST:
       return "That date has passed. Please choose today or a later date.";
     case DAY_STATUS.CLOSED:
-      return serviceDayMessage(categoryKey);
+      // A day closed for a stated reason (prenatal on Thursdays) says why.
+      return closedWeekdayReason(categoryKey, dayStart.getDay()) ?? serviceDayMessage(categoryKey);
     case DAY_STATUS.BEYOND:
       return `${labelOf(categoryKey)} can be booked up to ${scheduleOf(categoryKey).horizonWeeks} weeks ahead. Please choose an earlier date.`;
     default:
@@ -44,7 +45,7 @@ const parseRegularStart = (categoryKey, { appointmentDate, slotStart } = {}, now
   }
 
   const closure = dayClosure(categoryKey, dayStart, now);
-  if (closure) throw badRequest(closureMessage(categoryKey, closure), ERROR_CODES.VALIDATION_ERROR);
+  if (closure) throw badRequest(closureMessage(categoryKey, closure, dayStart), ERROR_CODES.VALIDATION_ERROR);
 
   if (dayKeyOf(start) !== dayKeyOf(dayStart)) {
     throw badRequest("The selected time is not on the chosen date. Please pick a time from the list.", ERROR_CODES.VALIDATION_ERROR);

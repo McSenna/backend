@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const Appointment = require("../../models/Appointment");
 const { tagPendingAppointments, byPriorityThenCreated } = require("../triage/triagePriority");
 const { queueFilter } = require("../queueScope");
+const { withQueueDetails } = require("../doctorQueue/queueStatus");
 
 const RESIDENT_QUEUE_FIELDS = "fullname email dateOfBirth gender phone";
 
@@ -13,7 +14,7 @@ const loadPendingQueue = async (visibleKeys) => {
     .lean();
 
   await tagPendingAppointments(pending);
-  return pending.sort(byPriorityThenCreated);
+  return withQueueDetails(pending.sort(byPriorityThenCreated));
 };
 
 // The staff list's row shape. Realtime publishes appointments through this same
@@ -36,7 +37,7 @@ const loadAppointments = async ({ visibleKeys, status, missionScheduleId }) => {
   // the order assigning a slot enforces (rescheduled first, then age tier).
   if (status !== "pending") return rows;
   await tagPendingAppointments(rows);
-  return rows.sort(byPriorityThenCreated);
+  return withQueueDetails(rows.sort(byPriorityThenCreated));
 };
 
 module.exports = { loadPendingQueue, loadAppointments, staffAppointmentQuery };

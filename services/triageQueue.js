@@ -7,11 +7,27 @@ const { loadMissionQueue, planSlotFor } = require("./triage/missionQueueContext"
 const { announceAutoConfirm } = require("./triage/autoConfirmNotifier");
 const { loadBookedForMission } = require("./appointment/slotService");
 const { withMissionSlotLock } = require("./appointment/slotLock");
+const { QUEUE_ACTIVE_STATUSES } = require("../models/Appointment");
+const { todayBounds } = require("../utils/dateWindow");
 
 const normalizeDayStart = (value) => {
   const date = new Date(value);
   date.setHours(0, 0, 0, 0);
   return date;
+};
+
+// The rule resident booking already had: one active visit per service per day.
+// A resident with two queued checkups gets them on different mission days.
+const hasSameDayVisit = (appointment, mission, session) => {
+  const residentId = appointment.resident?._id ?? appointment.resident;
+  const { start, end } = todayBounds(mission.date);
+  return Appointment.exists({
+    _id: { $ne: appointment._id },
+    resident: residentId,
+    consultationType: appointment.consultationType,
+    status: { $in: QUEUE_ACTIVE_STATUSES },
+    slotStart: { $gte: start, $lt: end },
+  }).session(session);
 };
 
 const claimPendingAppointment = ({ appointment, mission, missionCategoryMap, staffId, now }) =>
@@ -21,13 +37,24 @@ const claimPendingAppointment = ({ appointment, mission, missionCategoryMap, sta
     const booked = await loadBookedForMission(mission._id, session);
     const plan = planSlotFor({ appointment, mission, missionCategoryMap, bookedSim: booked });
     if (!plan) return null;
+    if (await hasSameDayVisit(appointment, mission, session)) return null;
 
     const slotStart = new Date(plan.slotStartIso);
     const slotEnd = new Date(slotStart.getTime() + plan.durationMinutes * 60 * 1000);
 
+    // The status filter is the guard against a second run, or a staff action,
+    // placing the same request twice: only one update can see it pending.
     return Appointment.findOneAndUpdate(
       { _id: appointment._id, status: "pending" },
       {
+        $push: {
+          statusHistory: {
+            status: "confirmed",
+            timestamp: now,
+            changedBy: staffId ?? null,
+            note: "Scheduled automatically from the queue",
+          },
+        },
         $set: {
           ageTier: appointment.ageTier,
           prioritySortKey: appointment.prioritySortKey,
@@ -40,6 +67,7 @@ const claimPendingAppointment = ({ appointment, mission, missionCategoryMap, sta
           slotEnd,
           assignedBy: staffId ?? null,
           assignedAt: now,
+          approvedAt: now,
           status: "confirmed",
         },
       },

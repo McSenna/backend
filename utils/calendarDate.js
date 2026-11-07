@@ -2,8 +2,6 @@
 
 const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-// Only a real YYYY-MM-DD day is accepted, stored as UTC midnight so no
-// timezone can move it.
 const parseCalendarDate = (value) => {
   const text = typeof value === "string" ? value.trim() : "";
   if (!CALENDAR_DATE.test(text)) return null;
@@ -13,7 +11,6 @@ const parseCalendarDate = (value) => {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-// The [start, end) range of one UTC calendar day.
 const utcDayRange = (date) => {
   const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   return { start, end: new Date(start.getTime() + DAY_MS) };

@@ -10,6 +10,9 @@ const CONSULTATION_CATEGORIES = [
     durationMinutesMax: 20,
     residentBookable: true,
     queueRole: "doctor",
+    // Residents ask for a visit; the queue places it on a doctor's medical
+    // mission (services/doctorQueue). The mission sets the length within the range.
+    scheduling: "queue",
   },
   {
     key: "prenatal",
@@ -19,6 +22,23 @@ const CONSULTATION_CATEGORIES = [
     durationMinutes: 20,
     residentBookable: true,
     queueRole: "midwife",
+    // Runs on the health center's regular hours, never on a medical mission
+    // (2026-11-07). The resident picks the date and time, as for BP checking.
+    scheduling: "weekly",
+    residentPicksTime: true,
+    // Date#getDay() numbering: Monday to Saturday except Thursday, when the
+    // midwife runs immunization. Sunday is closed.
+    serviceWeekdays: [1, 2, 3, 5, 6],
+    closedWeekdayReasons: {
+      4: "Prenatal appointments are unavailable on Thursdays because the midwife is assigned to immunization services. Please choose another available day.",
+    },
+    // The health center hours BP checking uses, as kape chose on 2026-11-07.
+    // 20-minute visits: 08:00 to 11:40, then 13:00 to 15:40; Saturday mornings only.
+    serviceWindows: [
+      { start: "08:00", end: "12:00" },
+      { start: "13:00", end: "16:00" },
+    ],
+    serviceWindowsByWeekday: { 6: [{ start: "08:00", end: "12:00" }] },
   },
   {
     key: "immunization",
@@ -49,6 +69,7 @@ const CONSULTATION_CATEGORIES = [
     durationMinutesMax: 30,
     residentBookable: true,
     queueRole: "doctor",
+    scheduling: "queue",
   },
   {
     key: "bp_checking",
@@ -110,7 +131,20 @@ function isWeeklyService(key) {
   return getCategory(key)?.scheduling === "weekly";
 }
 
-/** True for a weekly service where the resident chooses the date and time (BP checking). */
+/**
+ * True for a doctor service residents only request (general checkup,
+ * consultation): it waits in the priority queue until a medical mission has room.
+ */
+function isQueuedService(key) {
+  return getCategory(key)?.scheduling === "queue";
+}
+
+/** The reason a weekday is closed for a service, when its config gives one. */
+function closedWeekdayReason(key, weekday) {
+  return getCategory(key)?.closedWeekdayReasons?.[weekday] ?? null;
+}
+
+/** True for a weekly service where the resident chooses the date and time (BP checking, prenatal). */
 function residentPicksTime(key) {
   return isWeeklyService(key) && getCategory(key)?.residentPicksTime === true;
 }
@@ -177,6 +211,8 @@ module.exports = {
   canCreateMission,
   getCategory,
   isWeeklyService,
+  isQueuedService,
+  closedWeekdayReason,
   residentPicksTime,
   getQueueRole,
   getCategoryKeysForRole,

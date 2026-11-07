@@ -4,7 +4,8 @@ const { createChecker, startHarness, createUser, upcomingDateKey, localAt, finis
 const Appointment = require("../../models/Appointment");
 const Notification = require("../../models/Notification");
 
-const PRENATAL = { categoryKey: "prenatal", durationMinutes: 20 };
+// A mission service with resident-chosen reschedules; prenatal left missions on 2026-11-07.
+const PRENATAL = { categoryKey: "consultation", durationMinutes: 20 };
 const iso = (date) => new Date(date).toISOString();
 
 /** A visit already holding a weekly position, written directly so its day can be chosen freely. */
@@ -51,17 +52,17 @@ const run = async ({ request }, check) => {
   console.log("\nOther services keep the resident's choice of time");
   const mission = (await request("/mission-schedule", { method: "POST", token: doctor.token, body: { date: w1Key, categories: [PRENATAL] } })).body.missionSchedule;
   const prenatal = await Appointment.create({
-    resident: residentC.user._id, consultationType: "prenatal", status: "confirmed", ageTier: 4, prioritySortKey: 4,
-    missionSchedule: mission._id, assignedCategoryKey: "prenatal", assignedDurationMinutes: 20,
+    resident: residentC.user._id, consultationType: "consultation", status: "confirmed", ageTier: 6, prioritySortKey: 6,
+    missionSchedule: mission._id, assignedCategoryKey: "consultation", assignedDurationMinutes: 20,
     slotStart: localAt(w1Key, "11:00"), slotEnd: localAt(w1Key, "11:20"), approvedAt: new Date(),
     statusHistory: [{ status: "confirmed", timestamp: new Date() }],
   });
   const prenatalOptions = (await request(`/appointments/${prenatal._id}/reschedule-options`, { token: residentC.token })).body;
-  check("prenatal options are mission times, not first-slot", prenatalOptions.assignsEarliestSlot === false && prenatalOptions.scheduling === "mission");
+  check("consultation options are mission times, not first-slot", prenatalOptions.assignsEarliestSlot === false && prenatalOptions.scheduling === "mission");
   const prenatalMove = await reschedule(residentC, prenatal._id, { missionScheduleId: String(mission._id), slotStart: iso(localAt(w1Key, "14:00")) });
   const prenatalStored = await Appointment.findById(prenatal._id).lean();
   check(
-    "a prenatal visit can move to a chosen afternoon time without priority",
+    "a consultation can move to a chosen afternoon time without priority",
     prenatalMove.status === 200 && iso(prenatalStored.slotStart) === iso(localAt(w1Key, "14:00")) && prenatalStored.reschedulePriorityAt === null
   );
 

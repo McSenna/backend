@@ -42,7 +42,7 @@ const LOCKED_STATUS_MESSAGES = Object.freeze({
   cancelled: "This appointment has already been cancelled.",
   declined: "The health team declined this request, so it can no longer be changed.",
   processing: "Your visit has already started, so this appointment can no longer be changed.",
-  pending: "This request has no schedule yet. You can move it once the health team assigns a date.",
+  pending: "This request is still in the queue, so it has no date or time to change yet. You can reschedule it once one is assigned.",
 });
 
 const assertStatusAllows = (appointment, allowedStatuses, action) => {

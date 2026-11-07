@@ -1,6 +1,7 @@
 "use strict";
 
 const REDACTED = "[REDACTED]";
+const { requestOperation } = require("./requestOperation");
 
 const SENSITIVE_KEY_PATTERN =
   /^(password|newpassword|confirmpassword|currentpassword|otp|token|accesstoken|refreshtoken|authorization|cookie|jwt|secret|apikey|api_key|mongo_uri|mongouri|profilephoto|photo|profileimage)$/i;
@@ -25,8 +26,6 @@ function redact(value, depth = 0) {
   return value;
 }
 
-const isProduction = () => process.env.NODE_ENV === "production";
-
 function format(level, message, context) {
   const line = {
     timestamp: new Date().toISOString(),
@@ -50,21 +49,15 @@ const logger = {
     console.error(format("error", message, context));
   },
 
-  requestError(err, req, { statusCode, code, isOperational }) {
+  requestError(err, req, { statusCode, code }) {
     const context = {
       method: req?.method,
-      route: req?.originalUrl,
+      route: requestOperation(req),
+      requestId: req?.requestId,
       statusCode,
       code,
       errorName: err?.name,
-      errorMessage: err?.message,
-      userId: req?.user?.userId ? String(req.user.userId) : undefined,
-      role: req?.user?.role,
     };
-
-    if (!isProduction() && !isOperational && err?.stack) {
-      context.stack = err.stack;
-    }
 
     if (statusCode >= 500) {
       logger.error("Request failed", context);

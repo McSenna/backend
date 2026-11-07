@@ -22,8 +22,6 @@ class EmailServiceError extends Error {
   }
 }
 
-// Brevo's message text can echo addresses, so it picks the category but is never
-// copied into the error, which ends up in logs.
 function classifyBrevoResponse(status, body, headers) {
   const providerCode = String(body?.code || "");
   const providerMessage = String(body?.message || "");

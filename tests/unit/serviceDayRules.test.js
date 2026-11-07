@@ -56,6 +56,8 @@ console.log("\nOther services keep every day");
 for (const key of ["bp_checking", "prenatal", "general_checkup", "consultation"]) {
   check(`${key} is allowed on a Tuesday`, isServiceDay(key, at("2026-10-06")));
 }
+check("prenatal is not allowed on a Thursday (the midwife's immunization day)", !isServiceDay("prenatal", at("2026-10-08")));
+check("BP checking is still allowed on a Thursday", isServiceDay("bp_checking", at("2026-10-08")));
 
 console.log("\nDay boundaries do not drift through UTC");
 check("a mission saved as Manila midnight (Wed 16:00 UTC) reads as Thursday", isServiceDay("immunization", "2026-10-07T16:00:00.000Z"));
@@ -118,7 +120,7 @@ const missionOn = (dateKey) => ({
   afternoonStart: "13:00",
   afternoonEnd: "17:00",
 });
-const categoryMap = new Map([["immunization", 10], ["prenatal", 20]]);
+const categoryMap = new Map([["immunization", 10], ["prenatal", 20], ["general_checkup", 20]]);
 const plan = (type, dateKey) =>
   planSlotFor({ appointment: { consultationType: type }, mission: missionOn(dateKey), missionCategoryMap: categoryMap, bookedSim: [] });
 // Triage only plans future slots, so these missions sit in the week after next.
@@ -132,12 +134,14 @@ const upcoming = (weekday) => {
 check("a Tuesday mission that still lists immunization gets no plan", plan("immunization", upcoming(2)) === null);
 // Immunization has its own weekly schedule now, so no mission ever places it.
 check("even a Thursday mission that lists immunization gets no plan", plan("immunization", upcoming(4)) === null);
-check("prenatal still plans on a Tuesday", plan("prenatal", upcoming(2))?.durationMinutes === 20);
-check("prenatal still plans on a Thursday mission", plan("prenatal", upcoming(4))?.durationMinutes === 20);
+// Prenatal left missions on 2026-11-07 for its own schedule with no Thursdays.
+check("an older mission that still lists prenatal gets no plan", plan("prenatal", upcoming(2)) === null && plan("prenatal", upcoming(4)) === null);
+check("a general checkup still plans on a Tuesday", plan("general_checkup", upcoming(2))?.durationMinutes === 20);
+check("a general checkup still plans on a Thursday mission", plan("general_checkup", upcoming(4))?.durationMinutes === 20);
 const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
 check(
   "a mission day that has passed gets no plan",
-  plan("prenatal", `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`) === null
+  plan("general_checkup", `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`) === null
 );
 
 console.log(`\nResults: ${passed} passed, ${failed} failed.`);

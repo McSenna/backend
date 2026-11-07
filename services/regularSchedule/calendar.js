@@ -1,5 +1,6 @@
 "use strict";
 
+const { closedWeekdayReason } = require("../../config/consultationCategories");
 const { hasConflict } = require("../../utils/slotAvailability");
 const {
   addDays,
@@ -109,6 +110,10 @@ const scheduleSummary = (categoryKey, now) => {
     intervalMinutes,
     today: dayKeyOf(startOfDay(now)),
     weekdays: weekdays.map((weekday) => ({ weekday, windows: windowsFor(categoryKey, weekday) })),
+    // Closed days that carry a reason the resident should read (prenatal Thursdays).
+    closedDays: [0, 1, 2, 3, 4, 5, 6]
+      .map((weekday) => ({ weekday, reason: closedWeekdayReason(categoryKey, weekday) }))
+      .filter((entry) => entry.reason),
     bookingHorizonWeeks: horizonWeeks,
     lastBookableDate: last ? dayKeyOf(last) : null,
   };

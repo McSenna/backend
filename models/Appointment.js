@@ -19,8 +19,12 @@ const AppointmentSchema = new mongoose.Schema(
       index: true,
     },
 
-    ageTier: { type: Number, required: true, min: 0, max: 4 },
-    prioritySortKey: { type: Number, required: true, min: 0, max: 4, index: true },
+    // Queue priority group, 1 to 6 by age, 7 when the birth date is unusable
+    // (utils/priorityQueue.js). Rows saved before 2026-11-07 used 0 to 4 under the
+    // older five-tier rule; a pending row is re-ranked on every queue read and run.
+    ageTier: { type: Number, required: true, min: 0, max: 7 },
+    prioritySortKey: { type: Number, required: true, min: 0, max: 7, index: true },
+    // Despite the name, the age the last ranking used: ranking happens at allocation time.
     ageAtSubmission: { type: Number },
 
     missionSchedule: { type: mongoose.Schema.Types.ObjectId, ref: "MissionSchedule", default: null },

@@ -72,7 +72,7 @@ const createSystemLog = async (entry) => {
   } catch (error) {
     logger.error("Failed to create system log", {
       errorName: error?.name,
-      errorMessage: error?.message || String(error),
+      requestId: entry.req?.requestId,
     });
     return null;
   }

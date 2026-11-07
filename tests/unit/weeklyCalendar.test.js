@@ -25,7 +25,8 @@ const visit = (id, time) => ({ _id: id, slotStart: at(THU, time), slotEnd: new D
 console.log("\nWhich services run on their own weekly schedule");
 check("immunization does", isWeeklyService("immunization"));
 check("BP checking does (since 2026-11-06)", isWeeklyService("bp_checking"));
-for (const key of ["general_checkup", "consultation", "prenatal", "unknown"]) check(`${key} does not`, !isWeeklyService(key));
+check("prenatal does (since 2026-11-07)", isWeeklyService("prenatal"));
+for (const key of ["general_checkup", "consultation", "unknown"]) check(`${key} does not`, !isWeeklyService(key));
 
 console.log("\nDay keys");
 check("a real date parses to local midnight", dayStartOf(THU)?.getTime() === at(THU, "00:00").getTime());

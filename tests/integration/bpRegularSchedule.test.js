@@ -144,7 +144,7 @@ const run = async ({ request }, check) => {
   const general = await request("/mission-schedule", { method: "POST", token: doctor.token, body: { date: THU, categories: [{ categoryKey: "general_checkup", durationMinutes: 20 }] } });
   check("a general checkup mission is still created", general.status === 201);
   const generalOptions = await request("/appointments/booking-options?consultationType=general_checkup", { token: alice.token });
-  check("general checkup still lists mission times", generalOptions.body.scheduling === "mission" && generalOptions.body.schedules.length === 1);
+  check("general checkup is a queued service with no times to pick", generalOptions.body.scheduling === "queue");
 
   console.log("\nAn older BP visit booked on a mission keeps its time");
   const legacyMission = await MissionSchedule.collection.insertOne({ date: localAt(MON, "00:00"), categories: [{ categoryKey: "bp_checking", durationMinutes: 5 }], createdBy: doctor.user._id, morningStart: "08:00", morningEnd: "12:00", afternoonStart: "13:00", afternoonEnd: "17:00" });

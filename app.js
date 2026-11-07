@@ -7,6 +7,8 @@ const { buildCorsOptions } = require("./config/cors");
 const { globalErrorHandler, notFoundHandler } = require("./middleware/errorHandler");
 const { attachRequestPlatform } = require("./middleware/platformMiddleware");
 const { rejectNullBytes } = require("./middleware/rejectNullBytes");
+const { requestDiagnostics } = require("./middleware/requestDiagnostics");
+const { databaseReady } = require("./middleware/databaseReady");
 
 const organizationRoutes = require("./routes/organizationRoutes");
 const authRoutes = require("./routes/authRoutes");
@@ -30,7 +32,8 @@ function createApp() {
     app.set("trust proxy", /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
   }
 
-  app.use(cors(buildCorsOptions()));  
+  app.use(requestDiagnostics);
+  app.use(cors(buildCorsOptions()));
 
   const bodyLimit = process.env.REQUEST_BODY_LIMIT || "10mb";
   app.use(express.json({ limit: bodyLimit }));
@@ -52,6 +55,9 @@ function createApp() {
   app.get("/api/health", (_req, res) => {
     res.status(200).json({ success: true, message: "Service is running", data: {} });
   });
+
+  app.use("/api", databaseReady);
+  app.get("/api/ready", (_req, res) => res.json({ success: true }));
 
   app.use("/api", organizationRoutes);
   app.use("/api", authRoutes);

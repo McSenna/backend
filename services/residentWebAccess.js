@@ -67,6 +67,7 @@ const assertResidentWebAccess = async (user) => {
       "Your web access has been disabled. Please contact the administrator.",
       "RESIDENT_WEB_ACCESS_DENIED",
     );
+  return policy;
 };
 /** Startup check only. A bad config never stops the server: the permission simply stays denied. */
 const reportDesignatedAdmin = async () => {

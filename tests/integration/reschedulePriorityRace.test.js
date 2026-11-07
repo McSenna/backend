@@ -80,12 +80,12 @@ const run = async ({ request }, check) => {
   check("a manual booking racing a manual move cannot bypass automatic assignment",booked.status===400 && moved.status===400 && afterRace.length===1 && !overlaps(afterRace));
 
   console.log("\nA mission edit or delete no longer moves anyone");
-  const mission = await request("/mission-schedule", { method: "POST", token: doctor.token, body: { date: w1Key, categories: [{ categoryKey: "prenatal", durationMinutes: 20 }] } });
+  const mission = await request("/mission-schedule", { method: "POST", token: doctor.token, body: { date: w1Key, categories: [{ categoryKey: "consultation", durationMinutes: 20 }] } });
   const before = afterRace.map((a) => `${a._id}@${iso(a.slotStart)}`).join();
   const edit = await request(`/mission-schedule/${mission.body.missionSchedule._id}`, {
     method: "PATCH",
     token: doctor.token,
-    body: { date: w1Key, startTime: "09:00", endTime: "12:00", categories: [{ categoryKey: "prenatal", durationMinutes: 20 }] },
+    body: { date: w1Key, startTime: "09:00", endTime: "12:00", categories: [{ categoryKey: "consultation", durationMinutes: 20 }] },
   });
   check("the edit leaves every immunization where it was", edit.status === 200 && (await activeOnW1()).map((a) => `${a._id}@${iso(a.slotStart)}`).join() === before);
   await request(`/mission-schedule/${mission.body.missionSchedule._id}`, { method: "DELETE", token: doctor.token });

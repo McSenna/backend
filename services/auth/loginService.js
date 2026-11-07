@@ -2,7 +2,8 @@
 
 const User = require("../../models/User");
 const { resolveUserStatus } = require("../../models/User");
-const logger = require("../../utils/logger");
+const { recordLoginActivity } = require("./loginActivity");
+const { timeDependency } = require("../../middleware/requestDiagnostics");
 const { createSystemLog } = require("../systemLogService");
 const { clearLoginAttempts } = require("../../middleware/rateLimiter");
 const { authorizeResidentLogin } = require("./residentSession");
@@ -17,7 +18,7 @@ const invalidCredentials = () =>
   unauthorized("Invalid email or password.", ERROR_CODES.INVALID_CREDENTIALS);
 
 const findLoginCandidate = async ({ req, normalizedEmail, platform }) => {
-  const user = await User.findOne({ email: normalizedEmail }).select("+password");
+  const user = await timeDependency(req, "accountLookup", () => User.findOne({ email: normalizedEmail }).select("+password"));
   if (user) return user;
 
   await createSystemLog({
@@ -60,34 +61,6 @@ const assertPlatformAllowed = async ({ req, user, platform }) => {
   throw forbidden(denial.message, denial.code);
 };
 
-const recordLastLogin = async (user) => {
-  const loginAt = new Date();
-  try {
-    await User.updateOne({ _id: user._id }, { $set: { lastLogin: loginAt } });
-    user.lastLogin = loginAt;
-  } catch (error) {
-    logger.warn("Could not record lastLogin timestamp", {
-      route: "auth.login",
-      errorName: error?.name,
-      errorMessage: error?.message,
-    });
-  }
-};
-
-// Approved means allowed to sign in but has not yet; this is the Approved to Active step.
-const promoteFirstSignIn = async (user) => {
-  try {
-    const { modifiedCount } = await User.updateOne({ _id: user._id, status: "approved" }, { $set: { status: "active" } });
-    if (modifiedCount === 1) user.status = "active";
-  } catch (error) {
-    logger.warn("Could not mark the account active after first sign-in", {
-      route: "auth.login",
-      errorName: error?.name,
-      errorMessage: error?.message,
-    });
-  }
-};
-
 const authenticate = async ({ req, email, password, platform }) => {
   if (!email || !password) {
     throw badRequest("Email and password are required.", ERROR_CODES.MISSING_FIELDS);
@@ -108,7 +81,7 @@ const authenticate = async ({ req, email, password, platform }) => {
   // The password is checked before any account-state guard so a wrong password
   // always gets the generic error; otherwise the pending/suspended/rejected
   // messages would confirm the email exists without knowing the password.
-  if (!(await user.comparePassword(password))) {
+  if (!(await timeDependency(req, "credentialCheck", () => user.comparePassword(password)))) {
     await logLoginFailure({
       req,
       user,
@@ -128,14 +101,13 @@ const authenticate = async ({ req, email, password, platform }) => {
 
   await assertPlatformAllowed({ req, user, platform });
 
-  await authorizeResidentLogin(user, platform);
+  const policy = await timeDependency(req, "policy", () => authorizeResidentLogin(user, platform));
   const { token, sessionId } = issueSession(user, platform);
 
-  await recordLastLogin(user);
-  await promoteFirstSignIn(user);
+  await timeDependency(req, "activity", () => recordLoginActivity(user));
   clearLoginAttempts(user.email);
 
-  await createSystemLog({
+  await timeDependency(req, "audit", () => createSystemLog({
     req,
     action: "LOGIN",
     user,
@@ -145,9 +117,9 @@ const authenticate = async ({ req, email, password, platform }) => {
     resourceId: String(user._id),
     clientPlatform: platform,
     metadata: { email: user.email, platform, sessionId },
-  });
+  }));
 
-  return { user, token };
+  return { user, token, policy };
 };
 
 module.exports = { authenticate };
