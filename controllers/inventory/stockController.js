@@ -30,36 +30,41 @@ const addStock = asyncHandler(async (req, res) => {
     throw badRequest(`An expiry date is required when receiving ${item.category} stock.`);
   }
 
+  let supplierName = "";
   if (req.body.supplier) {
     if (!isValidObjectId(req.body.supplier)) {
       throw badRequest("Supplier is not a valid reference.");
     }
     const supplier = await Supplier.findById(req.body.supplier).lean();
     if (!supplier) throw badRequest("The selected supplier no longer exists.");
+    supplierName = supplier.name;
   }
 
-  const { batch, item: updated, transaction } = await stockIn({
+  const { batch, item: updated, transaction, replayed } = await stockIn({
     item,
     payload: req.body,
     actor: { userId: req.user.userId, role: req.user.role },
+    supplierName,
   });
 
-  await createSystemLog({
-    req,
-    action: "INVENTORY_STOCK_IN",
-    resource: "InventoryItem",
-    resourceId: String(item._id),
-    description: `Added ${transaction.quantity} ${item.unit} to "${item.name}" (batch ${batch.batchNumber})`,
-    metadata: {
-      batchNumber: batch.batchNumber,
-      quantity: transaction.quantity,
-      previousStock: transaction.previousStock,
-      newStock: transaction.newStock,
-      source: transaction.source,
-    },
-  });
+  if (!replayed) {
+    await createSystemLog({
+      req,
+      action: "INVENTORY_STOCK_IN",
+      resource: "InventoryItem",
+      resourceId: String(item._id),
+      description: `Added ${transaction.quantity} ${item.unit} to "${item.name}" (batch ${batch.batchNumber})`,
+      metadata: {
+        batchNumber: batch.batchNumber,
+        quantity: transaction.quantity,
+        previousStock: transaction.previousStock,
+        newStock: transaction.newStock,
+        source: transaction.source,
+      },
+    });
 
-  await evaluateStockAlerts(updated);
+    await evaluateStockAlerts(updated);
+  }
 
   return res.status(HTTP_STATUS.OK).json({
     success: true,
@@ -87,7 +92,7 @@ const releaseStock = asyncHandler(async (req, res) => {
     throw badRequest("Unsupported release type.");
   }
 
-  const { item: updated, transactions } = await stockOut({
+  const { item: updated, transactions, replayed } = await stockOut({
     item,
     payload: { ...req.body, type: requestedType },
     actor: { userId: req.user.userId, role: req.user.role },
@@ -96,22 +101,24 @@ const releaseStock = asyncHandler(async (req, res) => {
   const totalReleased = transactions.reduce((sum, entry) => sum + entry.quantity, 0);
   const batchesUsed = transactions.map((entry) => entry.batchNumber).filter(Boolean);
 
-  await createSystemLog({
-    req,
-    action: requestedType === "STOCK_OUT" ? "INVENTORY_STOCK_OUT" : "INVENTORY_ADJUSTED",
-    resource: "InventoryItem",
-    resourceId: String(item._id),
-    description: `Released ${totalReleased} ${item.unit} of "${item.name}"`,
-    metadata: {
-      quantity: totalReleased,
-      type: requestedType,
-      batches: batchesUsed,
-      recipient: String(req.body.recipient || ""),
-      newStock: updated.currentStock,
-    },
-  });
+  if (!replayed) {
+    await createSystemLog({
+      req,
+      action: requestedType === "STOCK_OUT" ? "INVENTORY_STOCK_OUT" : "INVENTORY_ADJUSTED",
+      resource: "InventoryItem",
+      resourceId: String(item._id),
+      description: `Released ${totalReleased} ${item.unit} of "${item.name}"`,
+      metadata: {
+        quantity: totalReleased,
+        type: requestedType,
+        batches: batchesUsed,
+        recipient: String(req.body.recipient || ""),
+        newStock: updated.currentStock,
+      },
+    });
 
-  await evaluateStockAlerts(updated);
+    await evaluateStockAlerts(updated);
+  }
 
   return res.status(HTTP_STATUS.OK).json({
     success: true,

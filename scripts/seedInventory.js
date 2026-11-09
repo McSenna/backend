@@ -27,7 +27,8 @@ async function seedInventory({ force = false } = {}) {
     await Promise.all([
       InventoryItem.deleteMany({}),
       InventoryBatch.deleteMany({}),
-      InventoryTransaction.deleteMany({}),
+      // The model refuses deletes; a full reseed is the one deliberate exception.
+      InventoryTransaction.collection.deleteMany({}),
     ]);
     logger.info("Cleared existing inventory before reseeding");
   }

@@ -18,6 +18,9 @@ const { planFefoAllocation, allocateAndDecrement } = require("./inventory/fefoAl
 const { stockIn } = require("./inventory/stockInService");
 const { stockOut } = require("./inventory/stockOutService");
 const { dispenseItems } = require("./inventory/dispenseService");
+const { returnStock } = require("./inventory/stockReturnService");
+const { reverseMovement } = require("./inventory/stockReversalService");
+const { adjustLot } = require("./inventory/stockAdjustmentService");
 const { evaluateStockAlerts, notifyExpiryAlert } = require("./inventory/inventoryAlerts");
 
 module.exports = {
@@ -34,6 +37,9 @@ module.exports = {
   stockIn,
   stockOut,
   dispenseItems,
+  returnStock,
+  reverseMovement,
+  adjustLot,
   evaluateStockAlerts,
   notifyExpiryAlert,
   getItemOrThrow,

@@ -7,6 +7,8 @@ const asyncHandler = require("../../utils/asyncHandler");
 const { assertValidObjectId } = require("../../utils/objectId");
 const { notFound } = require("../../utils/AppError");
 const { HTTP_STATUS } = require("../../utils/errorCodes");
+const { can } = require("../../config/inventoryPermissions");
+const { correctionsOf, emptyLink, loadMovementLinks } = require("../../services/inventory/movementPresenter");
 const { serializeTransaction } = require("./inventory.serializers");
 const { assertCan, resolvePaging, pagingMeta } = require("./inventory.access");
 
@@ -21,7 +23,7 @@ const getItemHistory = asyncHandler(async (req, res) => {
 
   const [entries, total] = await Promise.all([
     InventoryTransaction.find({ item: itemId })
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: -1, _id: -1 })
       .skip(skip)
       .limit(pageLimit)
       .populate("performedBy", "fullname role")
@@ -29,11 +31,17 @@ const getItemHistory = asyncHandler(async (req, res) => {
     InventoryTransaction.countDocuments({ item: itemId }),
   ]);
 
+  // What can still be returned or reversed is only worked out for the role that can do it.
+  const mayCorrect = can(req.user.role, "correct");
+  const links = mayCorrect ? await loadMovementLinks(entries.map((entry) => entry._id)) : new Map();
+
   return res.status(HTTP_STATUS.OK).json({
     success: true,
     message: "Inventory history loaded successfully.",
     ...pagingMeta(total, pageNumber, pageLimit),
-    history: entries.map(serializeTransaction),
+    history: entries.map((entry) =>
+      serializeTransaction(entry, mayCorrect ? correctionsOf(entry, links.get(String(entry._id)) ?? emptyLink) : null)
+    ),
   });
 });
 

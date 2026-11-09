@@ -1,11 +1,12 @@
 "use strict";
 
-const InventoryItem = require("../../models/InventoryItem");
 const InventoryBatch = require("../../models/InventoryBatch");
-const InventoryTransaction = require("../../models/InventoryTransaction");
-const { readQuantity, readReceipt } = require("./stockValidation");
-const { runInTransaction } = require("./transactionRunner");
-const { recalculateItemStock } = require("./stockLedger");
+const InventoryItem = require("../../models/InventoryItem");
+const { FACILITY_NAME } = require("../../config/inventoryMovements");
+const { cleanText, readQuantity, readReceipt } = require("./stockValidation");
+const { runInTransaction, STOCK_TRANSACTION } = require("./transactionRunner");
+const { expireLapsedBatches, recalculateItemStock } = require("./stockLedger");
+const { findReplay, lockItem, readOperationId, recordMovements } = require("./movementRecorder");
 
 const upsertBatch = ({ item, payload, actor, batchNumber, expiryDate, receivedDate, quantity, session }) =>
   InventoryBatch.findOneAndUpdate(
@@ -24,12 +25,27 @@ const upsertBatch = ({ item, payload, actor, batchNumber, expiryDate, receivedDa
     { returnDocument: "after", upsert: true, setDefaultsOnInsert: true, session }
   );
 
-const stockIn = async ({ item, payload, actor }) => {
+const replayResult = async (rows, session) => ({
+  batch: await InventoryBatch.findById(rows[0].batch).session(session),
+  item: await InventoryItem.findById(rows[0].item).session(session),
+  transaction: rows[0],
+  replayed: true,
+});
+
+const stockIn = async ({ item, payload, actor, supplierName = "" }) => {
   const quantity = readQuantity(payload.quantity);
   const { batchNumber, expiryDate, receivedDate } = readReceipt(payload);
+  const operationId = readOperationId(payload);
 
   return runInTransaction(async (session) => {
-    const previousStock = item.currentStock;
+    await lockItem(item._id, session);
+
+    const replay = await findReplay({ itemId: item._id, operationId, session });
+    if (replay) return replayResult(replay, session);
+
+    // A lot that lapsed today gets its own record first, so this receipt's counts stay exact.
+    await expireLapsedBatches(item._id, session);
+    const before = await InventoryItem.findById(item._id).session(session);
 
     const batch = await upsertBatch({
       item, payload, actor, batchNumber, expiryDate, receivedDate, quantity, session,
@@ -43,28 +59,30 @@ const stockIn = async ({ item, payload, actor }) => {
       { session }
     );
 
-    const [transaction] = await InventoryTransaction.create(
-      [
+    const [transaction] = await recordMovements({
+      item: before,
+      actor,
+      operationId,
+      session,
+      lines: [
         {
-          item: item._id,
           batch: batch._id,
           batchNumber,
           type: "STOCK_IN",
           quantity,
-          previousStock,
+          previousStock: before.currentStock,
           newStock: updatedItem.currentStock,
-          reason: String(payload.reason || "Stock received").slice(0, 300),
-          source: String(payload.source || "").slice(0, 200),
-          notes: String(payload.remarks || "").slice(0, 1000),
-          performedBy: actor.userId,
-          performedByRole: actor.role,
+          reason: cleanText(payload.reason || "Stock received", 300),
+          source: cleanText(payload.source || supplierName, 200),
+          destinationName: FACILITY_NAME,
+          referenceNumber: cleanText(payload.referenceNumber, 80),
+          notes: cleanText(payload.remarks, 1000),
         },
       ],
-      session ? { session } : {}
-    );
+    });
 
     return { batch, item: updatedItem, transaction };
-  });
+  }, STOCK_TRANSACTION);
 };
 
 module.exports = { stockIn };

@@ -384,12 +384,12 @@ const stockOf = async (id) => (await InventoryItem.findById(id).lean()).currentS
   }
 
   const recordIds = await MedicalRecord.find({ appointment: { $in: made.appointments } }).distinct("_id");
-  await InventoryTransaction.deleteMany({ relatedAppointment: { $in: made.appointments } });
+  await InventoryTransaction.collection.deleteMany({ relatedAppointment: { $in: made.appointments } });
   await MedicalRecord.deleteMany({ appointment: { $in: made.appointments } });
   await Notification.deleteMany({ appointment: { $in: made.appointments } });
   await Appointment.deleteMany({ _id: { $in: made.appointments } });
   await InventoryBatch.deleteMany({ item: { $in: made.items } });
-  await InventoryTransaction.deleteMany({ item: { $in: made.items } });
+  await InventoryTransaction.collection.deleteMany({ item: { $in: made.items } });
   await InventoryItem.deleteMany({ _id: { $in: made.items } });
   console.log(`\n(test data removed: ${made.appointments.length} appointments, ${made.items.length} items, ${recordIds.length} records)`);
 

@@ -12,6 +12,7 @@ const {
   buildListMatch,
 } = require("../../services/userDirectory/userListQuery");
 const asyncHandler = require("../../utils/asyncHandler");
+const { csvCell: cell } = require("../../utils/csvCell");
 const { HTTP_STATUS } = require("../../utils/errorCodes");
 
 const EXPORT_ROW_CAP = 10000;
@@ -28,13 +29,6 @@ const PORTAL_LABELS = {
   individual_blocked: "Web blocked: Individually blocked",
   ineligible: "No web access: Account not active",
   unavailable: "Web access unavailable",
-};
-
-// Quotes every cell, and defuses a leading = + - @ so a spreadsheet never runs it as a formula.
-const cell = (value) => {
-  const text = String(value ?? "");
-  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
-  return `"${safe.replace(/"/g, '""')}"`;
 };
 
 const manilaTime = new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Manila", dateStyle: "short", timeStyle: "short" });

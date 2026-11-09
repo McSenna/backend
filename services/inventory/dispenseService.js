@@ -1,9 +1,10 @@
 "use strict";
 
 const InventoryItem = require("../../models/InventoryItem");
-const InventoryTransaction = require("../../models/InventoryTransaction");
+const { FACILITY_NAME } = require("../../config/inventoryMovements");
 const { notFound } = require("../../utils/AppError");
 const { allocateAndDecrement } = require("./fefoAllocator");
+const { lockItem, recordMovements } = require("./movementRecorder");
 
 const itemLabel = (item) =>
   `${item.name}${item.specification ? ` (${item.specification})` : ""}`;
@@ -21,20 +22,21 @@ const loadDispensableItem = async (itemId, session) => {
   return item;
 };
 
-const buildDispenseTransactions = ({ item, allocations, actor, context }) =>
+const buildDispenseLines = ({ allocations, context }) =>
   allocations.map((allocation) => ({
-    item: item._id,
     batch: allocation.batch,
     batchNumber: allocation.batchNumber,
     type: "STOCK_OUT",
+    status: "issued",
     quantity: allocation.quantity,
     previousStock: allocation.previousStock,
     newStock: allocation.newStock,
     reason: "Dispensed to patient",
+    source: FACILITY_NAME,
+    destinationName: context.serviceLabel ? String(context.serviceLabel).slice(0, 200) : "Patient care",
     recipient: context.patientName ? String(context.patientName).slice(0, 200) : "",
+    recipientDesignation: "Patient",
     notes: context.serviceLabel ? `${context.serviceLabel}`.slice(0, 1000) : "",
-    performedBy: actor.userId,
-    performedByRole: actor.role,
     relatedPatient: context.patientId || null,
     relatedAppointment: context.appointmentId || null,
     relatedMedicalRecord: context.medicalRecordId || null,
@@ -65,6 +67,7 @@ const dispenseItems = async ({ requests, actor, context, session = null }) => {
 
   for (const request of requests) {
     const item = await loadDispensableItem(request.itemId, session);
+    await lockItem(item._id, session);
 
     const { allocations, item: updatedItem } = await allocateAndDecrement({
       itemId: item._id,
@@ -72,10 +75,12 @@ const dispenseItems = async ({ requests, actor, context, session = null }) => {
       session,
     });
 
-    const created = await InventoryTransaction.create(
-      buildDispenseTransactions({ item, allocations, actor, context }),
-      session ? { session, ordered: true } : {}
-    );
+    const created = await recordMovements({
+      item,
+      actor,
+      session,
+      lines: buildDispenseLines({ allocations, context }),
+    });
 
     results.push({
       item: updatedItem,

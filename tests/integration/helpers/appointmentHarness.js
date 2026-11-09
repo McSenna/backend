@@ -34,7 +34,7 @@ const startHarness = async () => {
 
   // Plain http, not fetch: fetch adds Sec-Fetch-* headers, which the platform
   // guard rightly treats as a browser and refuses for mobile sessions.
-  const request = (path, { method = "GET", token, body } = {}) =>
+  const request = (path, { method = "GET", token, body, raw = false } = {}) =>
     new Promise((resolve, reject) => {
       const payload = body ? JSON.stringify(body) : null;
       const req = http.request(new URL(`${baseUrl}${path}`), {
@@ -47,7 +47,7 @@ const startHarness = async () => {
       }, (res) => {
         let text = "";
         res.on("data", (chunk) => (text += chunk));
-        res.on("end", () => resolve({ status: res.statusCode, body: text ? JSON.parse(text) : {} }));
+        res.on("end", () => resolve(raw ? { status: res.statusCode, text } : { status: res.statusCode, body: text ? JSON.parse(text) : {} }));
       });
       req.on("error", reject);
       if (payload) req.write(payload);

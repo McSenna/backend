@@ -18,6 +18,16 @@ const assertSupplierExists = async (supplierId) => {
   if (!supplier) throw badRequest("The selected supplier no longer exists.");
 };
 
+// Each attempt gets a new _id and so a new code; only a clash on the code itself is worth retrying.
+const createWithUniqueCode = async (fields, attemptsLeft = 3) => {
+  try {
+    return await InventoryItem.create(fields);
+  } catch (error) {
+    if (error?.code !== 11000 || !error.keyPattern?.itemCode || attemptsLeft <= 1) throw error;
+    return createWithUniqueCode(fields, attemptsLeft - 1);
+  }
+};
+
 const auditFields = (item) => ({
   reorderLevel: item.reorderLevel,
   category: item.category,
@@ -41,7 +51,7 @@ const createInventoryItem = asyncHandler(async (req, res) => {
     throw conflict("An active inventory item with this name and specification already exists.");
   }
 
-  const item = await InventoryItem.create({
+  const item = await createWithUniqueCode({
     ...payload,
     currentStock: 0,
     createdBy: req.user.userId,

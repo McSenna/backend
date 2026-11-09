@@ -1,14 +1,29 @@
 "use strict";
 
 const { forbidden } = require("../../utils/AppError");
-const { permissionsFor } = require("../../config/inventoryPermissions");
+const { permissionsFor, isViewOnly } = require("../../config/inventoryPermissions");
 
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 8;
 
+// The role comes from the account loaded by the auth middleware, never from the request body.
 const assertCan = (req, capability) => {
-  if (!permissionsFor(req.user?.role)[capability]) {
-    throw forbidden("You do not have permission to perform this action.");
+  const role = req.user?.role;
+  if (permissionsFor(role)[capability]) return;
+  throw forbidden(
+    isViewOnly(role)
+      ? "You have view-only access to inventory."
+      : "You do not have permission to perform this action."
+  );
+};
+
+// Route-level guard so a write route refuses before its handler reads the body or the database.
+const requireInventory = (capability) => (req, _res, next) => {
+  try {
+    assertCan(req, capability);
+    return next();
+  } catch (error) {
+    return next(error);
   }
 };
 
@@ -25,4 +40,11 @@ const pagingMeta = (total, pageNumber, pageLimit) => ({
   totalPages: Math.max(1, Math.ceil(total / pageLimit)),
 });
 
-module.exports = { MAX_PAGE_SIZE, DEFAULT_PAGE_SIZE, assertCan, resolvePaging, pagingMeta };
+module.exports = {
+  MAX_PAGE_SIZE,
+  DEFAULT_PAGE_SIZE,
+  assertCan,
+  requireInventory,
+  resolvePaging,
+  pagingMeta,
+};

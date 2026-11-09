@@ -1,6 +1,7 @@
 "use strict";
 
 const { computeExpiryStatus, computeStockStatus, daysUntil } = require("../../services/inventoryService");
+const { SYSTEM_ACTOR_NAME } = require("../../config/inventoryMovements");
 
 function serializeItem(item, extras = {}) {
   const stockStatus = computeStockStatus(item.currentStock, item.reorderLevel);
@@ -50,23 +51,27 @@ function serializeBatch(batch) {
   };
 }
 
-function serializeTransaction(entry) {
-  const performer = entry.performedBy && typeof entry.performedBy === "object" ? entry.performedBy : null;
+function serializeTransaction(entry, corrections = null) {
+  const performer = entry.performedBy && typeof entry.performedBy === "object" && entry.performedBy.fullname ? entry.performedBy : null;
 
   return {
     _id: String(entry._id),
+    reference: entry.reference || "",
     type: entry.type,
+    relation: entry.relation || null,
     quantity: entry.quantity,
     previousStock: entry.previousStock,
     newStock: entry.newStock,
     batchNumber: entry.batchNumber || "",
     reason: entry.reason || "",
     source: entry.source || "",
+    destinationName: entry.destinationName || "",
     recipient: entry.recipient || "",
     notes: entry.notes || "",
-    performedByName: performer?.fullname || "Unknown user",
+    performedByName: entry.recordedBySystem ? SYSTEM_ACTOR_NAME : entry.performedByName || performer?.fullname || "Unknown user",
     performedByRole: entry.performedByRole || performer?.role || "",
     createdAt: entry.createdAt,
+    ...(corrections ? { corrections } : {}),
   };
 }
 

@@ -28,6 +28,9 @@ const STORAGE_CONDITION_LABELS = {
 const InventoryItemSchema = new mongoose.Schema(
   {
     name: { type: String, required: [true, "Item name is required"], trim: true, maxlength: 160 },
+
+    // The short code staff search by. The _id stays the item's identity; this index keeps the code unambiguous.
+    itemCode: { type: String, trim: true, maxlength: 32, immutable: true },
     specification: { type: String, default: "", trim: true, maxlength: 120 },
     genericName: { type: String, default: "", trim: true, maxlength: 160 },
     description: { type: String, default: "", trim: true, maxlength: 1000 },
@@ -55,6 +58,9 @@ const InventoryItemSchema = new mongoose.Schema(
 
     currentStock: { type: Number, default: 0, min: 0, index: true },
 
+    // Bumped first in every stock transaction, so two movements on one item run one after the other.
+    movementSeq: { type: Number, default: 0 },
+
     nearestExpiry: { type: Date, default: null, index: true },
 
     lastRestockedAt: { type: Date, default: null },
@@ -70,8 +76,16 @@ const InventoryItemSchema = new mongoose.Schema(
 InventoryItemSchema.index({ isActive: 1, updatedAt: -1 });
 InventoryItemSchema.index({ isActive: 1, category: 1, currentStock: 1 });
 InventoryItemSchema.index({ name: "text", genericName: "text", description: "text" });
+InventoryItemSchema.index({ itemCode: 1 }, { unique: true, sparse: true });
+
+const itemCodeOf = (itemId, length = 6) => `IT-${String(itemId).slice(-length).toUpperCase()}`;
+
+InventoryItemSchema.pre("validate", function assignItemCode() {
+  if (this.isNew && !this.itemCode) this.itemCode = itemCodeOf(this._id);
+});
 
 module.exports = mongoose.model("InventoryItem", InventoryItemSchema, "inventoryitems");
+module.exports.itemCodeOf = itemCodeOf;
 module.exports.INVENTORY_CATEGORIES = INVENTORY_CATEGORIES;
 module.exports.CATEGORY_LABELS = CATEGORY_LABELS;
 module.exports.PERISHABLE_CATEGORIES = PERISHABLE_CATEGORIES;

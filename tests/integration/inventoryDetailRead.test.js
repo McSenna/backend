@@ -7,10 +7,13 @@ const updatedAtOf = async (id) => (await InventoryItem.findById(id).lean()).upda
 
 const run = async ({ request }, check) => {
   const admin = await createUser("admin");
+  const bhw = await createUser("bhw");
+  // A BHW makes the stock changes; the admin reads, which must never write.
   const as = (path, method = "GET", body) => request(path, { method, token: admin.token, body });
+  const asBhw = (path, method, body) => request(path, { method, token: bhw.token, body });
 
   // Equipment is not perishable, so stock can be received without an expiry date.
-  const created = await as("/inventory/items", "POST", { name: "Test thermometer", category: "equipment", unit: "piece", reorderLevel: 1 });
+  const created = await asBhw("/inventory/items", "POST", { name: "Test thermometer", category: "equipment", unit: "piece", reorderLevel: 1 });
   const itemId = created.body.item?._id ?? created.body.item?.id;
   check("a test item is created", created.status === 201 && Boolean(itemId), `${created.status} ${created.body.message}`);
 
@@ -25,12 +28,12 @@ const run = async ({ request }, check) => {
   check("reading leaves updatedAt as it was", (await updatedAtOf(itemId)) === beforeRead);
 
   console.log("\nStock changes still update the item");
-  const stockIn = await as(`/inventory/items/${itemId}/stock-in`, "POST", { quantity: 5, batchNumber: "TEST-BATCH-1" });
+  const stockIn = await asBhw(`/inventory/items/${itemId}/stock-in`, "POST", { quantity: 5, batchNumber: "TEST-BATCH-1" });
   check("receiving 5 sets the stock to 5", stockIn.status < 300 && stockIn.body.item?.currentStock === 5, `${stockIn.status} ${stockIn.body.message}`);
   const afterStockIn = await updatedAtOf(itemId);
   check("receiving stock changes updatedAt", afterStockIn > beforeRead);
 
-  const stockOut = await as(`/inventory/items/${itemId}/stock-out`, "POST", { quantity: 2, reason: "Test release" });
+  const stockOut = await asBhw(`/inventory/items/${itemId}/stock-out`, "POST", { quantity: 2, reason: "Test release", destinationName: "Test ward", recipient: "Test recipient" });
   check("releasing 2 leaves 3", stockOut.status < 300 && stockOut.body.item?.currentStock === 3, `${stockOut.status} ${stockOut.body.message}`);
 
   const afterStockOut = await updatedAtOf(itemId);
