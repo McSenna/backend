@@ -118,3 +118,13 @@ exports.markAllNotificationsRead = asyncHandler(async (req, res) => {
     unreadCount: 0,
   });
 });
+
+const pushDevices = require("../services/notification/pushDevices");
+exports.registerDevice = asyncHandler(async (req, res) => {
+  await pushDevices.register(req);
+  res.json({ success: true, message: "Push installation registered." });
+});
+exports.unregisterDevice = asyncHandler(async (req, res) => {
+  await pushDevices.unregister(req);
+  res.json({ success: true, message: "Push installation removed." });
+});

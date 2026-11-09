@@ -18,6 +18,7 @@ const { startRealtime, stopRealtime } = require("./realtime");
 
 const { startImmunizationReminderScheduler } = require("./services/immunization/reminderWorker");
 let stopImmunizationReminders = () => {};
+let stopPushWorker = () => {};
 
 const PORT = process.env.PORT || 3000;
 
@@ -29,6 +30,7 @@ async function bootstrap() {
   await require("./services/immunization/initialize").initializeImmunization();
   await require("./services/residentWebAccess").initializeResidentWebAccess();
   await require("./services/residentWebAccess").reportDesignatedAdmin();
+  await Promise.all([require("./models/PushDevice").createIndexes(), require("./models/PushDelivery").createIndexes()]);
   await seedAdmin();
   verifyTransport();
 }
@@ -38,6 +40,7 @@ function attachShutdownHandlers(server) {
     logger.info(`Received ${signal}; shutting down`);
     // Open sockets would keep server.close() waiting until the timeout below.
     stopImmunizationReminders();
+    stopPushWorker();
     void stopRealtime();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 10000).unref();
@@ -75,6 +78,7 @@ async function startServer() {
   const server = http.createServer(createApp());
   startRealtime(server);
   stopImmunizationReminders = startImmunizationReminderScheduler();
+  stopPushWorker = require("./services/notification/pushWorker").startPushWorker();
   server.listen(PORT, "0.0.0.0", () => {
     logger.info(`Server running on port ${PORT}`);
   });

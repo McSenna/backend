@@ -25,6 +25,8 @@ exports.login = asyncHandler(async (req, res) => {
 exports.logout = asyncHandler(async (req, res) => {
   const actor = req.user || {};
 
+  await require("../../services/notification/pushDevices").releaseSession(actor.userId, req.auth?.sessionId);
+
   await createSystemLog({
     req,
     action: "LOGOUT",

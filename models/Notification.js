@@ -20,6 +20,7 @@ const NotificationSchema = new mongoose.Schema(
       ref: "Announcement",
       default: null,
     },
+    pushQueued: { type: Boolean, default: false, select: false },
     dedupeKey: { type: String, default: undefined },
     immunizationBabyId: { type: mongoose.Schema.Types.ObjectId, ref: "Baby", default: null },
     immunizationReminderId: { type: mongoose.Schema.Types.ObjectId, ref: "ImmunizationReminder", default: null },
@@ -44,6 +45,7 @@ const NotificationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+NotificationSchema.index({ pushQueued: 1, createdAt: 1 }, { partialFilterExpression: { pushQueued: false } });
 NotificationSchema.index({ dedupeKey: 1 }, { unique: true, partialFilterExpression: { dedupeKey: { $type: "string" } } });
 NotificationSchema.index({ recipient: 1, isRead: 1, createdAt: -1 });
 NotificationSchema.index({ recipient: 1, createdAt: -1, _id: -1 });
