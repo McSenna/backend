@@ -4,6 +4,7 @@ const { badRequest, forbidden } = require("../../utils/AppError");
 const logger = require("../../utils/logger");
 const UUID = /^[a-f\d]{8}-[a-f\d]{4}-[1-5][a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i;
 const EXPO_TOKEN = /^(ExponentPushToken|ExpoPushToken)\[[A-Za-z\d_-]{1,200}\]$/;
+const FAILURE_CODE = /^[A-Z][A-Z\d_]{2,39}$/;
 function input(req, registering) {
   const body = req.body || {};
   const allowed = registering ? ["deviceId", "pushToken", "platform"] : ["deviceId"];
@@ -40,4 +41,13 @@ async function unregister(req) {
 async function releaseSession(user, sessionId) {
   if (sessionId) await PushDevice.updateMany({ user, sessionId }, { $set: { active: false } });
 }
-module.exports = { register, unregister, releaseSession };
+// A phone that cannot get a token never reaches register, so this is the only record of why.
+function reportFailure(req) {
+  const body = req.body || {};
+  if (Object.keys(body).length !== 1 || typeof body.code !== "string" || !FAILURE_CODE.test(body.code)) {
+    throw badRequest("Supply a push failure code.");
+  }
+  if (req.auth?.platform !== "mobile") throw forbidden("Sign in again in the Android app before reporting notification problems.");
+  logger.warn("Push setup failed on device", { code: body.code, requestId: req.requestId });
+}
+module.exports = { register, unregister, releaseSession, reportFailure };

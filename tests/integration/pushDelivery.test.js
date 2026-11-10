@@ -13,10 +13,12 @@ async function run() {
   const device = await Device.create({ user: user._id, deviceId: "550e8400-e29b-41d4-a716-446655440000", pushToken: "ExpoPushToken[synthetic]", platform: "android", sessionId: "test", tokenVersion: 0, expiresAt: new Date(Date.now() + 86400000) });
   const row = await Notification.create({ recipient: user._id, type: "appointment_confirmed", title: "Private detail", body: "Sensitive health detail" });
   let calls = 0;
+  let sentMessage;
   const fakeFetch = async (url, options) => {
     calls++;
     const payload = JSON.parse(options.body);
     if (url.endsWith("/send")) {
+      sentMessage = payload;
       assert.equal(payload.body, "Open MaslogCare to view your notification.");
       assert.equal(payload.channelId, "maslogcare-default");
       assert.equal(payload.data.destination, "notifications");
@@ -29,6 +31,8 @@ async function run() {
   await runPushCycle({ fetchImpl: fakeFetch });
   assert.equal(await Delivery.countDocuments({ notification: row._id }), 1);
   assert.equal(calls, 1, "accepted tickets must not be sent again");
+  assert.equal(sentMessage.priority, "high", "normal priority can wait until a dozing phone wakes");
+  assert.ok(sentMessage.ttl >= 86400, "a short ttl can expire before a dozing or offline phone reconnects");
   assert.equal((await Delivery.findOne()).state, "receipt");
   await Device.updateOne({ _id: device._id }, { $set: { pushToken: "ExpoPushToken[refreshed]" } });
   await Delivery.updateMany({}, { $set: { nextAt: new Date(0) } });

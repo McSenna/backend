@@ -13,6 +13,7 @@ router.patch("/notifications/read-all", auth, notificationController.markAllNoti
 
 router.post("/notifications/device", auth, notificationController.registerDevice);
 router.delete("/notifications/device", auth, notificationController.unregisterDevice);
+router.post("/notifications/device/failure", auth, notificationController.reportDeviceFailure);
 
 module.exports = router;
 

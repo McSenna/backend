@@ -7,9 +7,8 @@ const logger = require("../../utils/logger");
 const { randomUUID } = require("crypto");
 const BASE = "https://exp.host/--/api/v2/push";
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
+const TTL_SECONDS = 3 * 24 * 60 * 60;
 
-// All notification producers already persist Notification rows. Poll only the
-// explicit new-row flag, so old inbox history is never replayed as push.
 async function enqueue() {
   const rows = await Notification.find({ pushQueued: false }).sort({ createdAt: 1 }).limit(20).select("_id recipient").lean();
   for (const row of rows) {
@@ -77,7 +76,7 @@ async function perform(job, fetchImpl) {
     } else {
       ticket = await expoRequest("send", {
         to: device.pushToken, title: "MaslogCare", body: "Open MaslogCare to view your notification.",
-        sound: "default", channelId: "maslogcare-default", ttl: 3600,
+        sound: "default", channelId: "maslogcare-default", priority: "high", ttl: TTL_SECONDS,
         data: { version: 1, destination: "notifications", notificationId: String(job.notification), recipientId: String(job.user) },
       }, fetchImpl);
     }
@@ -96,7 +95,6 @@ async function perform(job, fetchImpl) {
     } });
     logger.info("Push status updated", { deliveryId: String(job._id), state });
   } catch (error) {
-    // Receipt HTTP failures retry the receipt lookup, never resend an accepted message.
     if (job.state === "checking" && error.retryable !== false && Date.now() - job.receiptStartedAt.getTime() < 86400000) {
       await Delivery.updateOne({ _id: job._id, state: job.state, nextAt: job.nextAt }, { $set: { state: "receipt", nextAt: new Date(Date.now() + FIFTEEN_MINUTES), lastError: "ReceiptLookupFailed" } });
       logger.warn("Push receipt lookup deferred", { deliveryId: String(job._id) });
@@ -108,8 +106,6 @@ async function runPushCycle({ fetchImpl = fetch } = {}) {
   await enqueue();
   for (let i = 0; i < 20; i++) {
     const now = new Date();
-    // Leases recover interrupted workers. Delivery is at least once: a crash after
-    // Expo accepts but before MongoDB saves its ticket can produce a duplicate.
     const job = await Delivery.findOneAndUpdate({ state: { $in: ["pending", "sending", "receipt", "checking"] }, nextAt: { $lte: now } }, [
       { $set: { state: { $cond: [{ $in: ["$state", ["receipt", "checking"]] }, "checking", "sending"] },
         attempts: { $cond: [{ $in: ["$state", ["receipt", "checking"]] }, "$attempts", { $add: ["$attempts", 1] }] },

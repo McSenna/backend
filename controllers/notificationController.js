@@ -128,3 +128,7 @@ exports.unregisterDevice = asyncHandler(async (req, res) => {
   await pushDevices.unregister(req);
   res.json({ success: true, message: "Push installation removed." });
 });
+exports.reportDeviceFailure = asyncHandler(async (req, res) => {
+  pushDevices.reportFailure(req);
+  res.json({ success: true, message: "Push failure recorded." });
+});

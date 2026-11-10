@@ -27,6 +27,23 @@ async function run() {
   const { unregister } = require("../../services/notification/pushDevices");
   await unregister({ body: { deviceId: body.deviceId }, user: { userId: String(a.user._id), exp: Math.floor(Date.now() / 1000) + 3600 }, auth: { platform: "mobile", sessionId: "a" } });
   assert.equal(await Device.countDocuments({ user: b.user._id, active: true }), 1, "old account cannot remove new owner");
+  const logger = require("../../utils/logger");
+  const originalWarn = logger.warn;
+  const logged = [];
+  logger.warn = (message, meta) => { logged.push({ message, ...meta }); };
+  const report = (token, payload) => harness.request("/notifications/device/failure", { method: "POST", token, body: payload });
+  assert.equal((await report(undefined, { code: "SERVICE_NOT_AVAILABLE" })).status, 401);
+  assert.equal((await report(ta, { code: "SERVICE_NOT_AVAILABLE" })).status, 200);
+  assert.equal(logged.filter(entry => entry.message === "Push setup failed on device" && entry.code === "SERVICE_NOT_AVAILABLE").length, 1);
+  for (const payload of [{}, { code: "has spaces private" }, { code: ["SERVICE_NOT_AVAILABLE"] }, { code: "SERVICE_NOT_AVAILABLE", email: "private" }]) {
+    assert.equal((await report(ta, payload)).status, 400, "only a bare failure constant is accepted");
+  }
+  assert.ok(!JSON.stringify(logged).includes("private"), "rejected text never reaches the logs");
+  // Staff reach this guard on web; resident web sessions stop earlier at the web-access check.
+  const staff = await createUser("admin");
+  const webSession = jwt.sign({ userId: String(staff.user._id), role: "admin", platform: "web", sessionId: "web" }, process.env.JWT_SECRET, { expiresIn: "1h" });
+  assert.equal((await report(webSession, { code: "SERVICE_NOT_AVAILABLE" })).status, 403);
+  logger.warn = originalWarn;
   await harness.request("/logout", { method: "POST", token: tb });
   assert.equal(await Device.countDocuments({ user: b.user._id, active: true }), 0, "server logout deactivates session push association");
   assert.equal(await Device.countDocuments({ user: a.user._id, active: true }), 1, "other devices remain registered");

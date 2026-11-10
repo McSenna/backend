@@ -43,8 +43,6 @@ function validateEnv() {
     );
   }
 
-  // Render sets RENDER=true. Behind its proxy every request arrives from the
-  // proxy's address, so without TRUST_PROXY all visitors share one sign-in and OTP limit.
   if (process.env.RENDER === "true" && !String(process.env.TRUST_PROXY || "").trim()) {
     logger.warn("TRUST_PROXY is not set; rate limits will count every visitor as the same device.");
   }
