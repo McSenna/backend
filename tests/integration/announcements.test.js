@@ -361,6 +361,36 @@ async function runTests() {
   const adminTitles = ((await request("/admin/announcements?limit=50", { headers: adminHeaders })).body.announcements || []).map((a) => a.title);
   check("admins still see the draft", adminTitles.includes("Draft clinic hours"));
 
+  const titleOnly = await post({ title: "Outreach plans", isDraft: true });
+  const titleOnlyItem = titleOnly.body.announcement || {};
+  check(
+    "a draft can be saved with only a title",
+    titleOnly.status === 201 && titleOnlyItem.eventAt === null && titleOnlyItem.message === "" && titleOnlyItem.location === "",
+    JSON.stringify(titleOnly.body)
+  );
+  const shortDraftMessage = await post({ title: "Outreach plans", message: "Soon", isDraft: true });
+  check("a draft's filled fields are still checked", shortDraftMessage.status === 400 && Boolean(shortDraftMessage.body.fieldErrors?.message));
+  const postTitleOnly = await request(`/admin/announcements/${titleOnlyItem.id}`, {
+    method: "PATCH",
+    headers: adminHeaders,
+    body: { title: "Outreach plans", isDraft: false },
+  });
+  const postErrors = postTitleOnly.body.fieldErrors || {};
+  check(
+    "posting a title-only draft asks for the rest",
+    postTitleOnly.status === 400 && ["message", "eventAt", "location"].every((field) => typeof postErrors[field] === "string"),
+    JSON.stringify(postTitleOnly.body)
+  );
+
+  const counts = await request("/admin/announcements/audience-counts", { headers: adminHeaders });
+  check(
+    "audience counts match who a post would notify",
+    counts.status === 200 && counts.body.counts?.patients === 1 && counts.body.counts?.staff === 2 && counts.body.counts?.everyone === 3,
+    JSON.stringify(counts.body)
+  );
+  const doctorCounts = await request("/admin/announcements/audience-counts", { headers: doctorHeaders });
+  check("non-admins cannot read audience counts", doctorCounts.status === 403);
+
   const staffOnly = await post({ ...validBody(), title: "Staff meeting notes", audience: "Staff" });
   const staffAlerts = await Notification.find({ title: "Staff meeting notes" }).lean();
   const staffRecipients = new Set(staffAlerts.map((n) => String(n.recipient)));

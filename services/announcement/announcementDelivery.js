@@ -23,18 +23,28 @@ const formatEventAt = (eventAt) =>
 const alertBody = ({ eventAt, location, message }) =>
   truncateNotificationBody(`${formatEventAt(new Date(eventAt))} · ${location}. ${message}`);
 
-// Every account in the audience that can currently sign in.
+// Every account in the audience that can currently sign in, apart from the author.
+const recipientFilter = (audience, excludeUserId) => ({
+  _id: { $ne: excludeUserId },
+  role: { $in: AUDIENCE_ROLES[audience] ?? AUDIENCE_ROLES.Everyone },
+  $or: [
+    { status: { $in: SIGN_IN_READY_STATUSES } },
+    { status: { $in: [null, ""] }, verified: true },
+  ],
+});
+
 const loadRecipients = (audience, excludeUserId) =>
-  User.find({
-    _id: { $ne: excludeUserId },
-    role: { $in: AUDIENCE_ROLES[audience] ?? AUDIENCE_ROLES.Everyone },
-    $or: [
-      { status: { $in: SIGN_IN_READY_STATUSES } },
-      { status: { $in: [null, ""] }, verified: true },
-    ],
-  })
-    .select("_id")
-    .lean();
+  User.find(recipientFilter(audience, excludeUserId)).select("_id").lean();
+
+/** How many accounts each audience would notify if this admin posted now. */
+const countAudiences = async (authorId) => {
+  const [patients, staff, everyone] = await Promise.all(
+    ["Patients", "Staff", "Everyone"].map((audience) =>
+      User.countDocuments(recipientFilter(audience, authorId))
+    )
+  );
+  return { patients, staff, everyone };
+};
 
 /** Writes one inbox alert per recipient and returns how many were sent. */
 const deliverAnnouncement = async (announcement, authorId) => {
@@ -94,4 +104,4 @@ const rollBackCreate = async (announcementId) => {
   }
 };
 
-module.exports = { deliverAnnouncement, refreshDeliveredAlerts, removeAlerts, rollBackCreate };
+module.exports = { countAudiences, deliverAnnouncement, refreshDeliveredAlerts, removeAlerts, rollBackCreate };

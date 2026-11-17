@@ -10,8 +10,8 @@ const ISO_DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-
 
 const asText = (value) => (typeof value === "string" ? value.trim() : "");
 
-const lengthError = (label, value, min, max) => {
-  if (!value) return `${label} is required.`;
+const lengthError = (label, value, min, max, optional = false) => {
+  if (!value) return optional ? null : `${label} is required.`;
   if (value.length < min) return `${label} must be at least ${min} characters.`;
   if (value.length > max) return `${label} must not exceed ${max} characters.`;
   return null;
@@ -43,9 +43,9 @@ const sameInstant = (a, b) => Boolean(a && b && new Date(a).getTime() === new Da
 
 // Editing an announcement whose event has passed must not force a new date,
 // so the range rules only apply to a date the admin actually changed.
-const checkEventAt = (raw, now, current) => {
+const checkEventAt = (raw, now, current, isDraft) => {
   if (raw === undefined || raw === null || raw === "") {
-    return { error: "Choose the date and time of the announcement." };
+    return isDraft ? { value: null } : { error: "Choose the date and time of the announcement." };
   }
   const eventAt = parseIso(raw);
   if (!eventAt) return { error: "Enter a valid date and time." };
@@ -99,15 +99,18 @@ const validateAnnouncementInput = (input, { now = new Date(), current = null } =
     location: asText(body.location),
   };
 
-  const eventAt = checkEventAt(body.eventAt, now, current);
+  // A draft needs only its title; anything else it carries must still be valid.
+  const isDraft = checkIsDraft(body.isDraft, current);
+  const draft = isDraft.value === true;
+  const eventAt = checkEventAt(body.eventAt, now, current, draft);
   const checks = {
     title: { error: lengthError("Title", values.title, L.titleMin, L.titleMax) },
-    message: { error: lengthError("Message", values.message, L.messageMin, L.messageMax) },
+    message: { error: lengthError("Message", values.message, L.messageMin, L.messageMax, draft) },
     eventAt,
-    location: { error: lengthError("Location", values.location, L.locationMin, L.locationMax) },
+    location: { error: lengthError("Location", values.location, L.locationMin, L.locationMax, draft) },
     audience: checkAudience(body.audience, current),
     expiresAt: checkExpiresAt(body.expiresAt, eventAt.value, now, current),
-    isDraft: checkIsDraft(body.isDraft, current),
+    isDraft,
   };
 
   const fieldErrors = {};

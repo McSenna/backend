@@ -15,6 +15,7 @@ router.get("/announcements", auth, announcementController.getAnnouncements);
 router.get("/announcements/:id", auth, announcementController.getAnnouncementById);
 
 router.get("/admin/announcements", auth, adminOnly, announcementController.getAdminAnnouncements);
+router.get("/admin/announcements/audience-counts", auth, adminOnly, announcementController.getAudienceCounts);
 router.post("/admin/announcements", auth, adminOnly, announcementController.createAnnouncement);
 router.patch("/admin/announcements/:id", auth, adminOnly, announcementController.updateAnnouncement);
 router.delete("/admin/announcements/:id", auth, adminOnly, announcementController.deleteAnnouncement);

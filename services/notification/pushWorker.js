@@ -5,6 +5,7 @@ const Delivery = require("../../models/PushDelivery");
 const User = require("../../models/User");
 const logger = require("../../utils/logger");
 const { randomUUID } = require("crypto");
+const { buildPushContent } = require("./pushContent");
 const BASE = "https://exp.host/--/api/v2/push";
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
 const TTL_SECONDS = 3 * 24 * 60 * 60;
@@ -61,7 +62,8 @@ async function perform(job, fetchImpl) {
   }).select("_id status verified role").lean();
   // Match authentication's legacy-status fallback and blocked-account policy.
   const account = accountRow && !User.BLOCKED_STATUSES.includes(User.resolveUserStatus(accountRow)) ? accountRow : null;
-  const notification = account && await Notification.exists({ _id: job.notification, recipient: job.user });
+  const notification = account && await Notification.findOne({ _id: job.notification, recipient: job.user })
+    .select("type body appointment recipient").lean();
   if (!device || !account || !notification) return fail(job, "AssociationEnded", false);
   try {
     let ticket;
@@ -74,8 +76,9 @@ async function perform(job, fetchImpl) {
         return;
       }
     } else {
+      const content = await buildPushContent(notification);
       ticket = await expoRequest("send", {
-        to: device.pushToken, title: "MaslogCare", body: "Open MaslogCare to view your notification.",
+        to: device.pushToken, ...content,
         sound: "default", channelId: "maslogcare-default", priority: "high", ttl: TTL_SECONDS,
         data: { version: 1, destination: "notifications", notificationId: String(job.notification), recipientId: String(job.user) },
       }, fetchImpl);

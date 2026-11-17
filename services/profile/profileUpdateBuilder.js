@@ -7,7 +7,6 @@ const {
   buildFullName,
   isValidAddress,
   isValidFullName,
-  isValidGender,
   isValidPhMobile,
   normalizePhMobile,
   validateDateOfBirth,
@@ -19,7 +18,6 @@ const EDITABLE_FIELDS = [
   "middleName",
   "surname",
   "dateOfBirth",
-  "gender",
   "phone",
   "address",
   "profilePhoto",
@@ -32,6 +30,19 @@ const NAME_PARTS = {
 };
 
 const invalid = (message) => badRequest(message, ERROR_CODES.VALIDATION_ERROR);
+
+const GENDER_LOCKED_MESSAGE = "Gender is set when the account is registered and cannot be changed.";
+const normalizeGender = (value) => String(value ?? "").trim().toLowerCase();
+
+/**
+ * Gender is recorded once, at registration, and never edited afterwards. A form
+ * that sends back the value already stored is accepted (nothing changes); any
+ * other value is refused, so no client can rewrite it.
+ */
+const assertGenderUnchanged = (body, current) => {
+  if (!("gender" in body)) return;
+  if (normalizeGender(body.gender) !== normalizeGender(current.gender)) throw invalid(GENDER_LOCKED_MESSAGE);
+};
 
 const readNamePart = (body, field) => {
   const { label, required } = NAME_PARTS[field];
@@ -74,6 +85,7 @@ const namePartsFromFullName = (fullname, suffix = "") => {
 };
 
 const buildProfileUpdate = (body, current) => {
+  assertGenderUnchanged(body, current);
   const update = {};
 
   Object.keys(NAME_PARTS).forEach((field) => {
@@ -84,14 +96,6 @@ const buildProfileUpdate = (body, current) => {
     const result = validateDateOfBirth(body.dateOfBirth);
     if (!result.isValid) throw invalid(result.error);
     update.dateOfBirth = new Date(body.dateOfBirth);
-  }
-
-  if ("gender" in body) {
-    const gender = String(body.gender ?? "").trim().toLowerCase();
-    if (!isValidGender(gender)) {
-      throw invalid('Gender must be "male", "female", or "other".');
-    }
-    update.gender = gender;
   }
 
   if ("phone" in body) {
@@ -129,4 +133,4 @@ const buildProfileUpdate = (body, current) => {
   return update;
 };
 
-module.exports = { EDITABLE_FIELDS, buildProfileUpdate, namePartsFromFullName };
+module.exports = { EDITABLE_FIELDS, GENDER_LOCKED_MESSAGE, assertGenderUnchanged, buildProfileUpdate, namePartsFromFullName };

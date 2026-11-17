@@ -1,9 +1,10 @@
 "use strict";
 
-const { getCategory, residentPicksTime } = require("../../config/consultationCategories");
-const { startOfDay } = require("../../utils/dateWindow");
-const { badRequest, conflict } = require("../../utils/AppError");
-const { ERROR_CODES } = require("../../utils/errorCodes");
+const { getCategory, residentPicksTime, isQueuedService } = require("../../config/consultationCategories");
+const AppError = require("../../utils/AppError");
+const { badRequest } = require("../../utils/AppError");
+const { ERROR_CODES, HTTP_STATUS } = require("../../utils/errorCodes");
+const { BUSINESS_TIME_ZONE, calendarDayIn } = require("../../utils/businessCalendar");
 
 // Weekdays are read with the server clock, which server.js pins to the
 // barangay's timezone. Mission dates are stored as local midnight on that same
@@ -71,30 +72,45 @@ const assertCategoriesFitDay = (categories, day) => {
   );
 };
 
-const formatDay = (date) =>
-  date.toLocaleDateString("en-PH", { weekday: "short", month: "short", day: "numeric" });
+// Noon UTC of a calendar key reads as that same day in every zone from UTC-11 to UTC+11.
+const formatDayKey = (dayKey) =>
+  new Date(`${dayKey}T12:00:00.000Z`).toLocaleDateString("en-PH", {
+    timeZone: "UTC",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 
 /**
- * A fixed-day service is delivered on its clinic day, so it cannot be signed
- * off before that calendar day. Later days stay open, as for every other
- * service, so a record can still be filed after the visit. Uses the server
- * clock on purpose: a device with a wrong date cannot unlock it early.
+ * Services whose visit happens on its scheduled day: the doctor's mission
+ * services and immunization. BP checking and prenatal run on resident-picked
+ * times and were never locked, so a resident who comes in early can still be
+ * seen and signed off.
  */
-const assertCompletionDayReached = (appointment, now = new Date()) => {
-  if (!serviceWeekdaysOf(appointment.consultationType)) return;
-  // BP checking runs six days a week and was never locked to its day, so a
-  // resident who comes in early can still be seen and signed off.
-  if (residentPicksTime(appointment.consultationType)) return;
+const isDateLockedService = (categoryKey) =>
+  isQueuedService(categoryKey) || Boolean(serviceWeekdaysOf(categoryKey) && !residentPicksTime(categoryKey));
 
-  const scheduledDay = appointment.slotStart ? startOfDay(appointment.slotStart) : null;
-  if (scheduledDay && startOfDay(now).getTime() >= scheduledDay.getTime()) return;
+/**
+ * Completing a visit, and the medical record filed with it, opens at the start
+ * of the scheduled calendar day in the barangay's time zone; the slot time does
+ * not matter and later days stay open. `now` is the server clock on purpose, so
+ * a device with a wrong date or a forged request cannot unlock it early. A
+ * missing or unreadable date is refused rather than allowed.
+ */
+const assertCompletionDayReached = (appointment, now = new Date(), timeZone = BUSINESS_TIME_ZONE) => {
+  if (!isDateLockedService(appointment.consultationType)) return;
 
-  const label = labelOf(appointment.consultationType);
-  throw conflict(
-    scheduledDay
-      ? `This ${label.toLowerCase()} appointment can be completed on ${formatDay(scheduledDay)}, its scheduled day.`
-      : `This ${label.toLowerCase()} appointment has no scheduled date yet, so it cannot be completed.`,
-    ERROR_CODES.INVALID_STATUS_TRANSITION
+  const scheduledDate = calendarDayIn(appointment.slotStart, timeZone);
+  const today = calendarDayIn(now, timeZone);
+  if (scheduledDate && today && today >= scheduledDate) return;
+
+  throw new AppError(
+    scheduledDate
+      ? `You can complete this appointment or add medical details starting on ${formatDayKey(scheduledDate)}.`
+      : "This appointment has no scheduled date yet, so it cannot be completed. Place it on a schedule first.",
+    HTTP_STATUS.CONFLICT,
+    ERROR_CODES.APPOINTMENT_DATE_NOT_REACHED,
+    { scheduledDate, timeZone }
   );
 };
 

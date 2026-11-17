@@ -3,6 +3,10 @@
 const mongoose = require("mongoose");
 const { ANNOUNCEMENT_AUDIENCES, ANNOUNCEMENT_LIMITS } = require("../config/announcements");
 
+function requiredWhenPosted() {
+  return !this.isDraft;
+}
+
 /**
  * One shared document per announcement. Every account reads the same row from
  * the feed; the per-user Notification copies only carry the inbox alert and its
@@ -11,11 +15,13 @@ const { ANNOUNCEMENT_AUDIENCES, ANNOUNCEMENT_LIMITS } = require("../config/annou
 const AnnouncementSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true, maxlength: ANNOUNCEMENT_LIMITS.titleMax },
-    message: { type: String, required: true, trim: true, maxlength: ANNOUNCEMENT_LIMITS.messageMax },
-    eventAt: { type: Date, required: true },
+    // A draft may be saved with only its title; posting needs the rest.
+    message: { type: String, required: requiredWhenPosted, trim: true, default: "", maxlength: ANNOUNCEMENT_LIMITS.messageMax },
+    eventAt: { type: Date, required: requiredWhenPosted, default: null },
     location: {
       type: String,
-      required: true,
+      required: requiredWhenPosted,
+      default: "",
       trim: true,
       maxlength: ANNOUNCEMENT_LIMITS.locationMax,
     },

@@ -2,7 +2,7 @@
 
 const User = require("../models/User");
 const { buildUserResponse } = require("../services/auth/authResponse");
-const { EDITABLE_FIELDS, buildProfileUpdate } = require("../services/profile/profileUpdateBuilder");
+const { EDITABLE_FIELDS, assertGenderUnchanged, buildProfileUpdate } = require("../services/profile/profileUpdateBuilder");
 const { createSystemLog } = require("../services/systemLogService");
 const asyncHandler = require("../utils/asyncHandler");
 const { HTTP_STATUS, ERROR_CODES } = require("../utils/errorCodes");
@@ -27,13 +27,15 @@ exports.getMyProfile = asyncHandler(async (req, res) => {
 
 exports.updateMyProfile = asyncHandler(async (req, res) => {
   const body = req.body || {};
+  const current = await loadOwnAccount(req.user.userId);
+  // Checked first, so a request that only tries to change gender hears why instead of "no editable fields".
+  assertGenderUnchanged(body, current);
   const requestedFields = Object.keys(body).filter((key) => EDITABLE_FIELDS.includes(key));
 
   if (requestedFields.length === 0) {
     throw badRequest("No editable fields were provided.", ERROR_CODES.VALIDATION_ERROR);
   }
 
-  const current = await loadOwnAccount(req.user.userId);
   const update = buildProfileUpdate(body, current);
 
   const user = await User.findByIdAndUpdate(

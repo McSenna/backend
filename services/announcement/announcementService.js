@@ -9,6 +9,7 @@ const { assertValidObjectId, isValidObjectId } = require("../../utils/objectId")
 const { ANNOUNCEMENT_AUDIENCES, ANNOUNCEMENT_PAGE, AUDIENCE_ROLES } = require("../../config/announcements");
 const { validateAnnouncementInput } = require("./announcementValidation");
 const {
+  countAudiences,
   deliverAnnouncement,
   refreshDeliveredAlerts,
   removeAlerts,
@@ -22,8 +23,9 @@ const toAnnouncement = (row, { includeAdminFields = false } = {}) => {
     id: String(row._id),
     title: row.title,
     message: row.message,
-    eventAt: new Date(row.eventAt).toISOString(),
-    location: row.location,
+    // Null only on a draft saved before its date was chosen.
+    eventAt: toIso(row.eventAt),
+    location: row.location ?? "",
     audience: row.audience ?? "Everyone",
     expiresAt: toIso(row.expiresAt),
     createdAt: toIso(row.createdAt),
@@ -34,6 +36,7 @@ const toAnnouncement = (row, { includeAdminFields = false } = {}) => {
   return {
     ...item,
     isDraft: Boolean(row.isDraft),
+    updatedAt: toIso(row.updatedAt),
     recipientCount: row.recipientCount ?? 0,
     postedBy: row.createdBy?.fullname ?? null,
   };
@@ -97,7 +100,12 @@ const updateAnnouncement = async ({ id, input, adminId }) => {
       await announcement.save();
     } catch (error) {
       logger.error("Failed to deliver announcement notifications", { errorName: error?.name });
-      await Notification.deleteMany({ announcement: announcement._id }).catch(() => undefined);
+      // The rollback continues either way; a failed cleanup leaves inbox rows for a draft.
+      await Notification.deleteMany({ announcement: announcement._id }).catch((cleanupError) =>
+        logger.error("Failed to remove notifications of an announcement returned to draft", {
+          errorName: cleanupError?.name,
+        }),
+      );
       announcement.isDraft = true;
       await announcement.save();
       throw serviceUnavailable(
@@ -179,6 +187,7 @@ const getAnnouncement = async (id, role) => {
 };
 
 module.exports = {
+  countAudiences,
   createAnnouncement,
   deleteAnnouncement,
   getAnnouncement,

@@ -43,7 +43,6 @@ function buildLimiter({ ipStore, emailStore, code, deviceMessage, accountMessage
         const retryAfter = emailStore.getRetryAfterSeconds(email);
         if (retryAfter > 0) err.details = { retryAfter };
       }
-      // The address stays out of the log: it is personal data, and the code says which limit hit.
       logger.warn("Rate limiter: email limit reached", { code, retryAfter: err.details?.retryAfter });
       return next(err);
     }
@@ -78,8 +77,6 @@ const loginRateLimiter = buildLimiter({
   accountMessage: `Too many sign-in attempts. Please wait ${WINDOW_MINUTES} minutes and try again.`,
 });
 
-// Keyed by the signed-in account, not a body email: a stolen session must not
-// get unlimited guesses at the current password from rotating IPs.
 const changePasswordIpStore = new SlidingWindowStore(15 * 60 * 1000, 20);
 const changePasswordUserStore = new SlidingWindowStore(15 * 60 * 1000, 8);
 

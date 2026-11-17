@@ -1,6 +1,7 @@
 "use strict";
 
 const asyncHandler = require("../../utils/asyncHandler");
+const logger = require("../../utils/logger");
 const { HTTP_STATUS } = require("../../utils/errorCodes");
 const { createSystemLog } = require("../../services/systemLogService");
 const { authenticate } = require("../../services/auth/loginService");
@@ -39,7 +40,9 @@ exports.logout = asyncHandler(async (req, res) => {
   });
 
   // The token stays valid until it expires, but this session's live feed ends now.
-  disconnectSession(actor.userId, req.auth?.sessionId).catch(() => undefined);
+  disconnectSession(actor.userId, req.auth?.sessionId).catch((error) =>
+    logger.warn("Logout could not close the session's live connection", { errorName: error?.name }),
+  );
 
   return res.status(HTTP_STATUS.OK).json({
     success: true,

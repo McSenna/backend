@@ -104,10 +104,17 @@ check(
   "an immunization without a slot cannot be completed",
   thrown(() => assertCompletionDayReached({ consultationType: "immunization", slotStart: null }, at("2026-10-08")))?.statusCode === 409
 );
-for (const key of ["bp_checking", "prenatal", "general_checkup", "consultation"]) {
+for (const key of ["bp_checking", "prenatal"]) {
   check(
     `${key} completion is unchanged ahead of its slot`,
     thrown(() => assertCompletionDayReached({ consultationType: key, slotStart: at("2026-10-09") }, at("2026-10-05"))) === null
+  );
+}
+// Doctor services joined the rule on 2026-11-13 (tests/unit/appointmentDateEligibility.test.js).
+for (const key of ["general_checkup", "consultation"]) {
+  check(
+    `${key} completion is refused ahead of its scheduled day`,
+    thrown(() => assertCompletionDayReached({ consultationType: key, slotStart: at("2026-10-09") }, at("2026-10-05")))?.statusCode === 409
   );
 }
 

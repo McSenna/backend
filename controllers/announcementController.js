@@ -4,6 +4,7 @@ const asyncHandler = require("../utils/asyncHandler");
 const { HTTP_STATUS } = require("../utils/errorCodes");
 const { createSystemLog } = require("../services/systemLogService");
 const {
+  countAudiences,
   createAnnouncement,
   deleteAnnouncement,
   getAnnouncement,
@@ -38,6 +39,16 @@ exports.getAdminAnnouncements = asyncHandler(async (req, res) => {
     success: true,
     message: "Announcements loaded successfully.",
     ...page,
+  });
+});
+
+exports.getAudienceCounts = asyncHandler(async (req, res) => {
+  const counts = await countAudiences(req.user.userId);
+
+  return res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: "Audience counts loaded successfully.",
+    counts,
   });
 });
 

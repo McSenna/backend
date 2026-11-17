@@ -82,7 +82,7 @@ const run = async ({ request }, check) => {
   const stillConfirmed = (await Appointment.findById(shot._id).lean()).status === "confirmed";
   check(
     "before the scheduled Thursday it is refused and nothing changes",
-    early.status === 409 && early.body.message.includes("its scheduled day") && stillConfirmed,
+    early.status === 409 && early.body.code === "APPOINTMENT_DATE_NOT_REACHED" && stillConfirmed,
     `${early.status} ${early.body.message}`
   );
 

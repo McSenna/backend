@@ -19,7 +19,6 @@ async function run() {
     const payload = JSON.parse(options.body);
     if (url.endsWith("/send")) {
       sentMessage = payload;
-      assert.equal(payload.body, "Open MaslogCare to view your notification.");
       assert.equal(payload.channelId, "maslogcare-default");
       assert.equal(payload.data.destination, "notifications");
       assert.ok(!JSON.stringify(payload).includes("Sensitive"));
@@ -31,6 +30,8 @@ async function run() {
   await runPushCycle({ fetchImpl: fakeFetch });
   assert.equal(await Delivery.countDocuments({ notification: row._id }), 1);
   assert.equal(calls, 1, "accepted tickets must not be sent again");
+  assert.equal(sentMessage.title, "Appointment");
+  assert.equal(sentMessage.body, "Your appointment is confirmed. Open MaslogCare for details.");
   assert.equal(sentMessage.priority, "high", "normal priority can wait until a dozing phone wakes");
   assert.ok(sentMessage.ttl >= 86400, "a short ttl can expire before a dozing or offline phone reconnects");
   assert.equal((await Delivery.findOne()).state, "receipt");
