@@ -48,6 +48,7 @@ const MASTER_READERS = new Set([
   "services/masterList/masterListReview.js",
   "services/masterList/medicalIdentityLookup.js",
   "services/masterList/masterResidentRows.js",
+  "services/masterList/similarResidents.js",
   "services/masterList/residentIdentityReadiness.js",
 ]);
 

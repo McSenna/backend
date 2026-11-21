@@ -8,6 +8,7 @@ const { createSystemLog } = require("../../services/systemLogService");
 const { sendPasswordChangedEmail } = require("../../services/mailer");
 const { validatePasswordStrength } = require("../../services/passwordReset/resetPolicy");
 const { issueSession } = require("../../services/sessionService");
+const { recordSession } = require("../../services/auth/authSessions");
 const { adoptSessionToken, disconnectOtherSessions } = require("../../realtime/socketServer");
 const logger = require("../../utils/logger");
 
@@ -63,6 +64,8 @@ exports.changePassword = asyncHandler(async (req, res) => {
   // Same session id, so this device's live feed and logout keep matching it.
   const { token } = issueSession(user, req.auth.platform, req.auth.sessionId);
   adoptSessionToken(user._id, req.auth.sessionId, token);
+  // The re-issued token carries the new tokenVersion; the session row follows it so this device still counts.
+  if (req.auth.sessionId) await recordSession({ user, sessionId: req.auth.sessionId, platform: req.auth.platform, token, req });
 
   disconnectOtherSessions(user._id, req.auth.sessionId).catch((error) => {
     logger.warn("Other sessions' live feeds not dropped after password change", { errorName: error?.name });

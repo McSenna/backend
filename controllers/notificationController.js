@@ -48,12 +48,14 @@ exports.getNotifications = asyncHandler(async (req, res) => {
     ? { recipient: recipientId, ...cursorFilter }
     : { recipient: recipientId };
 
-  const [rows, unreadCount] = await Promise.all([
+  const [rows, unreadCount, total] = await Promise.all([
     Notification.find(filter)
       .sort({ createdAt: -1, _id: -1 })
       .limit(limit + 1)
       .lean(),
     Notification.countDocuments({ recipient: recipientId, isRead: false }),
+    // The panel's "All" tab shows every alert's count, not just the loaded page's.
+    Notification.countDocuments({ recipient: recipientId }),
   ]);
 
   const hasMore = rows.length > limit;
@@ -64,19 +66,22 @@ exports.getNotifications = asyncHandler(async (req, res) => {
     success: true,
     message: "Notifications loaded successfully.",
     unreadCount,
+    total,
     hasMore,
     nextCursor: hasMore && last ? encodeCursor(last) : null,
     notifications: await presentProtectedNotifications(page, recipientId),
   });
 });
 
-exports.markNotificationRead = asyncHandler(async (req, res) => {
+// One alert's read state, read or unread, for its own recipient only. Setting
+// the state it already has is not an error: two tabs may both press it.
+const setReadState = (isRead) => asyncHandler(async (req, res) => {
   const recipientId = req.user.userId;
   const id = assertValidObjectId(req.params.id, "notification");
 
   const updated = await Notification.findOneAndUpdate(
-    { _id: id, recipient: recipientId, isRead: false },
-    { $set: { isRead: true, readAt: new Date() } },
+    { _id: id, recipient: recipientId, isRead: !isRead },
+    { $set: { isRead, readAt: isRead ? new Date() : null } },
     { returnDocument: "after" }
   ).lean();
 
@@ -102,6 +107,9 @@ exports.markNotificationRead = asyncHandler(async (req, res) => {
     unreadCount,
   });
 });
+
+exports.markNotificationRead = setReadState(true);
+exports.markNotificationUnread = setReadState(false);
 
 exports.markAllNotificationsRead = asyncHandler(async (req, res) => {
   const recipientId = req.user.userId;

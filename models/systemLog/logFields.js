@@ -2,6 +2,7 @@
 
 const mongoose = require("mongoose");
 const { VALID_ACTIONS, VALID_ROLES, VALID_SEVERITIES } = require("./logVocabulary");
+const { DeviceSnapshotSchema } = require("./deviceFields");
 
 const logFields = {
   action: {
@@ -91,6 +92,10 @@ const logFields = {
   metadata: {
     type: mongoose.Schema.Types.Mixed,
     default: {},
+  },
+  device: {
+    type: DeviceSnapshotSchema,
+    default: undefined,
   },
 };
 

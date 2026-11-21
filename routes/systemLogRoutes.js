@@ -7,11 +7,13 @@ const {
   getSystemLogs,
   getSystemLogStats,
   exportSystemLogs,
+  getSystemLogDeviceBrands,
 } = require("../controllers/systemLogController");
 
 const router = express.Router();
 
 router.get("/system-logs/stats", auth, roleCheck(["admin"]), getSystemLogStats);
+router.get("/system-logs/device-brands", auth, roleCheck(["admin"]), getSystemLogDeviceBrands);
 router.get("/system-logs/export", auth, roleCheck(["admin"]), exportSystemLogs);
 router.get("/system-logs", auth, roleCheck(["admin"]), getSystemLogs);
 

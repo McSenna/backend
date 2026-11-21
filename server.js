@@ -19,6 +19,7 @@ const { startRealtime, stopRealtime } = require("./realtime");
 const { startImmunizationReminderScheduler } = require("./services/immunization/reminderWorker");
 let stopImmunizationReminders = () => {};
 let stopPushWorker = () => {};
+let stopDeviceRetention = () => {};
 
 const PORT = process.env.PORT || 3000;
 
@@ -41,6 +42,7 @@ function attachShutdownHandlers(server) {
     // Open sockets would keep server.close() waiting until the timeout below.
     stopImmunizationReminders();
     stopPushWorker();
+    stopDeviceRetention();
     void stopRealtime();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 10000).unref();
@@ -79,6 +81,7 @@ async function startServer() {
   startRealtime(server);
   stopImmunizationReminders = startImmunizationReminderScheduler();
   stopPushWorker = require("./services/notification/pushWorker").startPushWorker();
+  stopDeviceRetention = require("./services/device/deviceRetention").startDeviceRetentionScheduler();
   server.listen(PORT, "0.0.0.0", () => {
     logger.info(`Server running on port ${PORT}`);
   });

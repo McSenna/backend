@@ -3,5 +3,6 @@
 const { getSystemLogs } = require("./systemLog/logQueryController");
 const { getSystemLogStats } = require("./systemLog/logStatsController");
 const { exportSystemLogs } = require("./systemLog/logExportController");
+const { getSystemLogDeviceBrands } = require("./systemLog/logDeviceBrandsController");
 
-module.exports = { getSystemLogs, getSystemLogStats, exportSystemLogs };
+module.exports = { getSystemLogs, getSystemLogStats, exportSystemLogs, getSystemLogDeviceBrands };

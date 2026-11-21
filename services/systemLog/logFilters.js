@@ -7,6 +7,25 @@ const { escapeRegex } = require("../../utils/escapeRegex");
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 const VALID_SEVERITIES = ["info", "success", "warning", "error"];
+const DEVICE_PLATFORMS = ["android", "ios", "web", "unknown"];
+const DEVICE_TYPES = ["phone", "tablet", "desktop", "tv", "unknown"];
+const BRAND_KEY = /^[a-z0-9-]{1,40}$/;
+
+const pickFrom = (value, allowed) => {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return allowed.includes(normalized) ? normalized : null;
+};
+
+const buildDeviceFilter = ({ devicePlatform, deviceType, brand }) => {
+  const filter = {};
+  const platform = pickFrom(devicePlatform, DEVICE_PLATFORMS);
+  const type = pickFrom(deviceType, DEVICE_TYPES);
+  const brandKey = String(brand ?? "").trim().toLowerCase();
+  if (platform) filter["device.platform"] = platform;
+  if (type) filter["device.deviceType"] = type;
+  if (BRAND_KEY.test(brandKey)) filter["device.brandKey"] = brandKey;
+  return filter;
+};
 
 const parseRangeEnd = (value, edge) => {
   const raw = String(value).trim();
@@ -82,8 +101,11 @@ const buildFilters = async ({
   outcome,
   fromDate,
   toDate,
+  devicePlatform,
+  deviceType,
+  brand,
 }) => {
-  const filters = {};
+  const filters = buildDeviceFilter({ devicePlatform, deviceType, brand });
 
   // "success" or "failed": the stored success flag, as the summary cards count it.
   if (outcome === "success") filters.success = true;
@@ -120,6 +142,9 @@ const readLogQuery = (query) => ({
   outcome: query.outcome === "success" || query.outcome === "failed" ? query.outcome : "all",
   fromDate: query.fromDate,
   toDate: query.toDate,
+  devicePlatform: query.devicePlatform,
+  deviceType: query.deviceType,
+  brand: query.brand,
 });
 
 const sortOrderOf = (sort = "desc") => (String(sort).toLowerCase() === "asc" ? 1 : -1);

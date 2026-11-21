@@ -17,6 +17,7 @@ const {
   deriveSeverity,
 } = require("./systemLog/logClassification");
 const { sanitizeMetadata } = require("./systemLog/metadataSanitizer");
+const { resolveLogDevice } = require("./device/deviceRegistry");
 
 const asText = (value) => (typeof value === "string" ? value : String(value || ""));
 
@@ -68,6 +69,7 @@ const createSystemLog = async (entry) => {
   if (!logData) return null;
 
   try {
+    logData.device = await resolveLogDevice(entry.req);
     return await SystemLog.create(logData);
   } catch (error) {
     logger.error("Failed to create system log", {
@@ -82,6 +84,7 @@ const createSystemLog = async (entry) => {
 const createRequiredSystemLog = async ({ session = null, ...entry }) => {
   const logData = buildLogData(entry);
   if (!logData) throw new Error(`Unknown system log action: ${entry.action}`);
+  logData.device = await resolveLogDevice(entry.req);
   const [log] = await SystemLog.create([logData], { session });
   return log;
 };

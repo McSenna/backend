@@ -7,6 +7,7 @@ const { sendWelcomeEmail } = require("../../services/mailer");
 const { createSystemLog } = require("../../services/systemLogService");
 const { authorizeResidentLogin } = require("../../services/auth/residentSession");
 const { issueSession } = require("../../services/sessionService");
+const { recordSession } = require("../../services/auth/authSessions");
 const { getPlatformDenial } = require("../../services/platformService");
 const { resendOtp } = require("../../services/auth/otpResendService");
 const { verifyRegistrationOtp } = require("../../services/auth/otpVerificationService");
@@ -83,7 +84,8 @@ exports.verifyOtp = asyncHandler(async (req, res) => {
     return respondWithPlatformDenial({ req, res, user, platform, denial });
   }
 
-  const { token } = issueSession(user, platform);
+  const { token, sessionId } = issueSession(user, platform);
+  await recordSession({ user, sessionId, platform, token, req });
 
   return res.status(HTTP_STATUS.CREATED).json({
     success: true,

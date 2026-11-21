@@ -14,7 +14,8 @@
     "reminders:immunization": "node scripts/runImmunizationReminders.js",
     "report:prenatal-closed-days": "node scripts/reports/prenatalClosedDays.js",
     "migrate:resident-web-access": "node scripts/migrations/residentWebAccess.js",
-    "migrate:inventory-movements": "node scripts/migrations/inventoryMovementLedger.js"
+    "migrate:inventory-movements": "node scripts/migrations/inventoryMovementLedger.js",
+    "migrate:system-log-devices": "node scripts/migrations/systemLogDevices.js"
   },
   "keywords": [],
   "author": "",

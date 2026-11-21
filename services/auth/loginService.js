@@ -8,6 +8,7 @@ const { createSystemLog } = require("../systemLogService");
 const { clearLoginAttempts } = require("../../middleware/rateLimiter");
 const { authorizeResidentLogin } = require("./residentSession");
 const { issueSession } = require("../sessionService");
+const { recordSession } = require("./authSessions");
 const { getPlatformDenial } = require("../platformService");
 const { describePlatformAccess } = require("../../config/platformAccess");
 const { badRequest, unauthorized, forbidden } = require("../../utils/AppError");
@@ -103,6 +104,7 @@ const authenticate = async ({ req, email, password, platform }) => {
 
   const policy = await timeDependency(req, "policy", () => authorizeResidentLogin(user, platform));
   const { token, sessionId } = issueSession(user, platform);
+  await timeDependency(req, "session", () => recordSession({ user, sessionId, platform, token, req }));
 
   await timeDependency(req, "activity", () => recordLoginActivity(user));
   clearLoginAttempts(user.email);

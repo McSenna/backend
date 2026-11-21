@@ -9,6 +9,7 @@ const { attachRequestPlatform } = require("./middleware/platformMiddleware");
 const { rejectNullBytes } = require("./middleware/rejectNullBytes");
 const { requestDiagnostics } = require("./middleware/requestDiagnostics");
 const { databaseReady } = require("./middleware/databaseReady");
+const { attachDeviceClaim } = require("./services/device/deviceRegistry");
 
 const organizationRoutes = require("./routes/organizationRoutes");
 const authRoutes = require("./routes/authRoutes");
@@ -57,6 +58,8 @@ function createApp() {
   });
 
   app.use("/api", databaseReady);
+  // After databaseReady: a full device report is stored as it arrives.
+  app.use("/api", attachDeviceClaim);
   app.get("/api/ready", (_req, res) => res.json({ success: true }));
 
   app.use("/api", organizationRoutes);

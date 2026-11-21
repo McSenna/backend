@@ -7,7 +7,7 @@
 // linked account and clinical history references never dangle.
 
 const MasterResident = require("../../models/MasterResident");
-const { badRequest, notFound } = require("../../utils/AppError");
+const { badRequest, conflict, notFound } = require("../../utils/AppError");
 const { ERROR_CODES } = require("../../utils/errorCodes");
 const { isValidObjectId } = require("../../utils/objectId");
 const { linkedIdsAmong, toRow } = require("./masterResidentRows");
@@ -22,6 +22,7 @@ const {
 const { translateDuplicateError } = require("./residentIdentity");
 const { assertIdentityEnforcement } = require("./residentIdentityReadiness");
 const { buildMasterResidentFilter, readMasterResidentSort } = require("./masterResidentQuery");
+const { countSimilarResidents } = require("./similarResidents");
 
 const listMasterResidents = async ({ search = "", status = "active", role = "all", civilStatus = "all", purok = "all", sort = "name_asc", page, limit } = {}) => {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -72,9 +73,21 @@ const saveRecord = async (record) => {
   }
 };
 
-const createMasterResident = async (body, adminId) => {
+const possibleDuplicate = (similar) => {
+  const error = conflict("A similar record already exists. Save this as a different person?", ERROR_CODES.POSSIBLE_DUPLICATE);
+  error.details = { similar };
+  return error;
+};
+
+// `checkSimilar` is the Add resident form's guard: a look-alike record stops the
+// save until the admin confirms. Imports and scripts add exact rows and skip it.
+const createMasterResident = async (body, adminId, { checkSimilar = false } = {}) => {
   const { doc, fieldErrors } = await buildNewRecord(body, adminId);
   assertNoFieldErrors(fieldErrors);
+  if (checkSimilar) {
+    const similar = await countSimilarResidents(doc);
+    if (similar > 0) throw possibleDuplicate(similar);
+  }
   await saveRecord(doc);
   return presentOne(doc);
 };

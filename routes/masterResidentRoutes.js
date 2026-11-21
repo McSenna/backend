@@ -11,6 +11,7 @@ const {
   listMasterResidents,
   getMasterResident,
   createMasterResident,
+  findSimilarMasterResidents,
   updateMasterResident,
   setMasterResidentStatus,
   importMasterResidents,
@@ -22,6 +23,7 @@ const adminOnly = [auth, roleCheck(["admin"])];
 router.get("/admin/master-residents", ...adminOnly, listMasterResidents);
 router.post("/admin/master-residents", ...adminOnly, createMasterResident);
 router.post("/admin/master-residents/import", ...adminOnly, importMasterResidents);
+router.post("/admin/master-residents/duplicates", ...adminOnly, findSimilarMasterResidents);
 router.get("/admin/master-residents/:id", ...adminOnly, getMasterResident);
 router.patch("/admin/master-residents/:id", ...adminOnly, updateMasterResident);
 router.patch("/admin/master-residents/:id/status", ...adminOnly, setMasterResidentStatus);

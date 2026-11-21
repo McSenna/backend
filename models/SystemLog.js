@@ -17,6 +17,9 @@ const QUERY_INDEXES = [
   { ipAddress: 1, createdAt: -1 },
   { action: 1, role: 1, createdAt: -1 },
   { severity: 1, createdAt: -1 },
+  { "device.platform": 1, createdAt: -1 },
+  { "device.brandKey": 1, createdAt: -1 },
+  { "device.deviceType": 1, createdAt: -1 },
 ];
 
 for (const index of QUERY_INDEXES) SystemLogSchema.index(index);

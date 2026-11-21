@@ -13,6 +13,7 @@ const {
   verifyOtp,
   login,
   logout,
+  listSessions,
   changePassword,
 } = require("../controllers/authController");
 const {
@@ -42,6 +43,7 @@ router.post("/resend-reset-code", otpSendRateLimiter, forgotPassword);
 router.post("/verify-reset-code", otpVerifyRateLimiter, verifyResetCode);
 router.post("/reset-password", otpVerifyRateLimiter, resetPassword);
 router.post("/logout", auth.accountOnly, logout);
+router.get("/sessions", auth.accountOnly, listSessions);
 router.post("/change-password", auth, changePasswordRateLimiter, changePassword);
 
 module.exports = router;

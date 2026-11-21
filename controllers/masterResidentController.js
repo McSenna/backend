@@ -14,6 +14,7 @@ const {
   updateMasterResident,
   setMasterResidentActive,
 } = require("../services/masterList/masterResidentAdmin");
+const { findSimilarResidents } = require("../services/masterList/similarResidents");
 const { importMasterResidents } = require("../services/masterList/masterResidentImport");
 
 const adminIdOf = (req) => req.user?.userId || req.user?._id;
@@ -43,10 +44,20 @@ exports.getMasterResident = asyncHandler(async (req, res) => {
   return res.status(HTTP_STATUS.OK).json({ success: true, record });
 });
 
+// POST, not GET: the names travel in the body so they never reach a URL or an access log.
+exports.findSimilarMasterResidents = asyncHandler(async (req, res) => {
+  const { lastName, firstName, dateOfBirth } = req.body ?? {};
+  const result = await findSimilarResidents({ lastName, firstName, dateOfBirth });
+  res.set("Cache-Control", "no-store");
+  return res.status(HTTP_STATUS.OK).json({ success: true, ...result });
+});
+
 exports.createMasterResident = asyncHandler(async (req, res) => {
-  const record = await createMasterResident(req.body ?? {}, adminIdOf(req));
+  const allowDuplicate = req.body?.allowDuplicate === true;
+  const record = await createMasterResident(req.body ?? {}, adminIdOf(req), { checkSimilar: !allowDuplicate });
   await logRecordAction(req, "MASTER_RESIDENT_CREATED", `Admin added master list record ${record.masterResidentId}`, {
     masterResidentId: record.masterResidentId,
+    ...(allowDuplicate ? { confirmedDespiteSimilar: true } : {}),
   });
   return res
     .status(HTTP_STATUS.CREATED)

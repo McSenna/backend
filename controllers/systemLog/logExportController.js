@@ -5,6 +5,8 @@ const asyncHandler = require("../../utils/asyncHandler");
 const { HTTP_STATUS } = require("../../utils/errorCodes");
 const { buildFilters, readLogQuery, sortOrderOf } = require("../../services/systemLog/logFilters");
 const { serializeLog } = require("../../services/systemLog/logPresenter");
+// Device fields are client-reported, so every cell goes through the formula-safe escaper.
+const { csvCell } = require("../../utils/csvCell");
 
 const EXPORT_ROW_CAP = 10000;
 
@@ -22,11 +24,6 @@ const CSV_HEADER = [
   "Browser",
   "Log Type",
 ];
-
-const csvCell = (value) => {
-  const text = String(value ?? "");
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-};
 
 const toCsvRow = (row) =>
   [
