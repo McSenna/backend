@@ -53,7 +53,10 @@ function createApp() {
     res.status(200).json({ success: true, message: "MaslogCare API is running" });
   });
 
+  // Liveness only: no database, no auth. Render's health check and the external
+  // keep-alive scheduler call it; no-store makes every ping reach the service.
   app.get("/api/health", (_req, res) => {
+    res.set("Cache-Control", "no-store");
     res.status(200).json({ success: true, message: "Service is running", data: {} });
   });
 

@@ -55,6 +55,22 @@ Start command `npm start`, health check path `/api/health`. Render sets
 | `CLIENT_ORIGINS` | Every address the web app is served from, comma separated, e.g. `https://maslogcare.com`. Full origins only: the server refuses to start on an entry without `https://` |
 | `TRUST_PROXY` | The number of proxies in front of the app, so sign-in and OTP limits see each visitor's address. Until it is set, the server logs a warning and every visitor shares one limit |
 
+### Health checks and keep-alive
+
+- `GET /api/health` is liveness only: public, no database, no auth, never cached.
+  Render's health check and the keep-alive scheduler use it.
+- `GET /api/ready` is readiness: it answers 503 while MongoDB is disconnected.
+  Do not point the scheduler at it, or a database outage turns into failed pings.
+
+Render Free spins a web service down after 15 minutes without inbound traffic.
+A free [cron-job.org](https://cron-job.org) job requests
+`https://backend-stus.onrender.com/api/health` every 10 minutes so that happens
+less often. This is best effort, not an uptime guarantee: Render can still
+restart a free service at any time, and the workspace's 750 free instance hours
+a month are shared by every free service in it. One service kept awake all month
+uses up to 744 of them, so a second always-on free service would run the pool out
+and Render would suspend all free services until the next month.
+
 REST and Socket.IO accept the same origins. Without `NODE_ENV=production`
 (local development), any localhost or private-network origin is also accepted,
 so Expo's changing web port and Wi-Fi address keep working.
